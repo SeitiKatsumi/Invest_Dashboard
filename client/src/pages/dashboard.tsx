@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { DashboardStats } from "@shared/schema";
+import investLogo from "@assets/Icon_Invest_1769010072868.jpg";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { SitesPanel } from "@/components/dashboard/sites-panel";
 import { LeiloesPanel } from "@/components/dashboard/leiloes-panel";
@@ -119,7 +120,7 @@ export default function Dashboard() {
         <header className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-4">
             <img 
-              src="/attached_assets/Icon_Invest_1769010072868.jpg" 
+              src={investLogo} 
               alt="Invest Leilões" 
               className="h-12 w-12 rounded-xl object-contain"
             />
