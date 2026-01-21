@@ -91,6 +91,14 @@ TypeScript interfaces are defined in `shared/schema.ts` and shared between front
   - Auction listings with type, state, and image statistics
   - Scraping logs with success/error rates
   - URL processing queue status
+- Added temporal chart (area chart) showing auctions created in last 14 days (`leiloesTemporal` aggregation)
+- Updated URL Consulta panel to show category breakdown using `classifica` field (imóvel individual, paginação, categoria, outros)
+- Removed "Erros por Site" chart from logs panel (now 2-column layout)
+- Created new `/logs` page with detailed scraping logs table:
+  - Full table of all logs with site information
+  - Filter by status (successes, successes_partial, erro, url_inválida)
+  - Search by site name or error reason
+  - Navigation link in dashboard header
 
 ### Key NPM Dependencies
 - `@tanstack/react-query` - Server state management
