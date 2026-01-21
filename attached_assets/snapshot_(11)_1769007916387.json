@@ -1,0 +1,5080 @@
+{
+  "data": {
+    "version": 1,
+    "directus": "11.13.2",
+    "vendor": "mysql",
+    "collections": [
+      {
+        "collection": "input_library_url",
+        "meta": {
+          "accountability": "all",
+          "archive_app_filter": true,
+          "archive_field": "status",
+          "archive_value": "archived",
+          "collapse": "open",
+          "collection": "input_library_url",
+          "color": null,
+          "display_template": null,
+          "group": null,
+          "hidden": false,
+          "icon": "pageview",
+          "item_duplication_fields": null,
+          "note": null,
+          "preview_url": null,
+          "singleton": false,
+          "sort": 1,
+          "sort_field": "sort",
+          "translations": null,
+          "unarchive_value": "draft",
+          "versioning": false
+        },
+        "schema": {
+          "name": "input_library_url"
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "meta": {
+          "accountability": "all",
+          "archive_app_filter": true,
+          "archive_field": "status",
+          "archive_value": "archived",
+          "collapse": "open",
+          "collection": "leiloes_imovel",
+          "color": null,
+          "display_template": null,
+          "group": null,
+          "hidden": false,
+          "icon": "apartment",
+          "item_duplication_fields": null,
+          "note": null,
+          "preview_url": null,
+          "singleton": false,
+          "sort": 3,
+          "sort_field": "sort",
+          "translations": null,
+          "unarchive_value": "draft",
+          "versioning": false
+        },
+        "schema": {
+          "name": "leiloes_imovel"
+        }
+      },
+      {
+        "collection": "logs_scraping",
+        "meta": {
+          "accountability": "all",
+          "archive_app_filter": true,
+          "archive_field": "status",
+          "archive_value": "archived",
+          "collapse": "open",
+          "collection": "logs_scraping",
+          "color": null,
+          "display_template": null,
+          "group": null,
+          "hidden": false,
+          "icon": null,
+          "item_duplication_fields": null,
+          "note": null,
+          "preview_url": null,
+          "singleton": false,
+          "sort": null,
+          "sort_field": "sort",
+          "translations": null,
+          "unarchive_value": "draft",
+          "versioning": false
+        },
+        "schema": {
+          "name": "logs_scraping"
+        }
+      },
+      {
+        "collection": "url_consulta",
+        "meta": {
+          "accountability": "all",
+          "archive_app_filter": true,
+          "archive_field": "status",
+          "archive_value": "archived",
+          "collapse": "open",
+          "collection": "url_consulta",
+          "color": null,
+          "display_template": null,
+          "group": null,
+          "hidden": false,
+          "icon": "link",
+          "item_duplication_fields": null,
+          "note": null,
+          "preview_url": null,
+          "singleton": false,
+          "sort": 2,
+          "sort_field": "sort",
+          "translations": null,
+          "unarchive_value": "draft",
+          "versioning": false
+        },
+        "schema": {
+          "name": "url_consulta"
+        }
+      }
+    ],
+    "fields": [
+      {
+        "collection": "directus_users",
+        "field": "favoritos",
+        "type": "json",
+        "meta": {
+          "collection": "directus_users",
+          "conditions": null,
+          "display": "raw",
+          "display_options": null,
+          "field": "favoritos",
+          "group": null,
+          "hidden": false,
+          "interface": "tags",
+          "note": "IDs dos imoveis favoritos do usuario",
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 1,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "favoritos",
+          "table": "directus_users",
+          "data_type": "json",
+          "default_value": null,
+          "max_length": null,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "input_library_url",
+        "field": "id",
+        "type": "integer",
+        "meta": {
+          "collection": "input_library_url",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "id",
+          "group": "oculto",
+          "hidden": true,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": true,
+          "required": false,
+          "searchable": true,
+          "sort": 1,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "id",
+          "table": "input_library_url",
+          "data_type": "int unsigned",
+          "default_value": null,
+          "max_length": null,
+          "numeric_precision": 10,
+          "numeric_scale": 0,
+          "is_nullable": false,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": true,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": true,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "input_library_url",
+        "field": "status",
+        "type": "string",
+        "meta": {
+          "collection": "input_library_url",
+          "conditions": null,
+          "display": "labels",
+          "display_options": {
+            "choices": [
+              {
+                "background": "var(--theme--primary-background)",
+                "color": "var(--theme--primary)",
+                "foreground": "var(--theme--primary)",
+                "text": "$t:published",
+                "value": "published"
+              },
+              {
+                "background": "var(--theme--background-normal)",
+                "color": "var(--theme--foreground)",
+                "foreground": "var(--theme--foreground)",
+                "text": "$t:draft",
+                "value": "draft"
+              },
+              {
+                "background": "var(--theme--warning-background)",
+                "color": "var(--theme--warning)",
+                "foreground": "var(--theme--warning)",
+                "text": "$t:archived",
+                "value": "archived"
+              }
+            ],
+            "showAsDot": true
+          },
+          "field": "status",
+          "group": "oculto",
+          "hidden": true,
+          "interface": "select-dropdown",
+          "note": null,
+          "options": {
+            "choices": [
+              {
+                "color": "var(--theme--primary)",
+                "text": "$t:published",
+                "value": "published"
+              },
+              {
+                "color": "var(--theme--foreground)",
+                "text": "$t:draft",
+                "value": "draft"
+              },
+              {
+                "color": "var(--theme--warning)",
+                "text": "$t:archived",
+                "value": "archived"
+              }
+            ]
+          },
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 2,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "status",
+          "table": "input_library_url",
+          "data_type": "varchar",
+          "default_value": "draft",
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": false,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "input_library_url",
+        "field": "sort",
+        "type": "integer",
+        "meta": {
+          "collection": "input_library_url",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "sort",
+          "group": "oculto",
+          "hidden": true,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 3,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "sort",
+          "table": "input_library_url",
+          "data_type": "int",
+          "default_value": null,
+          "max_length": null,
+          "numeric_precision": 10,
+          "numeric_scale": 0,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "input_library_url",
+        "field": "user_created",
+        "type": "string",
+        "meta": {
+          "collection": "input_library_url",
+          "conditions": null,
+          "display": "user",
+          "display_options": null,
+          "field": "user_created",
+          "group": "oculto",
+          "hidden": true,
+          "interface": "select-dropdown-m2o",
+          "note": null,
+          "options": {
+            "template": "{{avatar}} {{first_name}} {{last_name}}"
+          },
+          "readonly": true,
+          "required": false,
+          "searchable": true,
+          "sort": 5,
+          "special": [
+            "user-created"
+          ],
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "user_created",
+          "table": "input_library_url",
+          "data_type": "char",
+          "default_value": null,
+          "max_length": 36,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": true,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": "directus_users",
+          "foreign_key_column": "id"
+        }
+      },
+      {
+        "collection": "input_library_url",
+        "field": "date_created",
+        "type": "timestamp",
+        "meta": {
+          "collection": "input_library_url",
+          "conditions": null,
+          "display": "datetime",
+          "display_options": {
+            "relative": true
+          },
+          "field": "date_created",
+          "group": "oculto",
+          "hidden": true,
+          "interface": "datetime",
+          "note": null,
+          "options": null,
+          "readonly": true,
+          "required": false,
+          "searchable": true,
+          "sort": 4,
+          "special": [
+            "date-created"
+          ],
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "date_created",
+          "table": "input_library_url",
+          "data_type": "timestamp",
+          "default_value": null,
+          "max_length": null,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "input_library_url",
+        "field": "user_updated",
+        "type": "string",
+        "meta": {
+          "collection": "input_library_url",
+          "conditions": null,
+          "display": "user",
+          "display_options": null,
+          "field": "user_updated",
+          "group": "oculto",
+          "hidden": true,
+          "interface": "select-dropdown-m2o",
+          "note": null,
+          "options": {
+            "template": "{{avatar}} {{first_name}} {{last_name}}"
+          },
+          "readonly": true,
+          "required": false,
+          "searchable": true,
+          "sort": 7,
+          "special": [
+            "user-updated"
+          ],
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "user_updated",
+          "table": "input_library_url",
+          "data_type": "char",
+          "default_value": null,
+          "max_length": 36,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": true,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": "directus_users",
+          "foreign_key_column": "id"
+        }
+      },
+      {
+        "collection": "input_library_url",
+        "field": "date_updated",
+        "type": "timestamp",
+        "meta": {
+          "collection": "input_library_url",
+          "conditions": null,
+          "display": "datetime",
+          "display_options": {
+            "relative": true
+          },
+          "field": "date_updated",
+          "group": "oculto",
+          "hidden": true,
+          "interface": "datetime",
+          "note": null,
+          "options": null,
+          "readonly": true,
+          "required": false,
+          "searchable": true,
+          "sort": 6,
+          "special": [
+            "date-updated"
+          ],
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "date_updated",
+          "table": "input_library_url",
+          "data_type": "timestamp",
+          "default_value": null,
+          "max_length": null,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "input_library_url",
+        "field": "oculto",
+        "type": "alias",
+        "meta": {
+          "collection": "input_library_url",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "oculto",
+          "group": null,
+          "hidden": false,
+          "interface": "group-raw",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 1,
+          "special": [
+            "alias",
+            "no-data",
+            "group"
+          ],
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        }
+      },
+      {
+        "collection": "input_library_url",
+        "field": "url_listagem",
+        "type": "string",
+        "meta": {
+          "collection": "input_library_url",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "url_listagem",
+          "group": null,
+          "hidden": false,
+          "interface": "input",
+          "note": "Adicione o link da página de listagem de imóveis do site, como: https://www.megaleiloes.com.br/imoveis",
+          "options": null,
+          "readonly": false,
+          "required": true,
+          "searchable": true,
+          "sort": 3,
+          "special": null,
+          "translations": [
+            {
+              "language": "pt-BR",
+              "translation": "Link da página de listagem"
+            }
+          ],
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "url_listagem",
+          "table": "input_library_url",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "input_library_url",
+        "field": "nome_site",
+        "type": "string",
+        "meta": {
+          "collection": "input_library_url",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "nome_site",
+          "group": null,
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 2,
+          "special": null,
+          "translations": [
+            {
+              "language": "pt-BR",
+              "translation": "Nome do site"
+            }
+          ],
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "nome_site",
+          "table": "input_library_url",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "input_library_url",
+        "field": "liga_desliga",
+        "type": "string",
+        "meta": {
+          "collection": "input_library_url",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "liga_desliga",
+          "group": null,
+          "hidden": false,
+          "interface": "select-dropdown",
+          "note": null,
+          "options": {
+            "choices": [
+              {
+                "text": "ligado",
+                "value": "ligado"
+              },
+              {
+                "text": "desligado",
+                "value": "desligado"
+              }
+            ]
+          },
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 8,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "liga_desliga",
+          "table": "input_library_url",
+          "data_type": "varchar",
+          "default_value": "ligado",
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "input_library_url",
+        "field": "url_site",
+        "type": "string",
+        "meta": {
+          "collection": "input_library_url",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "url_site",
+          "group": null,
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 9,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "url_site",
+          "table": "input_library_url",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "id",
+        "type": "integer",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "id",
+          "group": "oculto",
+          "hidden": true,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": true,
+          "required": false,
+          "searchable": true,
+          "sort": 1,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "id",
+          "table": "leiloes_imovel",
+          "data_type": "int unsigned",
+          "default_value": null,
+          "max_length": null,
+          "numeric_precision": 10,
+          "numeric_scale": 0,
+          "is_nullable": false,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": true,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": true,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "status",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": "labels",
+          "display_options": {
+            "choices": [
+              {
+                "background": "var(--theme--primary-background)",
+                "color": "var(--theme--primary)",
+                "foreground": "var(--theme--primary)",
+                "text": "$t:published",
+                "value": "published"
+              },
+              {
+                "background": "var(--theme--background-normal)",
+                "color": "var(--theme--foreground)",
+                "foreground": "var(--theme--foreground)",
+                "text": "$t:draft",
+                "value": "draft"
+              },
+              {
+                "background": "var(--theme--warning-background)",
+                "color": "var(--theme--warning)",
+                "foreground": "var(--theme--warning)",
+                "text": "$t:archived",
+                "value": "archived"
+              }
+            ],
+            "showAsDot": true
+          },
+          "field": "status",
+          "group": null,
+          "hidden": false,
+          "interface": "select-dropdown",
+          "note": null,
+          "options": {
+            "choices": [
+              {
+                "color": "var(--theme--primary)",
+                "text": "$t:published",
+                "value": "published"
+              },
+              {
+                "color": "var(--theme--foreground)",
+                "text": "$t:draft",
+                "value": "draft"
+              },
+              {
+                "color": "var(--theme--warning)",
+                "text": "$t:archived",
+                "value": "archived"
+              }
+            ]
+          },
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 1,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "status",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": "published",
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": false,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "sort",
+        "type": "integer",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "sort",
+          "group": "oculto",
+          "hidden": true,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 2,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "sort",
+          "table": "leiloes_imovel",
+          "data_type": "int",
+          "default_value": null,
+          "max_length": null,
+          "numeric_precision": 10,
+          "numeric_scale": 0,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "user_created",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": "user",
+          "display_options": null,
+          "field": "user_created",
+          "group": "oculto",
+          "hidden": true,
+          "interface": "select-dropdown-m2o",
+          "note": null,
+          "options": {
+            "template": "{{avatar}} {{first_name}} {{last_name}}"
+          },
+          "readonly": true,
+          "required": false,
+          "searchable": true,
+          "sort": 3,
+          "special": [
+            "user-created"
+          ],
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "user_created",
+          "table": "leiloes_imovel",
+          "data_type": "char",
+          "default_value": null,
+          "max_length": 36,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": true,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": "directus_users",
+          "foreign_key_column": "id"
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "date_created",
+        "type": "timestamp",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": "datetime",
+          "display_options": {
+            "relative": true
+          },
+          "field": "date_created",
+          "group": "oculto",
+          "hidden": false,
+          "interface": "datetime",
+          "note": null,
+          "options": null,
+          "readonly": true,
+          "required": false,
+          "searchable": true,
+          "sort": 6,
+          "special": [
+            "date-created"
+          ],
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "date_created",
+          "table": "leiloes_imovel",
+          "data_type": "timestamp",
+          "default_value": null,
+          "max_length": null,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "user_updated",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": "user",
+          "display_options": null,
+          "field": "user_updated",
+          "group": "oculto",
+          "hidden": true,
+          "interface": "select-dropdown-m2o",
+          "note": null,
+          "options": {
+            "template": "{{avatar}} {{first_name}} {{last_name}}"
+          },
+          "readonly": true,
+          "required": false,
+          "searchable": true,
+          "sort": 4,
+          "special": [
+            "user-updated"
+          ],
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "user_updated",
+          "table": "leiloes_imovel",
+          "data_type": "char",
+          "default_value": null,
+          "max_length": 36,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": true,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": "directus_users",
+          "foreign_key_column": "id"
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "date_updated",
+        "type": "timestamp",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": "datetime",
+          "display_options": {
+            "relative": true
+          },
+          "field": "date_updated",
+          "group": "oculto",
+          "hidden": true,
+          "interface": "datetime",
+          "note": null,
+          "options": null,
+          "readonly": true,
+          "required": false,
+          "searchable": true,
+          "sort": 5,
+          "special": [
+            "date-updated"
+          ],
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "date_updated",
+          "table": "leiloes_imovel",
+          "data_type": "timestamp",
+          "default_value": null,
+          "max_length": null,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "oculto",
+        "type": "alias",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "oculto",
+          "group": null,
+          "hidden": false,
+          "interface": "group-raw",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 2,
+          "special": [
+            "alias",
+            "no-data",
+            "group"
+          ],
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "nome_do_anuncio",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "nome_do_anuncio",
+          "group": null,
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 3,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "nome_do_anuncio",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "descricao",
+        "type": "text",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "descricao",
+          "group": null,
+          "hidden": false,
+          "interface": "input-multiline",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 4,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "descricao",
+          "table": "leiloes_imovel",
+          "data_type": "text",
+          "default_value": null,
+          "max_length": 65535,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "area_imovel",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "area_imovel",
+          "group": null,
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 5,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "area_imovel",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "tipo_do_imovel",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "tipo_do_imovel",
+          "group": null,
+          "hidden": false,
+          "interface": "select-dropdown",
+          "note": null,
+          "options": {
+            "choices": [
+              {
+                "text": "Casa",
+                "value": "Casa"
+              },
+              {
+                "text": "Apartamento",
+                "value": "Apartamento"
+              },
+              {
+                "text": "Terreno",
+                "value": "Terreno"
+              }
+            ]
+          },
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 6,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "tipo_do_imovel",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "tipo_de_leilao",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "tipo_de_leilao",
+          "group": null,
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": {
+            "choices": null
+          },
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 7,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "tipo_de_leilao",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "nome_leiloeiro",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "nome_leiloeiro",
+          "group": null,
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 8,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "nome_leiloeiro",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "valor_avalaiacao_imovel",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "valor_avalaiacao_imovel",
+          "group": null,
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 9,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "valor_avalaiacao_imovel",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "praca_1",
+        "type": "dateTime",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "praca_1",
+          "group": null,
+          "hidden": false,
+          "interface": "datetime",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 10,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "praca_1",
+          "table": "leiloes_imovel",
+          "data_type": "datetime",
+          "default_value": null,
+          "max_length": null,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "praca_2",
+        "type": "dateTime",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "praca_2",
+          "group": null,
+          "hidden": false,
+          "interface": "datetime",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 11,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "praca_2",
+          "table": "leiloes_imovel",
+          "data_type": "datetime",
+          "default_value": null,
+          "max_length": null,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "praca_3",
+        "type": "dateTime",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "praca_3",
+          "group": null,
+          "hidden": false,
+          "interface": "datetime",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 12,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "praca_3",
+          "table": "leiloes_imovel",
+          "data_type": "datetime",
+          "default_value": null,
+          "max_length": null,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "link_edital",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "link_edital",
+          "group": null,
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 13,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "link_edital",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "link_matricula",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "link_matricula",
+          "group": null,
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 14,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "link_matricula",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "desconto",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "desconto",
+          "group": null,
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 16,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "desconto",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "cep",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "cep",
+          "group": "endereco",
+          "hidden": false,
+          "interface": "brazilian-cep",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 1,
+          "special": null,
+          "translations": [
+            {
+              "language": "pt-BR",
+              "translation": "CEP"
+            }
+          ],
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "cep",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "cidade",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "cidade",
+          "group": "endereco",
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 2,
+          "special": null,
+          "translations": [
+            {
+              "language": "pt-BR",
+              "translation": "Cidade"
+            }
+          ],
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "cidade",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "estado_uf",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "estado_uf",
+          "group": "endereco",
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 3,
+          "special": null,
+          "translations": [
+            {
+              "language": "pt-BR",
+              "translation": "Estado - UF"
+            }
+          ],
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "estado_uf",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "logradouro",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "logradouro",
+          "group": "endereco",
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 5,
+          "special": null,
+          "translations": [
+            {
+              "language": "pt-BR",
+              "translation": "Logradouro"
+            }
+          ],
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "logradouro",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "bairro",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "bairro",
+          "group": "endereco",
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 4,
+          "special": null,
+          "translations": [
+            {
+              "language": "pt-BR",
+              "translation": "Bairro"
+            }
+          ],
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "bairro",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "endereco",
+        "type": "alias",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "endereco",
+          "group": null,
+          "hidden": false,
+          "interface": "group-detail",
+          "note": null,
+          "options": {
+            "headerIcon": "add_location_alt"
+          },
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 24,
+          "special": [
+            "alias",
+            "no-data",
+            "group"
+          ],
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "link_imagem",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "link_imagem",
+          "group": null,
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 17,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "link_imagem",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "numero_do_processo",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "numero_do_processo",
+          "group": null,
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 15,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "numero_do_processo",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "link_anuncio",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "link_anuncio",
+          "group": null,
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 18,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "link_anuncio",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 2000,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "numero",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "numero",
+          "group": "endereco",
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 6,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "numero",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "valor_leilao",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "valor_leilao",
+          "group": null,
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 19,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "valor_leilao",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "site",
+        "type": "integer",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "site",
+          "group": null,
+          "hidden": false,
+          "interface": "select-dropdown-m2o",
+          "note": null,
+          "options": {
+            "enableLink": true,
+            "template": "{{nome_site}}"
+          },
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 20,
+          "special": [
+            "m2o"
+          ],
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "site",
+          "table": "leiloes_imovel",
+          "data_type": "int unsigned",
+          "default_value": null,
+          "max_length": null,
+          "numeric_precision": 10,
+          "numeric_scale": 0,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": true,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": "input_library_url",
+          "foreign_key_column": "id"
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "valor_praca1",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "valor_praca1",
+          "group": null,
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 21,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "valor_praca1",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "valor_praca2",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "valor_praca2",
+          "group": null,
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 22,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "valor_praca2",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "valor_praca3",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "valor_praca3",
+          "group": null,
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 23,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "valor_praca3",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "campos_caixa",
+        "type": "alias",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "campos_caixa",
+          "group": null,
+          "hidden": false,
+          "interface": "group-raw",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 25,
+          "special": [
+            "alias",
+            "no-data",
+            "group"
+          ],
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "numero_imovel_caixa",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "numero_imovel_caixa",
+          "group": "campos_caixa",
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 1,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "numero_imovel_caixa",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": true,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "numero_matricula_caixa",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "numero_matricula_caixa",
+          "group": "campos_caixa",
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 2,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "numero_matricula_caixa",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "comarca",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "comarca",
+          "group": "campos_caixa",
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 3,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "comarca",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "oficio",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "oficio",
+          "group": "campos_caixa",
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 4,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "oficio",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "instituicao_imobiliaria",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "instituicao_imobiliaria",
+          "group": "campos_caixa",
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 5,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "instituicao_imobiliaria",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "area_terreno",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "area_terreno",
+          "group": "campos_caixa",
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 6,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "area_terreno",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "informacoes_de_compra",
+        "type": "text",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "informacoes_de_compra",
+          "group": "campos_caixa",
+          "hidden": false,
+          "interface": "input-multiline",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 7,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "informacoes_de_compra",
+          "table": "leiloes_imovel",
+          "data_type": "text",
+          "default_value": null,
+          "max_length": 65535,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "status_scraping_caixa",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "status_scraping_caixa",
+          "group": "campos_caixa",
+          "hidden": false,
+          "interface": "select-dropdown",
+          "note": null,
+          "options": {
+            "choices": [
+              {
+                "text": "não processado",
+                "value": "não processado"
+              },
+              {
+                "text": "processado",
+                "value": "processado"
+              },
+              {
+                "text": "com foto",
+                "value": "com foto"
+              }
+            ]
+          },
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 8,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "status_scraping_caixa",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": "não processado",
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "averbacao",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "averbacao",
+          "group": "campos_caixa",
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 10,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "averbacao",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "arquivo_imagem",
+        "type": "uuid",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "arquivo_imagem",
+          "group": null,
+          "hidden": false,
+          "interface": "file-image",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 26,
+          "special": [
+            "file"
+          ],
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "arquivo_imagem",
+          "table": "leiloes_imovel",
+          "data_type": "char",
+          "default_value": null,
+          "max_length": 36,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": true,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": "directus_files",
+          "foreign_key_column": "id"
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "id_imagem_wp",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "id_imagem_wp",
+          "group": null,
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 27,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "id_imagem_wp",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "status_publicacao_wp",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "status_publicacao_wp",
+          "group": null,
+          "hidden": false,
+          "interface": "select-dropdown",
+          "note": null,
+          "options": {
+            "choices": [
+              {
+                "text": "publicado",
+                "value": "publicado"
+              },
+              {
+                "text": "não publicado",
+                "value": "não publicado"
+              }
+            ]
+          },
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 28,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "status_publicacao_wp",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": "não publicado",
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "modalidade_de_venda",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "modalidade_de_venda",
+          "group": "campos_caixa",
+          "hidden": false,
+          "interface": "select-dropdown",
+          "note": null,
+          "options": {
+            "choices": [
+              {
+                "text": "sfi",
+                "value": "sfi"
+              },
+              {
+                "text": "venda online",
+                "value": "venda online"
+              },
+              {
+                "text": "compra direta",
+                "value": "compra direta"
+              }
+            ]
+          },
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 9,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "modalidade_de_venda",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "tag_info_de_compra",
+        "type": "string",
+        "meta": {
+          "collection": "leiloes_imovel",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "tag_info_de_compra",
+          "group": "campos_caixa",
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 11,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "tag_info_de_compra",
+          "table": "leiloes_imovel",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "logs_scraping",
+        "field": "id",
+        "type": "integer",
+        "meta": {
+          "collection": "logs_scraping",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "id",
+          "group": "oculto",
+          "hidden": true,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": true,
+          "required": false,
+          "searchable": true,
+          "sort": 2,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "id",
+          "table": "logs_scraping",
+          "data_type": "int unsigned",
+          "default_value": null,
+          "max_length": null,
+          "numeric_precision": 10,
+          "numeric_scale": 0,
+          "is_nullable": false,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": true,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": true,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "logs_scraping",
+        "field": "status",
+        "type": "string",
+        "meta": {
+          "collection": "logs_scraping",
+          "conditions": null,
+          "display": "labels",
+          "display_options": {
+            "choices": [
+              {
+                "background": "var(--theme--primary-background)",
+                "color": "var(--theme--primary)",
+                "foreground": "var(--theme--primary)",
+                "text": "$t:published",
+                "value": "published"
+              },
+              {
+                "background": "var(--theme--background-normal)",
+                "color": "var(--theme--foreground)",
+                "foreground": "var(--theme--foreground)",
+                "text": "$t:draft",
+                "value": "draft"
+              },
+              {
+                "background": "var(--theme--warning-background)",
+                "color": "var(--theme--warning)",
+                "foreground": "var(--theme--warning)",
+                "text": "$t:archived",
+                "value": "archived"
+              }
+            ],
+            "showAsDot": true
+          },
+          "field": "status",
+          "group": null,
+          "hidden": false,
+          "interface": "select-dropdown",
+          "note": null,
+          "options": {
+            "choices": [
+              {
+                "color": "var(--theme--primary)",
+                "text": "$t:published",
+                "value": "published"
+              },
+              {
+                "color": "var(--theme--foreground)",
+                "text": "$t:draft",
+                "value": "draft"
+              },
+              {
+                "color": "var(--theme--warning)",
+                "text": "$t:archived",
+                "value": "archived"
+              }
+            ]
+          },
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 2,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "status",
+          "table": "logs_scraping",
+          "data_type": "varchar",
+          "default_value": "draft",
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": false,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "logs_scraping",
+        "field": "sort",
+        "type": "integer",
+        "meta": {
+          "collection": "logs_scraping",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "sort",
+          "group": "oculto",
+          "hidden": true,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 1,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "sort",
+          "table": "logs_scraping",
+          "data_type": "int",
+          "default_value": null,
+          "max_length": null,
+          "numeric_precision": 10,
+          "numeric_scale": 0,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "logs_scraping",
+        "field": "user_created",
+        "type": "string",
+        "meta": {
+          "collection": "logs_scraping",
+          "conditions": null,
+          "display": "user",
+          "display_options": null,
+          "field": "user_created",
+          "group": "oculto",
+          "hidden": true,
+          "interface": "select-dropdown-m2o",
+          "note": null,
+          "options": {
+            "template": "{{avatar}} {{first_name}} {{last_name}}"
+          },
+          "readonly": true,
+          "required": false,
+          "searchable": true,
+          "sort": 4,
+          "special": [
+            "user-created"
+          ],
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "user_created",
+          "table": "logs_scraping",
+          "data_type": "char",
+          "default_value": null,
+          "max_length": 36,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": true,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": "directus_users",
+          "foreign_key_column": "id"
+        }
+      },
+      {
+        "collection": "logs_scraping",
+        "field": "date_created",
+        "type": "timestamp",
+        "meta": {
+          "collection": "logs_scraping",
+          "conditions": null,
+          "display": "datetime",
+          "display_options": {
+            "relative": true
+          },
+          "field": "date_created",
+          "group": "oculto",
+          "hidden": true,
+          "interface": "datetime",
+          "note": null,
+          "options": null,
+          "readonly": true,
+          "required": false,
+          "searchable": true,
+          "sort": 3,
+          "special": [
+            "date-created"
+          ],
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "date_created",
+          "table": "logs_scraping",
+          "data_type": "timestamp",
+          "default_value": null,
+          "max_length": null,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "logs_scraping",
+        "field": "user_updated",
+        "type": "string",
+        "meta": {
+          "collection": "logs_scraping",
+          "conditions": null,
+          "display": "user",
+          "display_options": null,
+          "field": "user_updated",
+          "group": "oculto",
+          "hidden": true,
+          "interface": "select-dropdown-m2o",
+          "note": null,
+          "options": {
+            "template": "{{avatar}} {{first_name}} {{last_name}}"
+          },
+          "readonly": true,
+          "required": false,
+          "searchable": true,
+          "sort": 6,
+          "special": [
+            "user-updated"
+          ],
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "user_updated",
+          "table": "logs_scraping",
+          "data_type": "char",
+          "default_value": null,
+          "max_length": 36,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": true,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": "directus_users",
+          "foreign_key_column": "id"
+        }
+      },
+      {
+        "collection": "logs_scraping",
+        "field": "date_updated",
+        "type": "timestamp",
+        "meta": {
+          "collection": "logs_scraping",
+          "conditions": null,
+          "display": "datetime",
+          "display_options": {
+            "relative": true
+          },
+          "field": "date_updated",
+          "group": "oculto",
+          "hidden": true,
+          "interface": "datetime",
+          "note": null,
+          "options": null,
+          "readonly": true,
+          "required": false,
+          "searchable": true,
+          "sort": 5,
+          "special": [
+            "date-updated"
+          ],
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "date_updated",
+          "table": "logs_scraping",
+          "data_type": "timestamp",
+          "default_value": null,
+          "max_length": null,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "logs_scraping",
+        "field": "oculto",
+        "type": "alias",
+        "meta": {
+          "collection": "logs_scraping",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "oculto",
+          "group": null,
+          "hidden": false,
+          "interface": "group-raw",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 1,
+          "special": [
+            "alias",
+            "no-data",
+            "group"
+          ],
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        }
+      },
+      {
+        "collection": "logs_scraping",
+        "field": "motivo_do_erro",
+        "type": "text",
+        "meta": {
+          "collection": "logs_scraping",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "motivo_do_erro",
+          "group": null,
+          "hidden": false,
+          "interface": "input-multiline",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 5,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "motivo_do_erro",
+          "table": "logs_scraping",
+          "data_type": "text",
+          "default_value": null,
+          "max_length": 65535,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "logs_scraping",
+        "field": "site",
+        "type": "integer",
+        "meta": {
+          "collection": "logs_scraping",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "site",
+          "group": null,
+          "hidden": false,
+          "interface": "select-dropdown-m2o",
+          "note": null,
+          "options": {
+            "enableLink": true,
+            "template": "{{nome_site}} - {{liga_desliga}}"
+          },
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 3,
+          "special": [
+            "m2o"
+          ],
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "site",
+          "table": "logs_scraping",
+          "data_type": "int unsigned",
+          "default_value": null,
+          "max_length": null,
+          "numeric_precision": 10,
+          "numeric_scale": 0,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": true,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": "input_library_url",
+          "foreign_key_column": "id"
+        }
+      },
+      {
+        "collection": "logs_scraping",
+        "field": "status_scraping",
+        "type": "string",
+        "meta": {
+          "collection": "logs_scraping",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "status_scraping",
+          "group": null,
+          "hidden": false,
+          "interface": "select-dropdown",
+          "note": null,
+          "options": {
+            "choices": [
+              {
+                "text": "erro",
+                "value": "erro"
+              },
+              {
+                "text": "successes",
+                "value": "successes"
+              },
+              {
+                "text": "successes_partial",
+                "value": "successes_partial"
+              },
+              {
+                "text": "url_inválida",
+                "value": "url_inválida"
+              }
+            ]
+          },
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 4,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "status_scraping",
+          "table": "logs_scraping",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "url_consulta",
+        "field": "id",
+        "type": "integer",
+        "meta": {
+          "collection": "url_consulta",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "id",
+          "group": "Oculto",
+          "hidden": true,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": true,
+          "required": false,
+          "searchable": true,
+          "sort": 1,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "id",
+          "table": "url_consulta",
+          "data_type": "int unsigned",
+          "default_value": null,
+          "max_length": null,
+          "numeric_precision": 10,
+          "numeric_scale": 0,
+          "is_nullable": false,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": true,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": true,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "url_consulta",
+        "field": "status",
+        "type": "string",
+        "meta": {
+          "collection": "url_consulta",
+          "conditions": null,
+          "display": "labels",
+          "display_options": {
+            "choices": [
+              {
+                "background": "var(--theme--primary-background)",
+                "color": "var(--theme--primary)",
+                "foreground": "var(--theme--primary)",
+                "text": "$t:published",
+                "value": "published"
+              },
+              {
+                "background": "var(--theme--background-normal)",
+                "color": "var(--theme--foreground)",
+                "foreground": "var(--theme--foreground)",
+                "text": "$t:draft",
+                "value": "draft"
+              },
+              {
+                "background": "var(--theme--warning-background)",
+                "color": "var(--theme--warning)",
+                "foreground": "var(--theme--warning)",
+                "text": "$t:archived",
+                "value": "archived"
+              }
+            ],
+            "showAsDot": true
+          },
+          "field": "status",
+          "group": "Oculto",
+          "hidden": true,
+          "interface": "select-dropdown",
+          "note": null,
+          "options": {
+            "choices": [
+              {
+                "color": "var(--theme--primary)",
+                "text": "$t:published",
+                "value": "published"
+              },
+              {
+                "color": "var(--theme--foreground)",
+                "text": "$t:draft",
+                "value": "draft"
+              },
+              {
+                "color": "var(--theme--warning)",
+                "text": "$t:archived",
+                "value": "archived"
+              }
+            ]
+          },
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 2,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "status",
+          "table": "url_consulta",
+          "data_type": "varchar",
+          "default_value": "draft",
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": false,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "url_consulta",
+        "field": "sort",
+        "type": "integer",
+        "meta": {
+          "collection": "url_consulta",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "sort",
+          "group": "Oculto",
+          "hidden": true,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 3,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "sort",
+          "table": "url_consulta",
+          "data_type": "int",
+          "default_value": null,
+          "max_length": null,
+          "numeric_precision": 10,
+          "numeric_scale": 0,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "url_consulta",
+        "field": "user_created",
+        "type": "string",
+        "meta": {
+          "collection": "url_consulta",
+          "conditions": null,
+          "display": "user",
+          "display_options": null,
+          "field": "user_created",
+          "group": "Oculto",
+          "hidden": true,
+          "interface": "select-dropdown-m2o",
+          "note": null,
+          "options": {
+            "template": "{{avatar}} {{first_name}} {{last_name}}"
+          },
+          "readonly": true,
+          "required": false,
+          "searchable": true,
+          "sort": 5,
+          "special": [
+            "user-created"
+          ],
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "user_created",
+          "table": "url_consulta",
+          "data_type": "char",
+          "default_value": null,
+          "max_length": 36,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": true,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": "directus_users",
+          "foreign_key_column": "id"
+        }
+      },
+      {
+        "collection": "url_consulta",
+        "field": "date_created",
+        "type": "timestamp",
+        "meta": {
+          "collection": "url_consulta",
+          "conditions": null,
+          "display": "datetime",
+          "display_options": {
+            "relative": true
+          },
+          "field": "date_created",
+          "group": "Oculto",
+          "hidden": true,
+          "interface": "datetime",
+          "note": null,
+          "options": null,
+          "readonly": true,
+          "required": false,
+          "searchable": true,
+          "sort": 4,
+          "special": [
+            "date-created"
+          ],
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "date_created",
+          "table": "url_consulta",
+          "data_type": "timestamp",
+          "default_value": null,
+          "max_length": null,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "url_consulta",
+        "field": "user_updated",
+        "type": "string",
+        "meta": {
+          "collection": "url_consulta",
+          "conditions": null,
+          "display": "user",
+          "display_options": null,
+          "field": "user_updated",
+          "group": "Oculto",
+          "hidden": true,
+          "interface": "select-dropdown-m2o",
+          "note": null,
+          "options": {
+            "template": "{{avatar}} {{first_name}} {{last_name}}"
+          },
+          "readonly": true,
+          "required": false,
+          "searchable": true,
+          "sort": 7,
+          "special": [
+            "user-updated"
+          ],
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "user_updated",
+          "table": "url_consulta",
+          "data_type": "char",
+          "default_value": null,
+          "max_length": 36,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": true,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": "directus_users",
+          "foreign_key_column": "id"
+        }
+      },
+      {
+        "collection": "url_consulta",
+        "field": "date_updated",
+        "type": "timestamp",
+        "meta": {
+          "collection": "url_consulta",
+          "conditions": null,
+          "display": "datetime",
+          "display_options": {
+            "relative": true
+          },
+          "field": "date_updated",
+          "group": "Oculto",
+          "hidden": true,
+          "interface": "datetime",
+          "note": null,
+          "options": null,
+          "readonly": true,
+          "required": false,
+          "searchable": true,
+          "sort": 6,
+          "special": [
+            "date-updated"
+          ],
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "half"
+        },
+        "schema": {
+          "name": "date_updated",
+          "table": "url_consulta",
+          "data_type": "timestamp",
+          "default_value": null,
+          "max_length": null,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "url_consulta",
+        "field": "Oculto",
+        "type": "alias",
+        "meta": {
+          "collection": "url_consulta",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "Oculto",
+          "group": null,
+          "hidden": false,
+          "interface": "group-raw",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 1,
+          "special": [
+            "alias",
+            "no-data",
+            "group"
+          ],
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        }
+      },
+      {
+        "collection": "url_consulta",
+        "field": "status_processamento",
+        "type": "string",
+        "meta": {
+          "collection": "url_consulta",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "status_processamento",
+          "group": null,
+          "hidden": false,
+          "interface": "select-dropdown",
+          "note": null,
+          "options": {
+            "choices": [
+              {
+                "text": "não processado",
+                "value": "não processado"
+              },
+              {
+                "text": "processado",
+                "value": "processado"
+              },
+              {
+                "text": "erro",
+                "value": "erro"
+              }
+            ]
+          },
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 2,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "status_processamento",
+          "table": "url_consulta",
+          "data_type": "varchar",
+          "default_value": "não processado",
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "url_consulta",
+        "field": "classifica",
+        "type": "string",
+        "meta": {
+          "collection": "url_consulta",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "classifica",
+          "group": null,
+          "hidden": false,
+          "interface": "select-dropdown",
+          "note": null,
+          "options": {
+            "choices": [
+              {
+                "text": "paginação",
+                "value": "paginação"
+              },
+              {
+                "text": "imóvel individual",
+                "value": "imóvel individual"
+              },
+              {
+                "text": "categoria",
+                "value": "categoria"
+              },
+              {
+                "text": "outros",
+                "value": "outros"
+              }
+            ]
+          },
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 4,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "classifica",
+          "table": "url_consulta",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "url_consulta",
+        "field": "status_classifica",
+        "type": "string",
+        "meta": {
+          "collection": "url_consulta",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "status_classifica",
+          "group": null,
+          "hidden": false,
+          "interface": "select-dropdown",
+          "note": null,
+          "options": {
+            "choices": [
+              {
+                "text": "não classificada",
+                "value": "não classificada"
+              },
+              {
+                "text": "classificada",
+                "value": "classificada"
+              }
+            ]
+          },
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 6,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "status_classifica",
+          "table": "url_consulta",
+          "data_type": "varchar",
+          "default_value": "não classificada",
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "url_consulta",
+        "field": "status_paginacao",
+        "type": "string",
+        "meta": {
+          "collection": "url_consulta",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "status_paginacao",
+          "group": null,
+          "hidden": false,
+          "interface": "select-dropdown",
+          "note": null,
+          "options": {
+            "choices": [
+              {
+                "text": "não processado",
+                "value": "não processado"
+              },
+              {
+                "text": "processado",
+                "value": "processado"
+              }
+            ]
+          },
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 7,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "status_paginacao",
+          "table": "url_consulta",
+          "data_type": "varchar",
+          "default_value": "não processado",
+          "max_length": 255,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "url_consulta",
+        "field": "url",
+        "type": "string",
+        "meta": {
+          "collection": "url_consulta",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "url",
+          "group": null,
+          "hidden": false,
+          "interface": "input",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 3,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "url",
+          "table": "url_consulta",
+          "data_type": "varchar",
+          "default_value": null,
+          "max_length": 1200,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      },
+      {
+        "collection": "url_consulta",
+        "field": "site_origem",
+        "type": "integer",
+        "meta": {
+          "collection": "url_consulta",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "site_origem",
+          "group": null,
+          "hidden": false,
+          "interface": "select-dropdown-m2o",
+          "note": null,
+          "options": {
+            "enableLink": true,
+            "template": "{{nome_site}}"
+          },
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 8,
+          "special": [
+            "m2o"
+          ],
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "site_origem",
+          "table": "url_consulta",
+          "data_type": "int unsigned",
+          "default_value": null,
+          "max_length": null,
+          "numeric_precision": 10,
+          "numeric_scale": 0,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": true,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": "input_library_url",
+          "foreign_key_column": "id"
+        }
+      },
+      {
+        "collection": "url_consulta",
+        "field": "erro_output",
+        "type": "text",
+        "meta": {
+          "collection": "url_consulta",
+          "conditions": null,
+          "display": null,
+          "display_options": null,
+          "field": "erro_output",
+          "group": null,
+          "hidden": false,
+          "interface": "input-multiline",
+          "note": null,
+          "options": null,
+          "readonly": false,
+          "required": false,
+          "searchable": true,
+          "sort": 9,
+          "special": null,
+          "translations": null,
+          "validation": null,
+          "validation_message": null,
+          "width": "full"
+        },
+        "schema": {
+          "name": "erro_output",
+          "table": "url_consulta",
+          "data_type": "text",
+          "default_value": null,
+          "max_length": 65535,
+          "numeric_precision": null,
+          "numeric_scale": null,
+          "is_nullable": true,
+          "is_unique": false,
+          "is_indexed": false,
+          "is_primary_key": false,
+          "is_generated": false,
+          "generation_expression": null,
+          "has_auto_increment": false,
+          "foreign_key_table": null,
+          "foreign_key_column": null
+        }
+      }
+    ],
+    "systemFields": [
+      {
+        "collection": "directus_access",
+        "field": "policy",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_access",
+        "field": "role",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_access",
+        "field": "user",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_activity",
+        "field": "collection",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_activity",
+        "field": "timestamp",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_collections",
+        "field": "group",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_comments",
+        "field": "user_created",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_comments",
+        "field": "user_updated",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_dashboards",
+        "field": "user_created",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_fields",
+        "field": "collection",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_files",
+        "field": "folder",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_files",
+        "field": "modified_by",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_files",
+        "field": "uploaded_by",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_flows",
+        "field": "user_created",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_folders",
+        "field": "parent",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_notifications",
+        "field": "recipient",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_notifications",
+        "field": "sender",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_operations",
+        "field": "flow",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_operations",
+        "field": "user_created",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_panels",
+        "field": "dashboard",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_panels",
+        "field": "user_created",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_permissions",
+        "field": "collection",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_permissions",
+        "field": "policy",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_presets",
+        "field": "collection",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_presets",
+        "field": "role",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_presets",
+        "field": "user",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_relations",
+        "field": "many_collection",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_relations",
+        "field": "one_collection",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_revisions",
+        "field": "activity",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_revisions",
+        "field": "collection",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_revisions",
+        "field": "parent",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_revisions",
+        "field": "version",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_roles",
+        "field": "parent",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_sessions",
+        "field": "share",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_sessions",
+        "field": "user",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_settings",
+        "field": "project_logo",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_settings",
+        "field": "public_background",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_settings",
+        "field": "public_favicon",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_settings",
+        "field": "public_foreground",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_settings",
+        "field": "public_registration_role",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_settings",
+        "field": "storage_default_folder",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_shares",
+        "field": "collection",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_shares",
+        "field": "role",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_shares",
+        "field": "user_created",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_users",
+        "field": "role",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_versions",
+        "field": "collection",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_versions",
+        "field": "user_created",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_versions",
+        "field": "user_updated",
+        "schema": {
+          "is_indexed": true
+        }
+      },
+      {
+        "collection": "directus_webhooks",
+        "field": "migrated_flow",
+        "schema": {
+          "is_indexed": true
+        }
+      }
+    ],
+    "relations": [
+      {
+        "collection": "input_library_url",
+        "field": "user_created",
+        "related_collection": "directus_users",
+        "meta": {
+          "junction_field": null,
+          "many_collection": "input_library_url",
+          "many_field": "user_created",
+          "one_allowed_collections": null,
+          "one_collection": "directus_users",
+          "one_collection_field": null,
+          "one_deselect_action": "nullify",
+          "one_field": null,
+          "sort_field": null
+        },
+        "schema": {
+          "table": "input_library_url",
+          "column": "user_created",
+          "foreign_key_table": "directus_users",
+          "foreign_key_column": "id",
+          "constraint_name": "input_library_url_user_created_foreign",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION"
+        }
+      },
+      {
+        "collection": "input_library_url",
+        "field": "user_updated",
+        "related_collection": "directus_users",
+        "meta": {
+          "junction_field": null,
+          "many_collection": "input_library_url",
+          "many_field": "user_updated",
+          "one_allowed_collections": null,
+          "one_collection": "directus_users",
+          "one_collection_field": null,
+          "one_deselect_action": "nullify",
+          "one_field": null,
+          "sort_field": null
+        },
+        "schema": {
+          "table": "input_library_url",
+          "column": "user_updated",
+          "foreign_key_table": "directus_users",
+          "foreign_key_column": "id",
+          "constraint_name": "input_library_url_user_updated_foreign",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION"
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "user_created",
+        "related_collection": "directus_users",
+        "meta": {
+          "junction_field": null,
+          "many_collection": "leiloes_imovel",
+          "many_field": "user_created",
+          "one_allowed_collections": null,
+          "one_collection": "directus_users",
+          "one_collection_field": null,
+          "one_deselect_action": "nullify",
+          "one_field": null,
+          "sort_field": null
+        },
+        "schema": {
+          "table": "leiloes_imovel",
+          "column": "user_created",
+          "foreign_key_table": "directus_users",
+          "foreign_key_column": "id",
+          "constraint_name": "leiloes_imovel_user_created_foreign",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION"
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "user_updated",
+        "related_collection": "directus_users",
+        "meta": {
+          "junction_field": null,
+          "many_collection": "leiloes_imovel",
+          "many_field": "user_updated",
+          "one_allowed_collections": null,
+          "one_collection": "directus_users",
+          "one_collection_field": null,
+          "one_deselect_action": "nullify",
+          "one_field": null,
+          "sort_field": null
+        },
+        "schema": {
+          "table": "leiloes_imovel",
+          "column": "user_updated",
+          "foreign_key_table": "directus_users",
+          "foreign_key_column": "id",
+          "constraint_name": "leiloes_imovel_user_updated_foreign",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION"
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "site",
+        "related_collection": "input_library_url",
+        "meta": {
+          "junction_field": null,
+          "many_collection": "leiloes_imovel",
+          "many_field": "site",
+          "one_allowed_collections": null,
+          "one_collection": "input_library_url",
+          "one_collection_field": null,
+          "one_deselect_action": "nullify",
+          "one_field": null,
+          "sort_field": null
+        },
+        "schema": {
+          "table": "leiloes_imovel",
+          "column": "site",
+          "foreign_key_table": "input_library_url",
+          "foreign_key_column": "id",
+          "constraint_name": "leiloes_imovel_site_foreign",
+          "on_update": "NO ACTION",
+          "on_delete": "SET NULL"
+        }
+      },
+      {
+        "collection": "leiloes_imovel",
+        "field": "arquivo_imagem",
+        "related_collection": "directus_files",
+        "meta": {
+          "junction_field": null,
+          "many_collection": "leiloes_imovel",
+          "many_field": "arquivo_imagem",
+          "one_allowed_collections": null,
+          "one_collection": "directus_files",
+          "one_collection_field": null,
+          "one_deselect_action": "nullify",
+          "one_field": null,
+          "sort_field": null
+        },
+        "schema": {
+          "table": "leiloes_imovel",
+          "column": "arquivo_imagem",
+          "foreign_key_table": "directus_files",
+          "foreign_key_column": "id",
+          "constraint_name": "leiloes_imovel_arquivo_imagem_foreign",
+          "on_update": "NO ACTION",
+          "on_delete": "SET NULL"
+        }
+      },
+      {
+        "collection": "logs_scraping",
+        "field": "user_created",
+        "related_collection": "directus_users",
+        "meta": {
+          "junction_field": null,
+          "many_collection": "logs_scraping",
+          "many_field": "user_created",
+          "one_allowed_collections": null,
+          "one_collection": "directus_users",
+          "one_collection_field": null,
+          "one_deselect_action": "nullify",
+          "one_field": null,
+          "sort_field": null
+        },
+        "schema": {
+          "table": "logs_scraping",
+          "column": "user_created",
+          "foreign_key_table": "directus_users",
+          "foreign_key_column": "id",
+          "constraint_name": "logs_scraping_user_created_foreign",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION"
+        }
+      },
+      {
+        "collection": "logs_scraping",
+        "field": "user_updated",
+        "related_collection": "directus_users",
+        "meta": {
+          "junction_field": null,
+          "many_collection": "logs_scraping",
+          "many_field": "user_updated",
+          "one_allowed_collections": null,
+          "one_collection": "directus_users",
+          "one_collection_field": null,
+          "one_deselect_action": "nullify",
+          "one_field": null,
+          "sort_field": null
+        },
+        "schema": {
+          "table": "logs_scraping",
+          "column": "user_updated",
+          "foreign_key_table": "directus_users",
+          "foreign_key_column": "id",
+          "constraint_name": "logs_scraping_user_updated_foreign",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION"
+        }
+      },
+      {
+        "collection": "logs_scraping",
+        "field": "site",
+        "related_collection": "input_library_url",
+        "meta": {
+          "junction_field": null,
+          "many_collection": "logs_scraping",
+          "many_field": "site",
+          "one_allowed_collections": null,
+          "one_collection": "input_library_url",
+          "one_collection_field": null,
+          "one_deselect_action": "nullify",
+          "one_field": null,
+          "sort_field": null
+        },
+        "schema": {
+          "table": "logs_scraping",
+          "column": "site",
+          "foreign_key_table": "input_library_url",
+          "foreign_key_column": "id",
+          "constraint_name": "logs_scraping_site_foreign",
+          "on_update": "NO ACTION",
+          "on_delete": "SET NULL"
+        }
+      },
+      {
+        "collection": "url_consulta",
+        "field": "user_created",
+        "related_collection": "directus_users",
+        "meta": {
+          "junction_field": null,
+          "many_collection": "url_consulta",
+          "many_field": "user_created",
+          "one_allowed_collections": null,
+          "one_collection": "directus_users",
+          "one_collection_field": null,
+          "one_deselect_action": "nullify",
+          "one_field": null,
+          "sort_field": null
+        },
+        "schema": {
+          "table": "url_consulta",
+          "column": "user_created",
+          "foreign_key_table": "directus_users",
+          "foreign_key_column": "id",
+          "constraint_name": "url_consulta_user_created_foreign",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION"
+        }
+      },
+      {
+        "collection": "url_consulta",
+        "field": "user_updated",
+        "related_collection": "directus_users",
+        "meta": {
+          "junction_field": null,
+          "many_collection": "url_consulta",
+          "many_field": "user_updated",
+          "one_allowed_collections": null,
+          "one_collection": "directus_users",
+          "one_collection_field": null,
+          "one_deselect_action": "nullify",
+          "one_field": null,
+          "sort_field": null
+        },
+        "schema": {
+          "table": "url_consulta",
+          "column": "user_updated",
+          "foreign_key_table": "directus_users",
+          "foreign_key_column": "id",
+          "constraint_name": "url_consulta_user_updated_foreign",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION"
+        }
+      },
+      {
+        "collection": "url_consulta",
+        "field": "site_origem",
+        "related_collection": "input_library_url",
+        "meta": {
+          "junction_field": null,
+          "many_collection": "url_consulta",
+          "many_field": "site_origem",
+          "one_allowed_collections": null,
+          "one_collection": "input_library_url",
+          "one_collection_field": null,
+          "one_deselect_action": "nullify",
+          "one_field": null,
+          "sort_field": null
+        },
+        "schema": {
+          "table": "url_consulta",
+          "column": "site_origem",
+          "foreign_key_table": "input_library_url",
+          "foreign_key_column": "id",
+          "constraint_name": "url_consulta_site_origem_foreign",
+          "on_update": "NO ACTION",
+          "on_delete": "SET NULL"
+        }
+      }
+    ]
+  }
+}
