@@ -53,9 +53,9 @@ export function LeiloesPanel({
   ];
 
   return (
-    <Card className="overflow-visible col-span-full lg:col-span-2" data-testid="panel-leiloes">
+    <Card className="overflow-visible" data-testid="panel-leiloes">
       <CardHeader className="pb-4">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-chart-1/10">
               <Building2 className="h-5 w-5 text-chart-1" />
@@ -65,32 +65,32 @@ export function LeiloesPanel({
               <p className="text-sm text-muted-foreground">{total.toLocaleString("pt-BR")} leilões no total</p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-6">
             <div className="flex items-center gap-2">
               <Image className="h-4 w-4 text-emerald-500" />
-              <span className="text-sm font-medium">{comImagem.toLocaleString("pt-BR")}</span>
+              <span className="text-sm font-medium">{comImagem.toLocaleString("pt-BR")} com imagem</span>
             </div>
             <div className="flex items-center gap-2">
               <ImageOff className="h-4 w-4 text-gray-400" />
-              <span className="text-sm font-medium">{semImagem.toLocaleString("pt-BR")}</span>
+              <span className="text-sm font-medium">{semImagem.toLocaleString("pt-BR")} sem imagem</span>
             </div>
             <div className="flex items-center gap-2">
               <FileCheck className="h-4 w-4 text-blue-500" />
-              <span className="text-sm font-medium">{publicados.toLocaleString("pt-BR")}</span>
+              <span className="text-sm font-medium">{publicados.toLocaleString("pt-BR")} publicados</span>
             </div>
           </div>
         </div>
       </CardHeader>
       <CardContent className="pt-2">
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Por Estado */}
-          <div>
-            <h4 className="text-xs font-medium text-muted-foreground mb-1">Por Estado (UF)</h4>
-            <div className="h-[160px]">
+          <div className="bg-muted/30 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-muted-foreground mb-3">Por Estado (UF)</h4>
+            <div className="h-[220px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={ufData} layout="vertical" margin={{ left: 0, right: 5, top: 0, bottom: 0 }}>
+                <BarChart data={ufData} layout="vertical" margin={{ left: 0, right: 10, top: 0, bottom: 0 }}>
                   <XAxis type="number" hide />
-                  <YAxis type="category" dataKey="name" width={25} tick={{ fontSize: 9 }} axisLine={false} tickLine={false} />
+                  <YAxis type="category" dataKey="name" width={35} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: "hsl(var(--card))",
@@ -105,17 +105,17 @@ export function LeiloesPanel({
           </div>
 
           {/* Por Tipo */}
-          <div>
-            <h4 className="text-xs font-medium text-muted-foreground mb-1">Por Tipo de Imóvel</h4>
-            <div className="h-[160px]">
+          <div className="bg-muted/30 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-muted-foreground mb-3">Por Tipo de Imóvel</h4>
+            <div className="h-[220px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
                   <Pie
                     data={tipoData}
                     cx="50%"
                     cy="40%"
-                    innerRadius={30}
-                    outerRadius={45}
+                    innerRadius={40}
+                    outerRadius={60}
                     paddingAngle={2}
                     dataKey="value"
                   >
@@ -130,24 +130,24 @@ export function LeiloesPanel({
                       borderRadius: "8px",
                     }}
                   />
-                  <Legend wrapperStyle={{ fontSize: "9px", paddingTop: "0px" }} iconSize={8} />
+                  <Legend wrapperStyle={{ fontSize: "11px", paddingTop: "8px" }} iconSize={10} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
           </div>
 
           {/* Status Imagem */}
-          <div>
-            <h4 className="text-xs font-medium text-muted-foreground mb-1">Status de Imagens</h4>
-            <div className="h-[160px]">
+          <div className="bg-muted/30 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-muted-foreground mb-3">Status de Imagens</h4>
+            <div className="h-[220px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
                   <Pie
                     data={imagemData}
                     cx="50%"
                     cy="40%"
-                    innerRadius={30}
-                    outerRadius={45}
+                    innerRadius={40}
+                    outerRadius={60}
                     paddingAngle={2}
                     dataKey="value"
                   >
@@ -161,20 +161,20 @@ export function LeiloesPanel({
                       borderRadius: "8px",
                     }}
                   />
-                  <Legend wrapperStyle={{ fontSize: "9px", paddingTop: "0px" }} iconSize={8} />
+                  <Legend wrapperStyle={{ fontSize: "11px", paddingTop: "8px" }} iconSize={10} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
           </div>
 
           {/* Por Site */}
-          <div>
-            <h4 className="text-xs font-medium text-muted-foreground mb-1">Por Site</h4>
-            <div className="h-[160px]">
+          <div className="bg-muted/30 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-muted-foreground mb-3">Por Site</h4>
+            <div className="h-[220px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={siteData} layout="vertical" margin={{ left: 0, right: 5, top: 0, bottom: 0 }}>
+                <BarChart data={siteData} layout="vertical" margin={{ left: 0, right: 10, top: 0, bottom: 0 }}>
                   <XAxis type="number" hide />
-                  <YAxis type="category" dataKey="name" width={55} tick={{ fontSize: 8 }} axisLine={false} tickLine={false} />
+                  <YAxis type="category" dataKey="name" width={70} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: "hsl(var(--card))",

@@ -186,28 +186,25 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Main Panels */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Sites Panel */}
-          <SitesPanel
-            total={data.sites.total}
-            ligados={data.sites.ligados}
-            desligados={data.sites.desligados}
-            sites={data.sites.list}
-          />
-          
-          {/* Leilões Panel */}
-          <LeiloesPanel
-            total={data.leiloes.total}
-            comImagem={data.leiloes.comImagem}
-            semImagem={data.leiloes.semImagem}
-            porTipo={data.leiloes.porTipo}
-            porUf={data.leiloes.porUf}
-            porSite={data.leiloes.porSite}
-            publicados={data.leiloes.publicados}
-            naoPublicados={data.leiloes.naoPublicados}
-          />
-        </div>
+        {/* Leilões Panel - Full Width */}
+        <LeiloesPanel
+          total={data.leiloes.total}
+          comImagem={data.leiloes.comImagem}
+          semImagem={data.leiloes.semImagem}
+          porTipo={data.leiloes.porTipo}
+          porUf={data.leiloes.porUf}
+          porSite={data.leiloes.porSite}
+          publicados={data.leiloes.publicados}
+          naoPublicados={data.leiloes.naoPublicados}
+        />
+
+        {/* Sites Panel */}
+        <SitesPanel
+          total={data.sites.total}
+          ligados={data.sites.ligados}
+          desligados={data.sites.desligados}
+          sites={data.sites.list}
+        />
 
         {/* Temporal Chart */}
         <LeiloesTemporalChart data={data.leiloesTemporal} />
