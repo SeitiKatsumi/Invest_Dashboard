@@ -213,6 +213,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <UrlConsultaPanel
             total={data.urlConsulta.total}
+            totalImoveisIndividuais={data.urlConsulta.totalImoveisIndividuais}
             processadas={data.urlConsulta.processadas}
             naoProcessadas={data.urlConsulta.naoProcessadas}
             comErro={data.urlConsulta.comErro}

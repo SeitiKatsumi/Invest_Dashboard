@@ -229,11 +229,15 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     porCategoria[cat] = (porCategoria[cat] || 0) + 1;
   });
 
+  // Filter only "imóvel individual" for processing status
+  const imoveisIndividuais = urlConsulta.filter((u) => u.classifica === "imóvel individual");
+  
   const urlConsultaStats = {
     total: urlConsulta.length,
-    processadas: urlConsulta.filter((u) => u.status_processamento === "processado").length,
-    naoProcessadas: urlConsulta.filter((u) => u.status_processamento === "não processado" || !u.status_processamento).length,
-    comErro: urlConsulta.filter((u) => u.status_processamento === "erro").length,
+    totalImoveisIndividuais: imoveisIndividuais.length,
+    processadas: imoveisIndividuais.filter((u) => u.status_processamento === "processado").length,
+    naoProcessadas: imoveisIndividuais.filter((u) => u.status_processamento === "não processado" || !u.status_processamento).length,
+    comErro: imoveisIndividuais.filter((u) => u.status_processamento === "erro").length,
     porCategoria,
   };
 

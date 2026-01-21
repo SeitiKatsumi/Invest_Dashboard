@@ -4,6 +4,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Ba
 
 interface UrlConsultaPanelProps {
   total: number;
+  totalImoveisIndividuais: number;
   processadas: number;
   naoProcessadas: number;
   comErro: number;
@@ -34,7 +35,7 @@ const getCategoryIcon = (cat: string) => {
   }
 };
 
-export function UrlConsultaPanel({ total, processadas, naoProcessadas, comErro, porCategoria }: UrlConsultaPanelProps) {
+export function UrlConsultaPanel({ total, totalImoveisIndividuais, processadas, naoProcessadas, comErro, porCategoria }: UrlConsultaPanelProps) {
   const chartData = [
     { name: "Processadas", value: processadas },
     { name: "Pendentes", value: naoProcessadas },
@@ -51,7 +52,8 @@ export function UrlConsultaPanel({ total, processadas, naoProcessadas, comErro, 
     .sort((a, b) => b.value - a.value)
     .slice(0, 5);
 
-  const percentage = total > 0 ? Math.round((processadas / total) * 100) : 0;
+  const totalImoveis = totalImoveisIndividuais || 0;
+  const percentage = totalImoveis > 0 ? Math.round((processadas / totalImoveis) * 100) : 0;
 
   return (
     <Card className="overflow-visible" data-testid="panel-url-consulta">
@@ -120,22 +122,28 @@ export function UrlConsultaPanel({ total, processadas, naoProcessadas, comErro, 
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-2 pt-2">
-          <div className="flex flex-col items-center gap-0.5 p-2 rounded-lg bg-emerald-500/10">
-            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-            <span className="text-sm font-bold">{processadas.toLocaleString("pt-BR")}</span>
-            <span className="text-[10px] text-muted-foreground">Processadas</span>
+        {/* Stats - Only for Imóvel Individual */}
+        <div className="space-y-2 pt-2">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Building2 className="h-3 w-3" />
+            <span>Status de Imóveis Individuais ({totalImoveis.toLocaleString("pt-BR")})</span>
           </div>
-          <div className="flex flex-col items-center gap-0.5 p-2 rounded-lg bg-gray-500/10">
-            <Clock className="h-4 w-4 text-gray-500" />
-            <span className="text-sm font-bold">{naoProcessadas.toLocaleString("pt-BR")}</span>
-            <span className="text-[10px] text-muted-foreground">Pendentes</span>
-          </div>
-          <div className="flex flex-col items-center gap-0.5 p-2 rounded-lg bg-red-500/10">
-            <XCircle className="h-4 w-4 text-red-500" />
-            <span className="text-sm font-bold">{comErro.toLocaleString("pt-BR")}</span>
-            <span className="text-[10px] text-muted-foreground">Com Erro</span>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="flex flex-col items-center gap-0.5 p-2 rounded-lg bg-emerald-500/10">
+              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+              <span className="text-sm font-bold">{processadas.toLocaleString("pt-BR")}</span>
+              <span className="text-[10px] text-muted-foreground">Processadas</span>
+            </div>
+            <div className="flex flex-col items-center gap-0.5 p-2 rounded-lg bg-gray-500/10">
+              <Clock className="h-4 w-4 text-gray-500" />
+              <span className="text-sm font-bold">{naoProcessadas.toLocaleString("pt-BR")}</span>
+              <span className="text-[10px] text-muted-foreground">Pendentes</span>
+            </div>
+            <div className="flex flex-col items-center gap-0.5 p-2 rounded-lg bg-red-500/10">
+              <XCircle className="h-4 w-4 text-red-500" />
+              <span className="text-sm font-bold">{comErro.toLocaleString("pt-BR")}</span>
+              <span className="text-[10px] text-muted-foreground">Com Erro</span>
+            </div>
           </div>
         </div>
       </CardContent>

@@ -85,6 +85,7 @@ export interface DashboardStats {
   };
   urlConsulta: {
     total: number;
+    totalImoveisIndividuais: number;
     processadas: number;
     naoProcessadas: number;
     comErro: number;
