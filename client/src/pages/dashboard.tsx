@@ -118,9 +118,11 @@ export default function Dashboard() {
         {/* Header */}
         <header className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-              <LayoutDashboard className="h-6 w-6 text-primary" />
-            </div>
+            <img 
+              src="/attached_assets/Icon_Invest_1769010072868.jpg" 
+              alt="Invest Leilões" 
+              className="h-12 w-12 rounded-xl object-contain"
+            />
             <div>
               <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Painel de Monitoramento Invest Leilões</h1>
               <p className="text-sm text-muted-foreground">
