@@ -82,15 +82,15 @@ export function LeiloesPanel({
         </div>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
           {/* Por Estado */}
-          <div className="space-y-3">
+          <div className="space-y-2">
             <h4 className="text-sm font-medium text-muted-foreground">Por Estado (UF)</h4>
-            <div className="h-[200px]">
+            <div className="h-[180px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={ufData} layout="vertical" margin={{ left: 0, right: 10 }}>
+                <BarChart data={ufData} layout="vertical" margin={{ left: 0, right: 5 }}>
                   <XAxis type="number" hide />
-                  <YAxis type="category" dataKey="name" width={35} tick={{ fontSize: 11 }} />
+                  <YAxis type="category" dataKey="name" width={30} tick={{ fontSize: 10 }} />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: "hsl(var(--card))",
@@ -105,17 +105,17 @@ export function LeiloesPanel({
           </div>
 
           {/* Por Tipo */}
-          <div className="space-y-3">
+          <div className="space-y-2">
             <h4 className="text-sm font-medium text-muted-foreground">Por Tipo de Imóvel</h4>
-            <div className="h-[200px]">
+            <div className="h-[180px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={tipoData}
                     cx="50%"
-                    cy="50%"
-                    innerRadius={40}
-                    outerRadius={60}
+                    cy="45%"
+                    innerRadius={35}
+                    outerRadius={50}
                     paddingAngle={3}
                     dataKey="value"
                   >
@@ -130,24 +130,24 @@ export function LeiloesPanel({
                       borderRadius: "8px",
                     }}
                   />
-                  <Legend wrapperStyle={{ fontSize: "11px" }} />
+                  <Legend wrapperStyle={{ fontSize: "10px" }} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
           </div>
 
           {/* Status Imagem */}
-          <div className="space-y-3">
+          <div className="space-y-2">
             <h4 className="text-sm font-medium text-muted-foreground">Status de Imagens</h4>
-            <div className="h-[200px]">
+            <div className="h-[180px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={imagemData}
                     cx="50%"
-                    cy="50%"
-                    innerRadius={40}
-                    outerRadius={60}
+                    cy="45%"
+                    innerRadius={35}
+                    outerRadius={50}
                     paddingAngle={3}
                     dataKey="value"
                   >
@@ -161,20 +161,20 @@ export function LeiloesPanel({
                       borderRadius: "8px",
                     }}
                   />
-                  <Legend wrapperStyle={{ fontSize: "11px" }} />
+                  <Legend wrapperStyle={{ fontSize: "10px" }} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
           </div>
 
           {/* Por Site */}
-          <div className="space-y-3">
+          <div className="space-y-2">
             <h4 className="text-sm font-medium text-muted-foreground">Por Site</h4>
-            <div className="h-[200px]">
+            <div className="h-[180px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={siteData} layout="vertical" margin={{ left: 0, right: 10 }}>
+                <BarChart data={siteData} layout="vertical" margin={{ left: 0, right: 5 }}>
                   <XAxis type="number" hide />
-                  <YAxis type="category" dataKey="name" width={70} tick={{ fontSize: 10 }} />
+                  <YAxis type="category" dataKey="name" width={60} tick={{ fontSize: 9 }} />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: "hsl(var(--card))",
