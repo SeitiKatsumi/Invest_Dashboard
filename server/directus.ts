@@ -1,0 +1,246 @@
+import { Site, Leilao, LogScraping, UrlConsulta, DashboardStats } from "@shared/schema";
+
+const DIRECTUS_URL = process.env.DIRECTUS_URL?.trim();
+const DIRECTUS_TOKEN = process.env.DIRECTUS_TOKEN?.trim();
+
+function validateUrl(url: string): boolean {
+  try {
+    new URL(url);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+interface DirectusResponse<T> {
+  data: T;
+  meta?: {
+    total_count?: number;
+    filter_count?: number;
+  };
+}
+
+async function directusFetch<T>(
+  endpoint: string,
+  params?: Record<string, string | number>
+): Promise<DirectusResponse<T>> {
+  if (!DIRECTUS_URL) {
+    throw new Error("DIRECTUS_URL environment variable is not set or is empty");
+  }
+  if (!DIRECTUS_TOKEN) {
+    throw new Error("DIRECTUS_TOKEN environment variable is not set or is empty");
+  }
+  if (!validateUrl(DIRECTUS_URL)) {
+    throw new Error(`DIRECTUS_URL is not a valid URL: "${DIRECTUS_URL}"`);
+  }
+
+  const fullUrl = `${DIRECTUS_URL}/items/${endpoint}`;
+  const url = new URL(fullUrl);
+
+  if (params) {
+    Object.entries(params).forEach(([key, value]) => {
+      url.searchParams.set(key, String(value));
+    });
+  }
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Directus API error: ${response.status} - ${error}`);
+  }
+
+  return response.json();
+}
+
+async function getAggregate(
+  collection: string,
+  aggregate: string,
+  filter?: string
+): Promise<number> {
+  if (!DIRECTUS_URL || !DIRECTUS_TOKEN) {
+    throw new Error("DIRECTUS_URL and DIRECTUS_TOKEN must be set");
+  }
+
+  const url = new URL(`${DIRECTUS_URL}/items/${collection}`);
+  url.searchParams.set("aggregate[count]", "*");
+  if (filter) {
+    url.searchParams.set("filter", filter);
+  }
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    return 0;
+  }
+
+  const data = await response.json();
+  return data.data?.[0]?.count || 0;
+}
+
+export async function getDashboardStats(): Promise<DashboardStats> {
+  // Fetch all data in parallel
+  const [
+    sitesResponse,
+    leiloesResponse,
+    logsResponse,
+    urlConsultaResponse,
+  ] = await Promise.all([
+    directusFetch<Site[]>("input_library_url", { limit: -1 }),
+    directusFetch<Leilao[]>("leiloes_imovel", { 
+      limit: -1,
+      fields: "id,tipo_do_imovel,uf,arquivo_imagem,status_publicacao_wp,site"
+    }),
+    directusFetch<LogScraping[]>("logs_scraping", { 
+      limit: -1,
+      fields: "id,status_scraping,motivo_do_erro,site,date_created",
+      sort: "-date_created"
+    }),
+    directusFetch<UrlConsulta[]>("url_consulta", { 
+      limit: -1,
+      fields: "id,status_processamento"
+    }),
+  ]);
+
+  const sites = sitesResponse.data || [];
+  const leiloes = leiloesResponse.data || [];
+  const logs = logsResponse.data || [];
+  const urlConsulta = urlConsultaResponse.data || [];
+
+  // Process sites data
+  const sitesStats = {
+    total: sites.length,
+    ligados: sites.filter((s) => s.liga_desliga === "ligado").length,
+    desligados: sites.filter((s) => s.liga_desliga === "desligado" || !s.liga_desliga).length,
+    list: sites,
+  };
+
+  // Create site name lookup
+  const siteNameLookup: Record<number, string> = {};
+  sites.forEach((site) => {
+    siteNameLookup[site.id] = site.nome_site || `Site #${site.id}`;
+  });
+
+  // Process leiloes data
+  const porTipo: Record<string, number> = {};
+  const porUf: Record<string, number> = {};
+  const porSite: Record<string, number> = {};
+  let comImagem = 0;
+  let semImagem = 0;
+  let publicados = 0;
+  let naoPublicados = 0;
+
+  leiloes.forEach((leilao) => {
+    // Por tipo
+    const tipo = leilao.tipo_do_imovel || "Outros";
+    porTipo[tipo] = (porTipo[tipo] || 0) + 1;
+
+    // Por UF
+    const uf = leilao.uf || "N/A";
+    porUf[uf] = (porUf[uf] || 0) + 1;
+
+    // Por site
+    if (leilao.site) {
+      const siteName = siteNameLookup[leilao.site] || `Site #${leilao.site}`;
+      porSite[siteName] = (porSite[siteName] || 0) + 1;
+    }
+
+    // Imagem
+    if (leilao.arquivo_imagem) {
+      comImagem++;
+    } else {
+      semImagem++;
+    }
+
+    // Publicação
+    if (leilao.status_publicacao_wp === "publicado") {
+      publicados++;
+    } else {
+      naoPublicados++;
+    }
+  });
+
+  const leiloesStats = {
+    total: leiloes.length,
+    comImagem,
+    semImagem,
+    porTipo,
+    porUf,
+    porSite,
+    publicados,
+    naoPublicados,
+  };
+
+  // Process logs data
+  let sucesso = 0;
+  let sucessoParcial = 0;
+  let erro = 0;
+  let urlInvalida = 0;
+  const errosPorSite: Record<string, number> = {};
+
+  logs.forEach((log) => {
+    switch (log.status_scraping) {
+      case "successes":
+        sucesso++;
+        break;
+      case "successes_partial":
+        sucessoParcial++;
+        break;
+      case "erro":
+        erro++;
+        if (log.site) {
+          const siteId = typeof log.site === "object" ? log.site.id : log.site;
+          const siteName = siteNameLookup[siteId] || `Site #${siteId}`;
+          errosPorSite[siteName] = (errosPorSite[siteName] || 0) + 1;
+        }
+        break;
+      case "url_inválida":
+        urlInvalida++;
+        break;
+    }
+  });
+
+  // Get recent logs with site info
+  const recentLogs = logs.slice(0, 20).map((log) => {
+    if (log.site && typeof log.site === "number") {
+      const siteData = sites.find((s) => s.id === log.site);
+      return { ...log, site: siteData || log.site };
+    }
+    return log;
+  });
+
+  const logsStats = {
+    total: logs.length,
+    sucesso,
+    sucessoParcial,
+    erro,
+    urlInvalida,
+    recentLogs,
+    errosPorSite,
+  };
+
+  // Process URL consulta
+  const urlConsultaStats = {
+    total: urlConsulta.length,
+    processadas: urlConsulta.filter((u) => u.status_processamento === "processado").length,
+    naoProcessadas: urlConsulta.filter((u) => u.status_processamento === "não processado" || !u.status_processamento).length,
+    comErro: urlConsulta.filter((u) => u.status_processamento === "erro").length,
+  };
+
+  return {
+    sites: sitesStats,
+    leiloes: leiloesStats,
+    logs: logsStats,
+    urlConsulta: urlConsultaStats,
+  };
+}
