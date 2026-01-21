@@ -99,7 +99,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     directusFetch<Site[]>("input_library_url", { limit: -1 }),
     directusFetch<Leilao[]>("leiloes_imovel", { 
       limit: -1,
-      fields: "id,tipo_do_imovel,uf,arquivo_imagem,status_publicacao_wp,site"
+      fields: "id,tipo_do_imovel,estado_uf,arquivo_imagem,status_publicacao_wp,site"
     }),
     directusFetch<LogScraping[]>("logs_scraping", { 
       limit: -1,
@@ -146,7 +146,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     porTipo[tipo] = (porTipo[tipo] || 0) + 1;
 
     // Por UF
-    const uf = leilao.uf || "N/A";
+    const uf = leilao.estado_uf || "N/A";
     porUf[uf] = (porUf[uf] || 0) + 1;
 
     // Por site

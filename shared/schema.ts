@@ -27,7 +27,7 @@ export interface Leilao {
   link_edital: string | null;
   link_matricula: string | null;
   desconto: string | null;
-  uf: string | null;
+  estado_uf: string | null;
   cidade: string | null;
   endereco: string | null;
   arquivo_imagem: string | null;
