@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Image, ImageOff, FileCheck, FileX } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Building2, Image, ImageOff, FileCheck, FileX, Expand } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 
 interface LeiloesPanelProps {
@@ -37,10 +40,16 @@ export function LeiloesPanel({
     .sort((a, b) => b.value - a.value)
     .slice(0, 10);
 
-  const siteData = Object.entries(porSite)
-    .map(([name, value]) => ({ name: name.length > 15 ? name.substring(0, 15) + "..." : name, value }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 8);
+  const siteDataFull = Object.entries(porSite)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value);
+
+  const siteData = siteDataFull
+    .slice(0, 8)
+    .map(item => ({ 
+      ...item, 
+      name: item.name.length > 15 ? item.name.substring(0, 15) + "..." : item.name 
+    }));
 
   const imagemData = [
     { name: "Com Imagem", value: comImagem },
@@ -169,7 +178,53 @@ export function LeiloesPanel({
 
           {/* Por Site */}
           <div className="bg-muted/30 rounded-lg p-4">
-            <h4 className="text-sm font-medium text-muted-foreground mb-3">Por Site</h4>
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-medium text-muted-foreground">Por Site</h4>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-7 px-2 gap-1" data-testid="button-expand-sites">
+                    <Expand className="h-3.5 w-3.5" />
+                    <span className="text-xs">Ver todos</span>
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <Building2 className="h-5 w-5" />
+                      Leilões por Site - Lista Completa
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="flex-1 overflow-auto">
+                    <div className="space-y-1">
+                      {siteDataFull.map((site, index) => (
+                        <div
+                          key={site.name}
+                          className="flex items-center justify-between py-2 px-3 rounded-lg hover-elevate"
+                          data-testid={`row-site-${index}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs text-muted-foreground w-6">{index + 1}.</span>
+                            <span className="text-sm font-medium">{site.name}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="h-2 rounded-full bg-chart-2" 
+                              style={{ width: `${Math.max(4, (site.value / siteDataFull[0].value) * 100)}px` }}
+                            />
+                            <span className="text-sm font-semibold text-chart-2 min-w-[60px] text-right">
+                              {site.value.toLocaleString("pt-BR")}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="pt-4 border-t text-center text-sm text-muted-foreground">
+                    Total: {siteDataFull.length} sites • {siteDataFull.reduce((acc, s) => acc + s.value, 0).toLocaleString("pt-BR")} leilões
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
             <div className="h-[220px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={siteData} layout="vertical" margin={{ left: 0, right: 10, top: 0, bottom: 0 }}>
