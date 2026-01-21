@@ -82,14 +82,15 @@ export interface DashboardStats {
     erro: number;
     urlInvalida: number;
     recentLogs: LogScraping[];
-    errosPorSite: Record<string, number>;
   };
   urlConsulta: {
     total: number;
     processadas: number;
     naoProcessadas: number;
     comErro: number;
+    porCategoria: Record<string, number>;
   };
+  leiloesTemporal: { date: string; count: number }[];
 }
 
 export const dashboardStatsSchema = z.object({
@@ -116,12 +117,16 @@ export const dashboardStatsSchema = z.object({
     erro: z.number(),
     urlInvalida: z.number(),
     recentLogs: z.array(z.any()),
-    errosPorSite: z.record(z.string(), z.number()),
   }),
   urlConsulta: z.object({
     total: z.number(),
     processadas: z.number(),
     naoProcessadas: z.number(),
     comErro: z.number(),
+    porCategoria: z.record(z.string(), z.number()),
   }),
+  leiloesTemporal: z.array(z.object({
+    date: z.string(),
+    count: z.number(),
+  })),
 });

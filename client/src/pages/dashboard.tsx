@@ -6,10 +6,12 @@ import { SitesPanel } from "@/components/dashboard/sites-panel";
 import { LeiloesPanel } from "@/components/dashboard/leiloes-panel";
 import { LogsPanel } from "@/components/dashboard/logs-panel";
 import { UrlConsultaPanel } from "@/components/dashboard/url-consulta-panel";
+import { LeiloesTemporalChart } from "@/components/dashboard/leiloes-temporal-chart";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Link } from "wouter";
 import { 
   Globe, 
   Building2, 
@@ -17,7 +19,8 @@ import {
   Image, 
   RefreshCw, 
   AlertCircle,
-  LayoutDashboard
+  LayoutDashboard,
+  FileText
 } from "lucide-react";
 
 function LoadingSkeleton() {
@@ -132,6 +135,12 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Link href="/logs">
+              <Button variant="outline" className="gap-2" data-testid="button-logs-page">
+                <FileText className="h-4 w-4" />
+                <span className="hidden sm:inline">Logs Detalhados</span>
+              </Button>
+            </Link>
             <Button
               variant="outline"
               size="icon"
@@ -200,6 +209,9 @@ export default function Dashboard() {
           />
         </div>
 
+        {/* Temporal Chart */}
+        <LeiloesTemporalChart data={data.leiloesTemporal} />
+
         {/* URL Consulta + Logs */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <UrlConsultaPanel
@@ -207,6 +219,7 @@ export default function Dashboard() {
             processadas={data.urlConsulta.processadas}
             naoProcessadas={data.urlConsulta.naoProcessadas}
             comErro={data.urlConsulta.comErro}
+            porCategoria={data.urlConsulta.porCategoria}
           />
           <div className="lg:col-span-3">
             <LogsPanel
@@ -216,7 +229,6 @@ export default function Dashboard() {
               erro={data.logs.erro}
               urlInvalida={data.logs.urlInvalida}
               recentLogs={data.logs.recentLogs}
-              errosPorSite={data.logs.errosPorSite}
             />
           </div>
         </div>

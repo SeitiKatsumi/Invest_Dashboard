@@ -14,7 +14,6 @@ interface LogsPanelProps {
   erro: number;
   urlInvalida: number;
   recentLogs: LogScraping[];
-  errosPorSite: Record<string, number>;
 }
 
 const COLORS = ["#10b981", "#f59e0b", "#ef4444", "#f97316"];
@@ -26,7 +25,6 @@ export function LogsPanel({
   erro,
   urlInvalida,
   recentLogs,
-  errosPorSite,
 }: LogsPanelProps) {
   const statusData = [
     { name: "Sucesso", value: sucesso },
@@ -34,11 +32,6 @@ export function LogsPanel({
     { name: "Erro", value: erro },
     { name: "URL Inválida", value: urlInvalida },
   ].filter((d) => d.value > 0);
-
-  const errosData = Object.entries(errosPorSite)
-    .map(([name, value]) => ({ name: name.length > 12 ? name.substring(0, 12) + "..." : name, value }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 6);
 
   const getStatusIcon = (status: string | null) => {
     switch (status) {
@@ -91,11 +84,11 @@ export function LogsPanel({
         </div>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Status Distribution */}
           <div className="space-y-3">
             <h4 className="text-sm font-medium text-muted-foreground">Distribuição de Status</h4>
-            <div className="h-[220px]">
+            <div className="h-[200px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -125,37 +118,10 @@ export function LogsPanel({
             </div>
           </div>
 
-          {/* Errors by Site */}
-          <div className="space-y-3">
-            <h4 className="text-sm font-medium text-muted-foreground">Erros por Site</h4>
-            <div className="h-[220px]">
-              {errosData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={errosData} layout="vertical" margin={{ left: 0, right: 10 }}>
-                    <XAxis type="number" hide />
-                    <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 11 }} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                      }}
-                    />
-                    <Bar dataKey="value" fill="hsl(var(--chart-4))" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center">
-                  <p className="text-sm text-muted-foreground">Nenhum erro registrado</p>
-                </div>
-              )}
-            </div>
-          </div>
-
           {/* Recent Logs */}
           <div className="space-y-3">
             <h4 className="text-sm font-medium text-muted-foreground">Logs Recentes</h4>
-            <ScrollArea className="h-[220px]">
+            <ScrollArea className="h-[200px]">
               <div className="space-y-2 pr-3">
                 {recentLogs.length > 0 ? (
                   recentLogs.slice(0, 10).map((log) => (

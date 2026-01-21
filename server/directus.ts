@@ -99,7 +99,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     directusFetch<Site[]>("input_library_url", { limit: -1 }),
     directusFetch<Leilao[]>("leiloes_imovel", { 
       limit: -1,
-      fields: "id,tipo_do_imovel,estado_uf,arquivo_imagem,status_publicacao_wp,site"
+      fields: "id,tipo_do_imovel,estado_uf,arquivo_imagem,status_publicacao_wp,site,date_created"
     }),
     directusFetch<LogScraping[]>("logs_scraping", { 
       limit: -1,
@@ -108,7 +108,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     }),
     directusFetch<UrlConsulta[]>("url_consulta", { 
       limit: -1,
-      fields: "id,status_processamento"
+      fields: "id,status_processamento,classifica"
     }),
   ]);
 
@@ -186,7 +186,6 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   let sucessoParcial = 0;
   let erro = 0;
   let urlInvalida = 0;
-  const errosPorSite: Record<string, number> = {};
 
   logs.forEach((log) => {
     switch (log.status_scraping) {
@@ -198,11 +197,6 @@ export async function getDashboardStats(): Promise<DashboardStats> {
         break;
       case "erro":
         erro++;
-        if (log.site) {
-          const siteId = typeof log.site === "object" ? log.site.id : log.site;
-          const siteName = siteNameLookup[siteId] || `Site #${siteId}`;
-          errosPorSite[siteName] = (errosPorSite[siteName] || 0) + 1;
-        }
         break;
       case "url_inválida":
         urlInvalida++;
@@ -226,21 +220,96 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     erro,
     urlInvalida,
     recentLogs,
-    errosPorSite,
   };
 
   // Process URL consulta
+  const porCategoria: Record<string, number> = {};
+  urlConsulta.forEach((u) => {
+    const cat = u.classifica || "não classificado";
+    porCategoria[cat] = (porCategoria[cat] || 0) + 1;
+  });
+
   const urlConsultaStats = {
     total: urlConsulta.length,
     processadas: urlConsulta.filter((u) => u.status_processamento === "processado").length,
     naoProcessadas: urlConsulta.filter((u) => u.status_processamento === "não processado" || !u.status_processamento).length,
     comErro: urlConsulta.filter((u) => u.status_processamento === "erro").length,
+    porCategoria,
   };
+
+  // Process temporal data for leilões (last 14 days)
+  const leiloesTemporal: { date: string; count: number }[] = [];
+  const dateCountMap: Record<string, number> = {};
+  const now = new Date();
+  
+  // Initialize last 14 days
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().split("T")[0];
+    dateCountMap[dateStr] = 0;
+  }
+  
+  // Count leilões by date_created
+  leiloes.forEach((leilao) => {
+    if (leilao.date_created) {
+      const dateStr = new Date(leilao.date_created).toISOString().split("T")[0];
+      if (dateCountMap[dateStr] !== undefined) {
+        dateCountMap[dateStr]++;
+      }
+    }
+  });
+  
+  // Convert to array format
+  Object.entries(dateCountMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .forEach(([date, count]) => {
+      leiloesTemporal.push({ date, count });
+    });
 
   return {
     sites: sitesStats,
     leiloes: leiloesStats,
     logs: logsStats,
     urlConsulta: urlConsultaStats,
+    leiloesTemporal,
+  };
+}
+
+export async function getDetailedLogs(): Promise<{ logs: LogScraping[]; total: number }> {
+  // Fetch sites for name lookup
+  const sitesResponse = await directusFetch<Site[]>("input_library_url", { 
+    limit: -1,
+    fields: "id,nome_site,url_site"
+  });
+  const sites = sitesResponse.data || [];
+  
+  // Create site lookup
+  const siteLookup: Record<number, Site> = {};
+  sites.forEach((site) => {
+    siteLookup[site.id] = site;
+  });
+
+  // Fetch logs with more fields
+  const logsResponse = await directusFetch<LogScraping[]>("logs_scraping", {
+    limit: -1,
+    fields: "id,status,status_scraping,motivo_do_erro,site,date_created,date_updated",
+    sort: "-date_created"
+  });
+  
+  const logs = logsResponse.data || [];
+  
+  // Enrich logs with site information
+  const enrichedLogs = logs.map((log) => {
+    if (log.site && typeof log.site === "number") {
+      const siteData = siteLookup[log.site];
+      return { ...log, site: siteData || log.site };
+    }
+    return log;
+  });
+
+  return {
+    logs: enrichedLogs,
+    total: logs.length,
   };
 }

@@ -1,28 +1,61 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Link2, CheckCircle2, Clock, XCircle } from "lucide-react";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
+import { Link2, CheckCircle2, Clock, XCircle, Building2, List, FileText, HelpCircle } from "lucide-react";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis } from "recharts";
 
 interface UrlConsultaPanelProps {
   total: number;
   processadas: number;
   naoProcessadas: number;
   comErro: number;
+  porCategoria: Record<string, number>;
 }
 
 const COLORS = ["#10b981", "#6b7280", "#ef4444"];
+const CATEGORY_COLORS = ["#3b82f6", "#8b5cf6", "#f59e0b", "#6b7280"];
 
-export function UrlConsultaPanel({ total, processadas, naoProcessadas, comErro }: UrlConsultaPanelProps) {
+const categoryLabels: Record<string, string> = {
+  "imóvel individual": "Imóvel Individual",
+  "paginação": "Paginação",
+  "categoria": "Categoria",
+  "outros": "Outros",
+  "não classificado": "Não Classificado",
+};
+
+const getCategoryIcon = (cat: string) => {
+  switch (cat.toLowerCase()) {
+    case "imóvel individual":
+      return <Building2 className="h-4 w-4" />;
+    case "paginação":
+      return <List className="h-4 w-4" />;
+    case "categoria":
+      return <FileText className="h-4 w-4" />;
+    default:
+      return <HelpCircle className="h-4 w-4" />;
+  }
+};
+
+export function UrlConsultaPanel({ total, processadas, naoProcessadas, comErro, porCategoria }: UrlConsultaPanelProps) {
   const chartData = [
     { name: "Processadas", value: processadas },
     { name: "Pendentes", value: naoProcessadas },
     { name: "Com Erro", value: comErro },
   ].filter((d) => d.value > 0);
 
+  const safeCategoria = porCategoria || {};
+  const categoryData = Object.entries(safeCategoria)
+    .map(([name, value]) => ({
+      name: categoryLabels[name] || name,
+      value,
+      originalName: name,
+    }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 5);
+
   const percentage = total > 0 ? Math.round((processadas / total) * 100) : 0;
 
   return (
     <Card className="overflow-visible" data-testid="panel-url-consulta">
-      <CardHeader className="pb-4">
+      <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-chart-5/10">
@@ -39,17 +72,17 @@ export function UrlConsultaPanel({ total, processadas, naoProcessadas, comErro }
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Chart */}
-        <div className="h-[180px]">
+      <CardContent className="space-y-3">
+        {/* Processing Status Chart */}
+        <div className="h-[140px]">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
                 data={chartData}
                 cx="50%"
                 cy="50%"
-                innerRadius={50}
-                outerRadius={70}
+                innerRadius={35}
+                outerRadius={55}
                 paddingAngle={4}
                 dataKey="value"
               >
@@ -64,27 +97,45 @@ export function UrlConsultaPanel({ total, processadas, naoProcessadas, comErro }
                   borderRadius: "8px",
                 }}
               />
-              <Legend />
+              <Legend wrapperStyle={{ fontSize: "11px" }} />
             </PieChart>
           </ResponsiveContainer>
         </div>
 
+        {/* Category Breakdown */}
+        <div className="space-y-2">
+          <h4 className="text-xs font-medium text-muted-foreground">Por Categoria</h4>
+          <div className="space-y-1.5">
+            {categoryData.map((cat, idx) => (
+              <div key={cat.name} className="flex items-center justify-between gap-2 text-sm">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span style={{ color: CATEGORY_COLORS[idx % CATEGORY_COLORS.length] }}>
+                    {getCategoryIcon(cat.originalName)}
+                  </span>
+                  <span className="truncate">{cat.name}</span>
+                </div>
+                <span className="font-medium tabular-nums">{cat.value.toLocaleString("pt-BR")}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-4">
-          <div className="flex flex-col items-center gap-1 p-3 rounded-lg bg-emerald-500/10">
-            <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-            <span className="text-lg font-bold">{processadas.toLocaleString("pt-BR")}</span>
-            <span className="text-xs text-muted-foreground">Processadas</span>
+        <div className="grid grid-cols-3 gap-2 pt-2">
+          <div className="flex flex-col items-center gap-0.5 p-2 rounded-lg bg-emerald-500/10">
+            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+            <span className="text-sm font-bold">{processadas.toLocaleString("pt-BR")}</span>
+            <span className="text-[10px] text-muted-foreground">Processadas</span>
           </div>
-          <div className="flex flex-col items-center gap-1 p-3 rounded-lg bg-gray-500/10">
-            <Clock className="h-5 w-5 text-gray-500" />
-            <span className="text-lg font-bold">{naoProcessadas.toLocaleString("pt-BR")}</span>
-            <span className="text-xs text-muted-foreground">Pendentes</span>
+          <div className="flex flex-col items-center gap-0.5 p-2 rounded-lg bg-gray-500/10">
+            <Clock className="h-4 w-4 text-gray-500" />
+            <span className="text-sm font-bold">{naoProcessadas.toLocaleString("pt-BR")}</span>
+            <span className="text-[10px] text-muted-foreground">Pendentes</span>
           </div>
-          <div className="flex flex-col items-center gap-1 p-3 rounded-lg bg-red-500/10">
-            <XCircle className="h-5 w-5 text-red-500" />
-            <span className="text-lg font-bold">{comErro.toLocaleString("pt-BR")}</span>
-            <span className="text-xs text-muted-foreground">Com Erro</span>
+          <div className="flex flex-col items-center gap-0.5 p-2 rounded-lg bg-red-500/10">
+            <XCircle className="h-4 w-4 text-red-500" />
+            <span className="text-sm font-bold">{comErro.toLocaleString("pt-BR")}</span>
+            <span className="text-[10px] text-muted-foreground">Com Erro</span>
           </div>
         </div>
       </CardContent>
