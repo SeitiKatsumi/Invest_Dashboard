@@ -81,16 +81,16 @@ export function LeiloesPanel({
           </div>
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      <CardContent className="pt-2">
+        <div className="grid grid-cols-4 gap-3">
           {/* Por Estado */}
-          <div className="space-y-2">
-            <h4 className="text-sm font-medium text-muted-foreground">Por Estado (UF)</h4>
-            <div className="h-[180px]">
+          <div>
+            <h4 className="text-xs font-medium text-muted-foreground mb-1">Por Estado (UF)</h4>
+            <div className="h-[160px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={ufData} layout="vertical" margin={{ left: 0, right: 5 }}>
+                <BarChart data={ufData} layout="vertical" margin={{ left: 0, right: 5, top: 0, bottom: 0 }}>
                   <XAxis type="number" hide />
-                  <YAxis type="category" dataKey="name" width={30} tick={{ fontSize: 10 }} />
+                  <YAxis type="category" dataKey="name" width={25} tick={{ fontSize: 9 }} axisLine={false} tickLine={false} />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: "hsl(var(--card))",
@@ -105,18 +105,18 @@ export function LeiloesPanel({
           </div>
 
           {/* Por Tipo */}
-          <div className="space-y-2">
-            <h4 className="text-sm font-medium text-muted-foreground">Por Tipo de Imóvel</h4>
-            <div className="h-[180px]">
+          <div>
+            <h4 className="text-xs font-medium text-muted-foreground mb-1">Por Tipo de Imóvel</h4>
+            <div className="h-[160px]">
               <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
+                <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
                   <Pie
                     data={tipoData}
                     cx="50%"
-                    cy="45%"
-                    innerRadius={35}
-                    outerRadius={50}
-                    paddingAngle={3}
+                    cy="40%"
+                    innerRadius={30}
+                    outerRadius={45}
+                    paddingAngle={2}
                     dataKey="value"
                   >
                     {tipoData.map((_, index) => (
@@ -130,25 +130,25 @@ export function LeiloesPanel({
                       borderRadius: "8px",
                     }}
                   />
-                  <Legend wrapperStyle={{ fontSize: "10px" }} />
+                  <Legend wrapperStyle={{ fontSize: "9px", paddingTop: "0px" }} iconSize={8} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
           </div>
 
           {/* Status Imagem */}
-          <div className="space-y-2">
-            <h4 className="text-sm font-medium text-muted-foreground">Status de Imagens</h4>
-            <div className="h-[180px]">
+          <div>
+            <h4 className="text-xs font-medium text-muted-foreground mb-1">Status de Imagens</h4>
+            <div className="h-[160px]">
               <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
+                <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
                   <Pie
                     data={imagemData}
                     cx="50%"
-                    cy="45%"
-                    innerRadius={35}
-                    outerRadius={50}
-                    paddingAngle={3}
+                    cy="40%"
+                    innerRadius={30}
+                    outerRadius={45}
+                    paddingAngle={2}
                     dataKey="value"
                   >
                     <Cell fill="#10b981" />
@@ -161,20 +161,20 @@ export function LeiloesPanel({
                       borderRadius: "8px",
                     }}
                   />
-                  <Legend wrapperStyle={{ fontSize: "10px" }} />
+                  <Legend wrapperStyle={{ fontSize: "9px", paddingTop: "0px" }} iconSize={8} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
           </div>
 
           {/* Por Site */}
-          <div className="space-y-2">
-            <h4 className="text-sm font-medium text-muted-foreground">Por Site</h4>
-            <div className="h-[180px]">
+          <div>
+            <h4 className="text-xs font-medium text-muted-foreground mb-1">Por Site</h4>
+            <div className="h-[160px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={siteData} layout="vertical" margin={{ left: 0, right: 5 }}>
+                <BarChart data={siteData} layout="vertical" margin={{ left: 0, right: 5, top: 0, bottom: 0 }}>
                   <XAxis type="number" hide />
-                  <YAxis type="category" dataKey="name" width={60} tick={{ fontSize: 9 }} />
+                  <YAxis type="category" dataKey="name" width={55} tick={{ fontSize: 8 }} axisLine={false} tickLine={false} />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: "hsl(var(--card))",
