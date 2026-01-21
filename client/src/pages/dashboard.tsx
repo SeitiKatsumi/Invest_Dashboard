@@ -122,9 +122,7 @@ export default function Dashboard() {
               <LayoutDashboard className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-                Painel de Monitoramento
-              </h1>
+              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Painel de Monitoramento Invest Leilões</h1>
               <p className="text-sm text-muted-foreground">
                 Acompanhe o processamento de leilões em tempo real
               </p>
