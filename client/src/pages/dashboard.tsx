@@ -171,11 +171,11 @@ export default function Dashboard() {
             variant="success"
           />
           <StatCard
-            title="Taxa de Sucesso"
-            value={`${data.logs.total > 0 ? Math.round(((data.logs.sucesso + data.logs.sucessoParcial) / data.logs.total) * 100) : 0}%`}
-            description={`${data.logs.sucesso + data.logs.sucessoParcial} de ${data.logs.total}`}
+            title="Sites com Sucesso"
+            value={(data.logs.sucesso + data.logs.sucessoParcial).toLocaleString("pt-BR")}
+            description="sites avaliados positivamente"
             icon={Activity}
-            variant={data.logs.erro > 0 ? "warning" : "success"}
+            variant="success"
           />
           <StatCard
             title="Imagens Processadas"
