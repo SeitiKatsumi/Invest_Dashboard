@@ -1,4 +1,4 @@
-import { Site, Leilao, LogScraping, UrlConsulta, DashboardStats } from "@shared/schema";
+import { Site, Leilao, LogScraping, UrlConsulta, DashboardStats, LeilaoInsert } from "@shared/schema";
 
 const DIRECTUS_URL = process.env.DIRECTUS_URL?.trim();
 const DIRECTUS_TOKEN = process.env.DIRECTUS_TOKEN?.trim();
@@ -278,6 +278,41 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     urlConsulta: urlConsultaStats,
     leiloesTemporal,
   };
+}
+
+export async function getSites(): Promise<Site[]> {
+  const response = await directusFetch<Site[]>("input_library_url", { 
+    limit: -1,
+    fields: "id,nome_site,url_listagem,liga_desliga,status",
+    sort: "nome_site"
+  });
+  return response.data || [];
+}
+
+export async function createLeilao(data: LeilaoInsert): Promise<Leilao> {
+  if (!DIRECTUS_URL || !DIRECTUS_TOKEN) {
+    throw new Error("DIRECTUS_URL and DIRECTUS_TOKEN must be set");
+  }
+
+  const response = await fetch(`${DIRECTUS_URL}/items/leiloes_imovel`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      ...data,
+      status: data.status || "published",
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to create leilao: ${response.status} - ${error}`);
+  }
+
+  const result = await response.json();
+  return result.data;
 }
 
 export async function getDetailedLogs(): Promise<{ logs: LogScraping[]; total: number }> {

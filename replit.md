@@ -61,6 +61,8 @@ TypeScript interfaces are defined in `shared/schema.ts` and shared between front
 - `LogScraping` - Scraping log entry
 - `UrlConsulta` - URL processing status
 - `DashboardStats` - Aggregated dashboard statistics
+- `LeilaoInsert` - Zod schema type for creating new auctions (used for form validation)
+- `leilaoInsertSchema` - Zod validation schema shared between frontend and backend
 
 ## External Dependencies
 
@@ -83,7 +85,20 @@ TypeScript interfaces are defined in `shared/schema.ts` and shared between front
 - `DATABASE_URL` - PostgreSQL connection string
 - `SESSION_SECRET` - Secret for session management
 
-## Recent Changes (January 2026)
+## Recent Changes (February 2026)
+- Created manual auction registration form at `/cadastro`:
+  - Comprehensive form with all auction fields (site, property info, values, dates, address, links)
+  - Site dropdown (required field) fetched from Directus
+  - CEP auto-fill using ViaCEP API for address completion
+  - Shared Zod schema (`leilaoInsertSchema`) used for both frontend and backend validation
+  - Backend validation before writing to Directus
+  - SEO tags for the page
+  - Navigation: "Cadastrar Leilão" button in dashboard header
+- Backend endpoints added:
+  - GET `/api/sites` - fetches all sites for dropdown
+  - POST `/api/leiloes` - creates new auction with Zod validation
+
+## Changes (January 2026)
 - Fixed Directus integration with proper URL validation and error handling
 - Updated field mapping: changed `uf` to `estado_uf` to match actual Directus schema
 - Dashboard now successfully displays real data from Directus including:

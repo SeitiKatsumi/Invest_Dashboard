@@ -94,6 +94,39 @@ export interface DashboardStats {
   leiloesTemporal: { date: string; count: number }[];
 }
 
+export const leilaoInsertSchema = z.object({
+  site: z.number().min(1, "Site é obrigatório"),
+  nome_do_anuncio: z.string().optional(),
+  descricao: z.string().optional(),
+  area_imovel: z.string().optional(),
+  tipo_do_imovel: z.string().optional(),
+  tipo_de_leilao: z.string().optional(),
+  nome_leiloeiro: z.string().optional(),
+  valor_avalaiacao_imovel: z.string().optional(),
+  praca_1: z.string().optional(),
+  praca_2: z.string().optional(),
+  praca_3: z.string().optional(),
+  valor_praca1: z.string().optional(),
+  valor_praca2: z.string().optional(),
+  valor_praca3: z.string().optional(),
+  link_edital: z.string().optional(),
+  link_matricula: z.string().optional(),
+  link_anuncio: z.string().optional(),
+  link_imagem: z.string().optional(),
+  desconto: z.string().optional(),
+  numero_do_processo: z.string().optional(),
+  valor_leilao: z.string().optional(),
+  cep: z.string().optional(),
+  cidade: z.string().optional(),
+  estado_uf: z.string().optional(),
+  logradouro: z.string().optional(),
+  bairro: z.string().optional(),
+  numero: z.string().optional(),
+  status: z.string().optional(),
+});
+
+export type LeilaoInsert = z.infer<typeof leilaoInsertSchema>;
+
 export const dashboardStatsSchema = z.object({
   sites: z.object({
     total: z.number(),

@@ -20,7 +20,8 @@ import {
   RefreshCw, 
   AlertCircle,
   LayoutDashboard,
-  FileText
+  FileText,
+  Plus
 } from "lucide-react";
 
 function LoadingSkeleton() {
@@ -135,6 +136,12 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Link href="/cadastro">
+              <Button className="gap-2" data-testid="button-cadastro-page">
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">Cadastrar Leilão</span>
+              </Button>
+            </Link>
             <Link href="/logs">
               <Button variant="outline" className="gap-2" data-testid="button-logs-page">
                 <FileText className="h-4 w-4" />
