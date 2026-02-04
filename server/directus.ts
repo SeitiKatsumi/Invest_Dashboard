@@ -339,16 +339,21 @@ export async function createLeilao(data: LeilaoInsert): Promise<Leilao> {
     throw new Error("DIRECTUS_URL and DIRECTUS_TOKEN must be set");
   }
 
+  const cleanData = {
+    ...data,
+    status: data.status || "published",
+    praca_1: data.praca_1 && data.praca_1.trim() !== "" ? data.praca_1 : null,
+    praca_2: data.praca_2 && data.praca_2.trim() !== "" ? data.praca_2 : null,
+    praca_3: data.praca_3 && data.praca_3.trim() !== "" ? data.praca_3 : null,
+  };
+
   const response = await fetch(`${DIRECTUS_URL}/items/leiloes_imovel`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${DIRECTUS_TOKEN}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      ...data,
-      status: data.status || "published",
-    }),
+    body: JSON.stringify(cleanData),
   });
 
   if (!response.ok) {
