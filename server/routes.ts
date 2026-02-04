@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { getDashboardStats, getDetailedLogs, getSites, createLeilao } from "./directus";
+import { getDashboardStats, getDetailedLogs, getSites, createLeilao, findSiteByUrl } from "./directus";
 import { leilaoInsertSchema } from "@shared/schema";
 
 export async function registerRoutes(
@@ -49,6 +49,25 @@ export async function registerRoutes(
       console.error("Error fetching sites:", error);
       res.status(500).json({
         error: "Failed to fetch sites",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Find site by URL
+  app.get("/api/sites/find-by-url", async (req, res) => {
+    try {
+      const url = req.query.url as string;
+      if (!url) {
+        return res.status(400).json({ error: "URL é obrigatória" });
+      }
+      
+      const site = await findSiteByUrl(url);
+      res.json({ site });
+    } catch (error) {
+      console.error("Error finding site by URL:", error);
+      res.status(500).json({
+        error: "Failed to find site",
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }

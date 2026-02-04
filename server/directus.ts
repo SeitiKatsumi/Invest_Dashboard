@@ -283,10 +283,55 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 export async function getSites(): Promise<Site[]> {
   const response = await directusFetch<Site[]>("input_library_url", { 
     limit: -1,
-    fields: "id,nome_site,url_listagem,liga_desliga,status",
+    fields: "id,nome_site,url_site,url_listagem,liga_desliga,status",
     sort: "nome_site"
   });
   return response.data || [];
+}
+
+export async function findSiteByUrl(url: string): Promise<Site | null> {
+  if (!url) return null;
+  
+  try {
+    const urlObj = new URL(url);
+    const domain = urlObj.hostname.replace(/^www\./, "");
+    
+    const sites = await getSites();
+    
+    for (const site of sites) {
+      if (site.url_site) {
+        try {
+          const siteUrl = new URL(site.url_site);
+          const siteDomain = siteUrl.hostname.replace(/^www\./, "");
+          if (domain.includes(siteDomain) || siteDomain.includes(domain)) {
+            return site;
+          }
+        } catch {
+          if (site.url_site.includes(domain)) {
+            return site;
+          }
+        }
+      }
+      
+      if (site.url_listagem) {
+        try {
+          const listUrl = new URL(site.url_listagem);
+          const listDomain = listUrl.hostname.replace(/^www\./, "");
+          if (domain.includes(listDomain) || listDomain.includes(domain)) {
+            return site;
+          }
+        } catch {
+          if (site.url_listagem.includes(domain)) {
+            return site;
+          }
+        }
+      }
+    }
+    
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 export async function createLeilao(data: LeilaoInsert): Promise<Leilao> {

@@ -1,9 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "wouter";
-import { ArrowLeft, Save, Loader2, Search, Building2, MapPin, FileText, DollarSign, Calendar, Link2 } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Search, Building2, MapPin, FileText, DollarSign, Calendar, Link2, CheckCircle2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Site, leilaoInsertSchema, LeilaoInsert } from "@shared/schema";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Badge } from "@/components/ui/badge";
 
 interface ViaCepResponse {
   cep: string;
@@ -26,6 +27,8 @@ interface ViaCepResponse {
 
 export default function CadastroPage() {
   const { toast } = useToast();
+  const [isSearchingSite, setIsSearchingSite] = useState(false);
+  const [detectedSite, setDetectedSite] = useState<Site | null>(null);
 
   useEffect(() => {
     document.title = "Cadastro de Leilão | Painel Invest Leilões";
@@ -136,6 +139,60 @@ export default function CadastroPage() {
     }
   };
 
+  const detectSiteFromUrl = async () => {
+    const url = form.getValues("link_anuncio");
+    if (!url) {
+      toast({
+        title: "URL vazia",
+        description: "Digite o link do anúncio primeiro",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      new URL(url);
+    } catch {
+      toast({
+        title: "URL inválida",
+        description: "Digite uma URL válida (ex: https://...)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSearchingSite(true);
+    setDetectedSite(null);
+
+    try {
+      const response = await fetch(`/api/sites/find-by-url?url=${encodeURIComponent(url)}`);
+      const data = await response.json();
+
+      if (data.site) {
+        setDetectedSite(data.site);
+        form.setValue("site", data.site.id);
+        toast({
+          title: "Site identificado!",
+          description: `O anúncio pertence ao site: ${data.site.nome_site || `Site #${data.site.id}`}`,
+        });
+      } else {
+        toast({
+          title: "Site não encontrado",
+          description: "Não foi possível identificar o site automaticamente. Selecione manualmente.",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({
+        title: "Erro ao buscar site",
+        description: "Não foi possível identificar o site",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSearchingSite(false);
+    }
+  };
+
   const onSubmit = (data: LeilaoInsert) => {
     createMutation.mutate(data);
   };
@@ -160,6 +217,60 @@ export default function CadastroPage() {
       <main className="container mx-auto px-4 py-6 max-w-4xl">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <Card className="border-primary/20 bg-primary/5">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ExternalLink className="h-5 w-5 text-primary" />
+                  Link do Anúncio
+                </CardTitle>
+                <CardDescription>Cole o link do anúncio para identificar automaticamente o site de origem</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="link_anuncio"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>URL do Anúncio</FormLabel>
+                      <div className="flex gap-2">
+                        <FormControl>
+                          <Input placeholder="https://www.exemplo.com.br/leilao/12345" {...field} data-testid="input-link-anuncio" className="flex-1" />
+                        </FormControl>
+                        <Button 
+                          type="button" 
+                          onClick={detectSiteFromUrl} 
+                          disabled={isSearchingSite}
+                          data-testid="button-detect-site"
+                        >
+                          {isSearchingSite ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <>
+                              <Search className="h-4 w-4 mr-2" />
+                              Identificar Site
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {detectedSite && (
+                  <div className="flex items-center gap-2 p-3 bg-green-100 dark:bg-green-900/30 rounded-md border border-green-200 dark:border-green-800">
+                    <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    <span className="text-sm text-green-800 dark:text-green-200">
+                      Site identificado: <strong>{detectedSite.nome_site || `Site #${detectedSite.id}`}</strong>
+                    </span>
+                    <Badge variant="secondary" className="ml-auto">
+                      Preenchido automaticamente
+                    </Badge>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -176,7 +287,10 @@ export default function CadastroPage() {
                     <FormItem className="md:col-span-2">
                       <FormLabel>Site de Origem *</FormLabel>
                       <Select
-                        onValueChange={(value) => field.onChange(parseInt(value))}
+                        onValueChange={(value) => {
+                          field.onChange(parseInt(value));
+                          setDetectedSite(null);
+                        }}
                         value={field.value ? String(field.value) : undefined}
                         disabled={sitesLoading}
                       >
@@ -562,25 +676,11 @@ export default function CadastroPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Link2 className="h-5 w-5 text-blue-600" />
-                  Links e Documentos
+                  Outros Links e Documentos
                 </CardTitle>
-                <CardDescription>Links para documentos e anúncio</CardDescription>
+                <CardDescription>Links para imagens e documentos adicionais</CardDescription>
               </CardHeader>
               <CardContent className="grid grid-cols-1 gap-4">
-                <FormField
-                  control={form.control}
-                  name="link_anuncio"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Link do Anúncio</FormLabel>
-                      <FormControl>
-                        <Input placeholder="https://..." {...field} data-testid="input-link-anuncio" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
                 <FormField
                   control={form.control}
                   name="link_imagem"
