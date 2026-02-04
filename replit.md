@@ -94,9 +94,22 @@ TypeScript interfaces are defined in `shared/schema.ts` and shared between front
   - Backend validation before writing to Directus
   - SEO tags for the page
   - Navigation: "Cadastrar Leilão" button in dashboard header
+  - **URL-based site detection**: paste auction URL → auto-detects and fills site dropdown
+  - **AI Image Extraction**: upload/paste screenshot of auction page → GPT-4o Vision extracts 24+ fields automatically
+    - Supports drag-and-drop, file selection, and Ctrl+V paste
+    - Extracts: nome, descrição, tipo imóvel/leilão, valores, praças, endereço, links, etc.
+    - Zod validation on extracted data for safety
 - Backend endpoints added:
   - GET `/api/sites` - fetches all sites for dropdown
+  - GET `/api/sites/find-by-url` - finds site by auction URL domain
   - POST `/api/leiloes` - creates new auction with Zod validation
+  - POST `/api/extract-from-image` - uses OpenAI GPT-4o Vision to extract auction data from images
+
+### OpenAI Integration
+- **File**: `server/openai.ts`
+- **Model**: GPT-4o with vision capabilities
+- **API Key**: `OPENAI_API_KEY` environment variable (user's own key)
+- **Purpose**: Extract structured auction data from screenshots of auction pages
 
 ## Changes (January 2026)
 - Fixed Directus integration with proper URL validation and error handling
