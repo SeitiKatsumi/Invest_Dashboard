@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "wouter";
-import { ArrowLeft, Save, Loader2, Search, Building2, MapPin, FileText, DollarSign, Calendar, Link2, CheckCircle2, ExternalLink } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Search, Building2, MapPin, FileText, DollarSign, Calendar, Link2, CheckCircle2, ExternalLink, ImageIcon, Upload, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -25,10 +25,40 @@ interface ViaCepResponse {
   erro?: boolean;
 }
 
+interface ExtractedAuctionData {
+  nome_do_anuncio?: string;
+  descricao?: string;
+  tipo_do_imovel?: string;
+  tipo_de_leilao?: string;
+  nome_leiloeiro?: string;
+  area_imovel?: string;
+  valor_avalaiacao_imovel?: string;
+  valor_leilao?: string;
+  valor_praca1?: string;
+  valor_praca2?: string;
+  valor_praca3?: string;
+  praca_1?: string;
+  praca_2?: string;
+  praca_3?: string;
+  desconto?: string;
+  numero_do_processo?: string;
+  cep?: string;
+  cidade?: string;
+  estado_uf?: string;
+  logradouro?: string;
+  bairro?: string;
+  numero?: string;
+  link_edital?: string;
+  link_matricula?: string;
+}
+
 export default function CadastroPage() {
   const { toast } = useToast();
   const [isSearchingSite, setIsSearchingSite] = useState(false);
   const [detectedSite, setDetectedSite] = useState<Site | null>(null);
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     document.title = "Cadastro de Leilão | Painel Invest Leilões";
@@ -193,6 +223,133 @@ export default function CadastroPage() {
     }
   };
 
+  const extractFromImageMutation = useMutation({
+    mutationFn: async (image: string) => {
+      const response = await apiRequest("POST", "/api/extract-from-image", { image });
+      return response.json();
+    },
+    onSuccess: (result: { data: ExtractedAuctionData }) => {
+      const data = result.data;
+      let fieldsUpdated = 0;
+
+      const setIfNotEmpty = (field: keyof LeilaoInsert, value: string | undefined) => {
+        if (value && value.trim() !== "") {
+          form.setValue(field, value);
+          fieldsUpdated++;
+        }
+      };
+
+      setIfNotEmpty("nome_do_anuncio", data.nome_do_anuncio);
+      setIfNotEmpty("descricao", data.descricao);
+      setIfNotEmpty("tipo_do_imovel", data.tipo_do_imovel);
+      setIfNotEmpty("tipo_de_leilao", data.tipo_de_leilao);
+      setIfNotEmpty("nome_leiloeiro", data.nome_leiloeiro);
+      setIfNotEmpty("area_imovel", data.area_imovel);
+      setIfNotEmpty("valor_avalaiacao_imovel", data.valor_avalaiacao_imovel);
+      setIfNotEmpty("valor_leilao", data.valor_leilao);
+      setIfNotEmpty("valor_praca1", data.valor_praca1);
+      setIfNotEmpty("valor_praca2", data.valor_praca2);
+      setIfNotEmpty("valor_praca3", data.valor_praca3);
+      setIfNotEmpty("praca_1", data.praca_1);
+      setIfNotEmpty("praca_2", data.praca_2);
+      setIfNotEmpty("praca_3", data.praca_3);
+      setIfNotEmpty("desconto", data.desconto);
+      setIfNotEmpty("numero_do_processo", data.numero_do_processo);
+      setIfNotEmpty("cep", data.cep);
+      setIfNotEmpty("cidade", data.cidade);
+      setIfNotEmpty("estado_uf", data.estado_uf);
+      setIfNotEmpty("logradouro", data.logradouro);
+      setIfNotEmpty("bairro", data.bairro);
+      setIfNotEmpty("numero", data.numero);
+      setIfNotEmpty("link_edital", data.link_edital);
+      setIfNotEmpty("link_matricula", data.link_matricula);
+
+      toast({
+        title: "Dados extraídos com sucesso!",
+        description: `${fieldsUpdated} campos foram preenchidos automaticamente. Revise os dados antes de salvar.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao extrair dados",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const processImage = useCallback((file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: "Arquivo inválido",
+        description: "Por favor, selecione uma imagem",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64 = e.target?.result as string;
+      setUploadedImage(base64);
+    };
+    reader.readAsDataURL(file);
+  }, [toast]);
+
+  const handlePaste = useCallback((e: ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (const item of items) {
+      if (item.type.startsWith("image/")) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) processImage(file);
+        break;
+      }
+    }
+  }, [processImage]);
+
+  useEffect(() => {
+    document.addEventListener("paste", handlePaste);
+    return () => document.removeEventListener("paste", handlePaste);
+  }, [handlePaste]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) processImage(file);
+  }, [processImage]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  }, []);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) processImage(file);
+  };
+
+  const extractDataFromImage = () => {
+    if (uploadedImage) {
+      extractFromImageMutation.mutate(uploadedImage);
+    }
+  };
+
+  const clearImage = () => {
+    setUploadedImage(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   const onSubmit = (data: LeilaoInsert) => {
     createMutation.mutate(data);
   };
@@ -266,6 +423,97 @@ export default function CadastroPage() {
                     <Badge variant="secondary" className="ml-auto">
                       Preenchido automaticamente
                     </Badge>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-950/20">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                  Extração Automática por Imagem
+                </CardTitle>
+                <CardDescription>
+                  Cole uma captura de tela (Ctrl+V), arraste uma imagem ou clique para selecionar. A IA irá extrair os dados automaticamente.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  data-testid="input-image-file"
+                />
+
+                {!uploadedImage ? (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    className={`
+                      flex flex-col items-center justify-center gap-4 p-8 border-2 border-dashed rounded-lg cursor-pointer transition-colors
+                      ${isDragging 
+                        ? "border-purple-500 bg-purple-100 dark:bg-purple-900/30" 
+                        : "border-muted-foreground/25 hover:border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/10"
+                      }
+                    `}
+                    data-testid="dropzone-image"
+                  >
+                    <div className="p-4 rounded-full bg-purple-100 dark:bg-purple-900/50">
+                      <Upload className="h-8 w-8 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <div className="text-center">
+                      <p className="font-medium text-foreground">
+                        Arraste uma imagem ou clique para selecionar
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Você também pode colar diretamente com <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs">Ctrl+V</kbd>
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <img
+                        src={uploadedImage}
+                        alt="Imagem carregada"
+                        className="w-full max-h-64 object-contain rounded-lg border"
+                        data-testid="img-uploaded"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-2 right-2"
+                        onClick={clearImage}
+                        data-testid="button-clear-image"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={extractDataFromImage}
+                      disabled={extractFromImageMutation.isPending}
+                      className="w-full bg-purple-600 hover:bg-purple-700"
+                      data-testid="button-extract-data"
+                    >
+                      {extractFromImageMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Extraindo dados com IA...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          Extrair Dados da Imagem
+                        </>
+                      )}
+                    </Button>
                   </div>
                 )}
               </CardContent>
