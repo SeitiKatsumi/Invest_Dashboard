@@ -1,35 +1,38 @@
 import OpenAI from "openai";
+import { z } from "zod";
 
 // the newest OpenAI model is "gpt-4o" which supports vision
 // Using gpt-4o for image analysis as it's the current vision-capable model
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-export interface ExtractedAuctionData {
-  nome_do_anuncio?: string;
-  descricao?: string;
-  tipo_do_imovel?: string;
-  tipo_de_leilao?: string;
-  nome_leiloeiro?: string;
-  area_imovel?: string;
-  valor_avalaiacao_imovel?: string;
-  valor_leilao?: string;
-  valor_praca1?: string;
-  valor_praca2?: string;
-  valor_praca3?: string;
-  praca_1?: string;
-  praca_2?: string;
-  praca_3?: string;
-  desconto?: string;
-  numero_do_processo?: string;
-  cep?: string;
-  cidade?: string;
-  estado_uf?: string;
-  logradouro?: string;
-  bairro?: string;
-  numero?: string;
-  link_edital?: string;
-  link_matricula?: string;
-}
+const extractedAuctionDataSchema = z.object({
+  nome_do_anuncio: z.string().optional().default(""),
+  descricao: z.string().optional().default(""),
+  tipo_do_imovel: z.string().optional().default(""),
+  tipo_de_leilao: z.string().optional().default(""),
+  nome_leiloeiro: z.string().optional().default(""),
+  area_imovel: z.string().optional().default(""),
+  valor_avalaiacao_imovel: z.string().optional().default(""),
+  valor_leilao: z.string().optional().default(""),
+  valor_praca1: z.string().optional().default(""),
+  valor_praca2: z.string().optional().default(""),
+  valor_praca3: z.string().optional().default(""),
+  praca_1: z.string().optional().default(""),
+  praca_2: z.string().optional().default(""),
+  praca_3: z.string().optional().default(""),
+  desconto: z.string().optional().default(""),
+  numero_do_processo: z.string().optional().default(""),
+  cep: z.string().optional().default(""),
+  cidade: z.string().optional().default(""),
+  estado_uf: z.string().optional().default(""),
+  logradouro: z.string().optional().default(""),
+  bairro: z.string().optional().default(""),
+  numero: z.string().optional().default(""),
+  link_edital: z.string().optional().default(""),
+  link_matricula: z.string().optional().default(""),
+});
+
+export type ExtractedAuctionData = z.infer<typeof extractedAuctionDataSchema>;
 
 export async function extractAuctionDataFromImage(base64Image: string): Promise<ExtractedAuctionData> {
   const prompt = `Você é um especialista em extrair dados de páginas de leilão de imóveis no Brasil.
@@ -59,7 +62,9 @@ Retorne um JSON com os seguintes campos (deixe vazio "" se não encontrar):
   "estado_uf": "sigla do estado (ex: SP, RJ, MG)",
   "logradouro": "rua/avenida do endereço",
   "bairro": "bairro do imóvel",
-  "numero": "número do endereço"
+  "numero": "número do endereço",
+  "link_edital": "URL do edital se visível na página",
+  "link_matricula": "URL da matrícula se visível na página"
 }
 
 IMPORTANTE: 
@@ -98,8 +103,22 @@ IMPORTANTE:
       throw new Error("No response from OpenAI");
     }
 
-    const extracted = JSON.parse(content) as ExtractedAuctionData;
-    return extracted;
+    const parsedJson = JSON.parse(content);
+    const validationResult = extractedAuctionDataSchema.safeParse(parsedJson);
+    
+    if (!validationResult.success) {
+      console.error("Validation errors:", validationResult.error.flatten());
+      const partialData: ExtractedAuctionData = {};
+      for (const key of Object.keys(extractedAuctionDataSchema.shape)) {
+        const value = parsedJson[key];
+        if (typeof value === "string") {
+          (partialData as Record<string, string>)[key] = value;
+        }
+      }
+      return partialData;
+    }
+    
+    return validationResult.data;
   } catch (error) {
     console.error("Error extracting data from image:", error);
     throw new Error(`Falha ao extrair dados da imagem: ${error instanceof Error ? error.message : "Erro desconhecido"}`);

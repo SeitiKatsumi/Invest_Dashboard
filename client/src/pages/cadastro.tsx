@@ -499,7 +499,7 @@ export default function CadastroPage() {
                       type="button"
                       onClick={extractDataFromImage}
                       disabled={extractFromImageMutation.isPending}
-                      className="w-full bg-purple-600 hover:bg-purple-700"
+                      className="w-full"
                       data-testid="button-extract-data"
                     >
                       {extractFromImageMutation.isPending ? (
