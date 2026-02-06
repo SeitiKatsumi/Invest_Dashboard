@@ -10,6 +10,8 @@ export interface Site {
   date_created: string | null;
   date_updated: string | null;
   scraping_config: string | Record<string, unknown> | null;
+  last_scraping_at: string | null;
+  last_scraping_urls_found: number | null;
 }
 
 export interface ScrapingJob {

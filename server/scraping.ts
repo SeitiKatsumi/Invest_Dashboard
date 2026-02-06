@@ -114,7 +114,7 @@ export async function getSitesWithConfig() {
 
   const url = new URL(`${DIRECTUS_URL}/items/input_library_url`);
   url.searchParams.set("limit", "-1");
-  url.searchParams.set("fields", "id,nome_site,url_site,url_listagem,liga_desliga,status,scraping_config");
+  url.searchParams.set("fields", "id,nome_site,url_site,url_listagem,liga_desliga,status,scraping_config,last_scraping_at,last_scraping_urls_found");
   url.searchParams.set("sort", "nome_site");
 
   const response = await fetch(url.toString(), {

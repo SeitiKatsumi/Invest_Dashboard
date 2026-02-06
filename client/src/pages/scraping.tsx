@@ -19,6 +19,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
   Dialog,
   DialogContent,
@@ -155,6 +157,8 @@ function SitesTable({
                   <th className="text-left p-3 font-medium hidden md:table-cell">URL</th>
                   <th className="text-center p-3 font-medium">Status</th>
                   <th className="text-center p-3 font-medium">Config</th>
+                  <th className="text-center p-3 font-medium hidden lg:table-cell">Último Scraping</th>
+                  <th className="text-center p-3 font-medium hidden lg:table-cell">URLs</th>
                   <th className="text-right p-3 font-medium">Ações</th>
                 </tr>
               </thead>
@@ -194,6 +198,24 @@ function SitesTable({
                           <XCircle className="h-4 w-4 text-muted-foreground mx-auto" />
                         )}
                       </td>
+                      <td className="p-3 text-center hidden lg:table-cell">
+                        {site.last_scraping_at ? (
+                          <span className="text-xs text-muted-foreground" title={new Date(site.last_scraping_at).toLocaleString("pt-BR")}>
+                            {formatDistanceToNow(new Date(site.last_scraping_at), { addSuffix: true, locale: ptBR })}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="p-3 text-center hidden lg:table-cell">
+                        {site.last_scraping_urls_found != null && site.last_scraping_urls_found > 0 ? (
+                          <Badge variant="secondary" data-testid={`badge-urls-${site.id}`}>
+                            {site.last_scraping_urls_found}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </td>
                       <td className="p-3">
                         <div className="flex items-center justify-end gap-1">
                           <Button
@@ -221,7 +243,7 @@ function SitesTable({
                 })}
                 {paged.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                    <td colSpan={7} className="p-8 text-center text-muted-foreground">
                       Nenhum site encontrado
                     </td>
                   </tr>
