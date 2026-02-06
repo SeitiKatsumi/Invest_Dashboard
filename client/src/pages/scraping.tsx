@@ -357,6 +357,7 @@ function JobsPanel() {
               const urlsFound = (job.urls_found as number) || (job.result as Record<string, unknown>)?.total_urls as number || 0;
               const pagesProcessed = (job.pages_processed as number) || (job.result as Record<string, unknown>)?.pages_processed as number || 0;
               const siteUrl = (job.url as string) || (job.site_url as string) || "";
+              const siteName = (job.site_name as string) || "";
 
               return (
                 <div
@@ -365,11 +366,17 @@ function JobsPanel() {
                   data-testid={`job-card-${jobId}`}
                 >
                   <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
                       {isRunning && <Loader2 className="h-4 w-4 animate-spin text-blue-500 shrink-0" />}
-                      <span className="text-xs font-mono truncate text-muted-foreground">
-                        {jobId}
-                      </span>
+                      {siteName ? (
+                        <span className="text-sm font-medium truncate" data-testid={`job-site-name-${jobId}`}>
+                          {siteName}
+                        </span>
+                      ) : (
+                        <span className="text-xs font-mono truncate text-muted-foreground">
+                          {jobId}
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       {getStatusBadge(status)}
@@ -386,7 +393,7 @@ function JobsPanel() {
                   </div>
 
                   {siteUrl && (
-                    <p className="text-xs text-muted-foreground truncate">{siteUrl}</p>
+                    <a href={siteUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground truncate block hover:underline" data-testid={`job-site-url-${jobId}`}>{siteUrl}</a>
                   )}
 
                   {isRunning && progress > 0 && (

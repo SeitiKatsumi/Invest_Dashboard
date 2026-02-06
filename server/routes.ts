@@ -225,8 +225,42 @@ export async function registerRoutes(
   app.get("/api/scraping/jobs", async (req, res) => {
     try {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
-      const jobs = await getJobs(limit);
-      res.json(jobs);
+      const jobsResult = await getJobs(limit);
+      const jobsList = jobsResult?.jobs || [];
+
+      let sites: any[] = [];
+      try {
+        sites = await getSitesWithConfig();
+      } catch {}
+
+      const enrichedJobs = jobsList.map((job: any) => {
+        let jobUrl = job.url || job.site_url || "";
+        if (!jobUrl && job.result?.urls_found?.[0]) {
+          try { jobUrl = new URL(job.result.urls_found[0]).origin; } catch {}
+        }
+        if (!jobUrl && job.result?.config_used?.url) {
+          jobUrl = job.result.config_used.url;
+        }
+        if (jobUrl && sites.length > 0) {
+          try {
+            const jobDomain = new URL(jobUrl).hostname.replace(/^www\./, "");
+            const matchedSite = sites.find((s: any) => {
+              const siteUrl = s.url_site || s.url_listagem || "";
+              if (!siteUrl) return false;
+              try {
+                const siteDomain = new URL(siteUrl).hostname.replace(/^www\./, "");
+                return siteDomain === jobDomain;
+              } catch { return false; }
+            });
+            if (matchedSite) {
+              return { ...job, site_name: matchedSite.nome_site, site_url: matchedSite.url_site || matchedSite.url_listagem };
+            }
+          } catch {}
+        }
+        return { ...job, site_url: jobUrl || undefined };
+      });
+
+      res.json({ ...jobsResult, jobs: enrichedJobs });
     } catch (error) {
       console.error("Error fetching jobs:", error);
       res.status(500).json({
