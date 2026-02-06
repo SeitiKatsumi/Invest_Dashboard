@@ -107,6 +107,31 @@ export async function saveSiteScrapingConfig(siteId: number, config: Record<stri
   return response.json();
 }
 
+export async function updateSiteScrapingStats(siteId: number, lastScrapingAt: string, urlsFound: number) {
+  if (!DIRECTUS_URL || !DIRECTUS_TOKEN) {
+    throw new Error("DIRECTUS_URL and DIRECTUS_TOKEN must be set");
+  }
+
+  const response = await fetch(`${DIRECTUS_URL}/items/input_library_url/${siteId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      last_scraping_at: lastScrapingAt,
+      last_scraping_urls_found: urlsFound,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to update scraping stats: ${response.status} - ${error}`);
+  }
+
+  return response.json();
+}
+
 export async function getSitesWithConfig() {
   if (!DIRECTUS_URL || !DIRECTUS_TOKEN) {
     throw new Error("DIRECTUS_URL and DIRECTUS_TOKEN must be set");

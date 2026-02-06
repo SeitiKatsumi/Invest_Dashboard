@@ -12,6 +12,7 @@ import {
   deleteJob,
   getSitesWithConfig,
   saveSiteScrapingConfig,
+  updateSiteScrapingStats,
 } from "./scraping";
 
 export async function registerRoutes(
@@ -253,6 +254,16 @@ export async function registerRoutes(
               } catch { return false; }
             });
             if (matchedSite) {
+              if (job.status === "completed" && job.completed_at && matchedSite.id) {
+                const totalUrls = job.result?.total_urls || job.result?.urls_found?.length || 0;
+                const existingDate = matchedSite.last_scraping_at;
+                const jobDate = new Date(job.completed_at);
+                if (!existingDate || new Date(existingDate) < jobDate) {
+                  updateSiteScrapingStats(matchedSite.id, job.completed_at, totalUrls).catch(() => {});
+                  matchedSite.last_scraping_at = job.completed_at;
+                  matchedSite.last_scraping_urls_found = totalUrls;
+                }
+              }
               return { ...job, site_name: matchedSite.nome_site, site_url: matchedSite.url_site || matchedSite.url_listagem };
             }
           } catch {}
