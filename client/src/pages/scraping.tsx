@@ -64,10 +64,24 @@ function SitesTable({
 }) {
   const [search, setSearch] = useState("");
   const [filterConfig, setFilterConfig] = useState<"all" | "with" | "without">("all");
+  const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("active");
   const [page, setPage] = useState(1);
+  const { toast } = useToast();
 
   const { data: sites, isLoading } = useQuery<Site[]>({
     queryKey: ["/api/scraping/sites"],
+  });
+
+  const toggleStatusMutation = useMutation({
+    mutationFn: async ({ siteId, newStatus }: { siteId: number; newStatus: "ligado" | "desligado" }) => {
+      await apiRequest("PATCH", `/api/scraping/sites/${siteId}/status`, { liga_desliga: newStatus });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/scraping/sites"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao atualizar status", description: error.message, variant: "destructive" });
+    },
   });
 
   const filtered = (sites || []).filter((site) => {
@@ -79,13 +93,17 @@ function SitesTable({
       filterConfig === "all" ||
       (filterConfig === "with" && site.scraping_config) ||
       (filterConfig === "without" && !site.scraping_config);
-    return matchSearch && matchConfig;
+    const matchStatus =
+      filterStatus === "all" ||
+      (filterStatus === "active" && site.liga_desliga === "ligado") ||
+      (filterStatus === "inactive" && site.liga_desliga !== "ligado");
+    return matchSearch && matchConfig && matchStatus;
   });
 
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
   const paged = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
-  useEffect(() => { setPage(1); }, [search, filterConfig]);
+  useEffect(() => { setPage(1); }, [search, filterConfig, filterStatus]);
 
   if (isLoading) {
     return (
@@ -120,14 +138,39 @@ function SitesTable({
               data-testid="input-search-sites"
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              variant={filterStatus === "active" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFilterStatus("active")}
+              data-testid="button-filter-active"
+            >
+              Ativos
+            </Button>
+            <Button
+              variant={filterStatus === "inactive" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFilterStatus("inactive")}
+              data-testid="button-filter-inactive"
+            >
+              Inativos
+            </Button>
+            <Button
+              variant={filterStatus === "all" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFilterStatus("all")}
+              data-testid="button-filter-all-status"
+            >
+              Todos
+            </Button>
+            <span className="border-l mx-1" />
             <Button
               variant={filterConfig === "all" ? "default" : "outline"}
               size="sm"
               onClick={() => setFilterConfig("all")}
               data-testid="button-filter-all"
             >
-              Todos
+              Todos Config
             </Button>
             <Button
               variant={filterConfig === "with" ? "default" : "outline"}
@@ -180,9 +223,19 @@ function SitesTable({
                         </span>
                       </td>
                       <td className="p-3 text-center">
-                        <Badge variant={site.liga_desliga === "ligado" ? "default" : "secondary"}>
-                          {site.liga_desliga === "ligado" ? "Ativo" : "Inativo"}
-                        </Badge>
+                        <button
+                          onClick={() => toggleStatusMutation.mutate({
+                            siteId: site.id,
+                            newStatus: site.liga_desliga === "ligado" ? "desligado" : "ligado",
+                          })}
+                          disabled={toggleStatusMutation.isPending}
+                          className="cursor-pointer"
+                          data-testid={`button-toggle-status-${site.id}`}
+                        >
+                          <Badge variant={site.liga_desliga === "ligado" ? "default" : "secondary"}>
+                            {site.liga_desliga === "ligado" ? "Ativo" : "Inativo"}
+                          </Badge>
+                        </button>
                       </td>
                       <td className="p-3 text-center">
                         {hasConfig ? (

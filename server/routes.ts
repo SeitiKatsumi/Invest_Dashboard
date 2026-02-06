@@ -13,6 +13,7 @@ import {
   getSitesWithConfig,
   saveSiteScrapingConfig,
   updateSiteScrapingStats,
+  updateSiteStatus,
 } from "./scraping";
 
 export async function registerRoutes(
@@ -302,6 +303,24 @@ export async function registerRoutes(
       console.error("Error deleting job:", error);
       res.status(500).json({
         error: "Failed to delete job",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  app.patch("/api/scraping/sites/:siteId/status", async (req, res) => {
+    try {
+      const siteId = parseInt(req.params.siteId);
+      const { liga_desliga } = req.body;
+      if (!siteId || !liga_desliga || !["ligado", "desligado"].includes(liga_desliga)) {
+        return res.status(400).json({ error: "siteId e liga_desliga (ligado/desligado) são obrigatórios" });
+      }
+      await updateSiteStatus(siteId, liga_desliga);
+      res.json({ success: true, liga_desliga });
+    } catch (error) {
+      console.error("Error updating site status:", error);
+      res.status(500).json({
+        error: "Failed to update site status",
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
