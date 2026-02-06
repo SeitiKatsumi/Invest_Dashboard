@@ -451,7 +451,7 @@ function OnboardingDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Bot className="h-5 w-5" />
@@ -462,7 +462,7 @@ function OnboardingDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-y-auto flex-1 min-h-0">
           <div>
             <Label className="text-sm font-medium">Site</Label>
             <p className="text-sm font-semibold mt-1">{site?.nome_site || `Site #${site?.id}`}</p>
@@ -524,7 +524,7 @@ function OnboardingDialog({
               {"config" in result && result.config ? (
                 <details className="text-xs">
                   <summary className="cursor-pointer text-muted-foreground">Ver configuração gerada</summary>
-                  <pre className="mt-2 p-2 bg-muted rounded text-xs overflow-auto max-h-48">
+                  <pre className="mt-2 p-2 bg-muted rounded text-xs overflow-auto max-h-48 whitespace-pre-wrap break-all">
                     {JSON.stringify(result.config, null, 2)}
                   </pre>
                 </details>
