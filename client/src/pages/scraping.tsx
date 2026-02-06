@@ -580,6 +580,7 @@ function ScrapingDialog({
   const { toast } = useToast();
 
   const config = site?.scraping_config ? (() => {
+    if (typeof site.scraping_config === "object") return site.scraping_config;
     try {
       return JSON.parse(site.scraping_config);
     } catch {
@@ -721,6 +722,7 @@ function ConfigDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const config = site?.scraping_config ? (() => {
+    if (typeof site.scraping_config === "object") return site.scraping_config;
     try {
       return JSON.parse(site.scraping_config);
     } catch {

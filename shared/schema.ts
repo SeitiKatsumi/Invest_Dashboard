@@ -9,7 +9,7 @@ export interface Site {
   liga_desliga: string | null;
   date_created: string | null;
   date_updated: string | null;
-  scraping_config: string | null;
+  scraping_config: string | Record<string, unknown> | null;
 }
 
 export interface ScrapingJob {
