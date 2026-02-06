@@ -161,7 +161,7 @@ export async function registerRoutes(
 
   app.post("/api/scraping/onboard", async (req, res) => {
     try {
-      const { siteId, siteUrl, maxPages } = req.body;
+      const { siteId, siteUrl, maxPages, model } = req.body;
       if (!siteUrl) {
         return res.status(400).json({ error: "URL do site é obrigatória" });
       }
@@ -169,7 +169,7 @@ export async function registerRoutes(
         return res.status(500).json({ error: "OPENAI_API_KEY não configurada" });
       }
 
-      const result = await startOnboarding(siteUrl, process.env.OPENAI_API_KEY, maxPages);
+      const result = await startOnboarding(siteUrl, process.env.OPENAI_API_KEY, maxPages, model);
 
       if (siteId && result.config) {
         try {

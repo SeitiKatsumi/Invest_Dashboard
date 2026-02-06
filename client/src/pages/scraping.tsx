@@ -9,6 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
@@ -395,8 +402,19 @@ function OnboardingDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const [maxPages, setMaxPages] = useState("30");
+  const [model, setModel] = useState("gpt-4o-mini");
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const { toast } = useToast();
+
+  const AI_MODELS = [
+    { value: "gpt-4o-mini", label: "GPT-4o Mini", desc: "Rápido e econômico" },
+    { value: "gpt-4o", label: "GPT-4o", desc: "Mais capaz, custo moderado" },
+    { value: "gpt-4.1", label: "GPT-4.1", desc: "Mais recente, forte em código" },
+    { value: "gpt-4.1-mini", label: "GPT-4.1 Mini", desc: "Versão leve do 4.1" },
+    { value: "gpt-4.1-nano", label: "GPT-4.1 Nano", desc: "Ultra-leve e rápido" },
+    { value: "o3-mini", label: "o3 Mini", desc: "Raciocínio avançado, compacto" },
+    { value: "o4-mini", label: "o4 Mini", desc: "Raciocínio mais recente" },
+  ];
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -404,6 +422,7 @@ function OnboardingDialog({
         siteId: site?.id,
         siteUrl: site?.url_site || site?.url_listagem,
         maxPages: parseInt(maxPages) || 30,
+        model,
       });
       return response.json();
     },
@@ -448,6 +467,23 @@ function OnboardingDialog({
             <Label className="text-sm font-medium">Site</Label>
             <p className="text-sm font-semibold mt-1">{site?.nome_site || `Site #${site?.id}`}</p>
             <p className="text-xs text-muted-foreground">{site?.url_site || site?.url_listagem}</p>
+          </div>
+
+          <div>
+            <Label className="text-sm font-medium">Modelo de IA</Label>
+            <Select value={model} onValueChange={setModel} disabled={mutation.isPending}>
+              <SelectTrigger data-testid="select-model-onboard">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {AI_MODELS.map((m) => (
+                  <SelectItem key={m.value} value={m.value} data-testid={`select-model-${m.value}`}>
+                    <span className="font-medium">{m.label}</span>
+                    <span className="text-muted-foreground ml-2">— {m.desc}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div>

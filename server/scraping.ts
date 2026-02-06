@@ -25,13 +25,13 @@ export async function getScrapingApiStatus() {
   return scrapingApiFetch("/api/status");
 }
 
-export async function startOnboarding(siteUrl: string, openaiApiKey: string, maxPages?: number) {
+export async function startOnboarding(siteUrl: string, openaiApiKey: string, maxPages?: number, model?: string) {
   return scrapingApiFetch("/api/onboard", {
     method: "POST",
     body: JSON.stringify({
       url: siteUrl,
       openai_api_key: openaiApiKey,
-      model: "gpt-4o-mini",
+      model: model || "gpt-4o-mini",
       max_pages_to_explore: maxPages || 30,
       target_description: "links de imóveis ou propriedades",
     }),
