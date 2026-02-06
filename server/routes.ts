@@ -3,6 +3,16 @@ import { createServer, type Server } from "http";
 import { getDashboardStats, getDetailedLogs, getSites, createLeilao, findSiteByUrl } from "./directus";
 import { leilaoInsertSchema } from "@shared/schema";
 import { extractAuctionDataFromImage } from "./openai";
+import {
+  getScrapingApiStatus,
+  startOnboarding,
+  startScraping,
+  getJobs,
+  getJob,
+  deleteJob,
+  getSitesWithConfig,
+  saveSiteScrapingConfig,
+} from "./scraping";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -116,6 +126,158 @@ export async function registerRoutes(
       console.error("Error creating leilao:", error);
       res.status(500).json({
         error: "Failed to create leilao",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // ======= SCRAPING API ROUTES =======
+
+  app.get("/api/scraping/status", async (req, res) => {
+    try {
+      const status = await getScrapingApiStatus();
+      res.json(status);
+    } catch (error) {
+      console.error("Error fetching scraping API status:", error);
+      res.status(500).json({
+        error: "Failed to fetch scraping API status",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  app.get("/api/scraping/sites", async (req, res) => {
+    try {
+      const sites = await getSitesWithConfig();
+      res.json(sites);
+    } catch (error) {
+      console.error("Error fetching sites with config:", error);
+      res.status(500).json({
+        error: "Failed to fetch sites",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  app.post("/api/scraping/onboard", async (req, res) => {
+    try {
+      const { siteId, siteUrl, maxPages } = req.body;
+      if (!siteUrl) {
+        return res.status(400).json({ error: "URL do site é obrigatória" });
+      }
+      if (!process.env.OPENAI_API_KEY) {
+        return res.status(500).json({ error: "OPENAI_API_KEY não configurada" });
+      }
+
+      const result = await startOnboarding(siteUrl, process.env.OPENAI_API_KEY, maxPages);
+
+      if (siteId && result.config) {
+        try {
+          await saveSiteScrapingConfig(siteId, result.config);
+        } catch (saveError) {
+          console.error("Error saving config to Directus:", saveError);
+        }
+      }
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error during onboarding:", error);
+      res.status(500).json({
+        error: "Falha no onboarding",
+        message: error instanceof Error ? error.message : "Erro desconhecido",
+      });
+    }
+  });
+
+  app.post("/api/scraping/scrape", async (req, res) => {
+    try {
+      const { siteUrl, config, maxPages, concurrentRequests } = req.body;
+      if (!siteUrl) {
+        return res.status(400).json({ error: "URL do site é obrigatória" });
+      }
+      if (!config) {
+        return res.status(400).json({ error: "Configuração de scraping é obrigatória. Execute o onboarding primeiro." });
+      }
+
+      let parsedConfig = config;
+      if (typeof config === "string") {
+        try {
+          parsedConfig = JSON.parse(config);
+        } catch {
+          return res.status(400).json({ error: "Configuração de scraping inválida (JSON malformado)" });
+        }
+      }
+      if (typeof parsedConfig !== "object" || parsedConfig === null) {
+        return res.status(400).json({ error: "Configuração de scraping deve ser um objeto JSON válido" });
+      }
+
+      const result = await startScraping(siteUrl, parsedConfig, maxPages, concurrentRequests);
+      res.json(result);
+    } catch (error) {
+      console.error("Error starting scraping:", error);
+      res.status(500).json({
+        error: "Falha ao iniciar scraping",
+        message: error instanceof Error ? error.message : "Erro desconhecido",
+      });
+    }
+  });
+
+  app.get("/api/scraping/jobs", async (req, res) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+      const jobs = await getJobs(limit);
+      res.json(jobs);
+    } catch (error) {
+      console.error("Error fetching jobs:", error);
+      res.status(500).json({
+        error: "Failed to fetch jobs",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  app.get("/api/scraping/jobs/:jobId", async (req, res) => {
+    try {
+      const job = await getJob(req.params.jobId);
+      res.json(job);
+    } catch (error) {
+      console.error("Error fetching job:", error);
+      res.status(500).json({
+        error: "Failed to fetch job",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  app.delete("/api/scraping/jobs/:jobId", async (req, res) => {
+    try {
+      const result = await deleteJob(req.params.jobId);
+      res.json(result);
+    } catch (error) {
+      console.error("Error deleting job:", error);
+      res.status(500).json({
+        error: "Failed to delete job",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  app.post("/api/scraping/save-config", async (req, res) => {
+    try {
+      const { siteId, config } = req.body;
+      if (!siteId || !config) {
+        return res.status(400).json({ error: "siteId e config são obrigatórios" });
+      }
+      let parsedConfig = config;
+      if (typeof config === "string") {
+        try { parsedConfig = JSON.parse(config); } catch { return res.status(400).json({ error: "Config JSON inválido" }); }
+      }
+      await saveSiteScrapingConfig(siteId, parsedConfig);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error saving config:", error);
+      res.status(500).json({
+        error: "Failed to save config",
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }

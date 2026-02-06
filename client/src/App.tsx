@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/lib/theme-provider";
 import Dashboard from "@/pages/dashboard";
 import LogsPage from "@/pages/logs";
 import CadastroPage from "@/pages/cadastro";
+import ScrapingPage from "@/pages/scraping";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -15,6 +16,7 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/logs" component={LogsPage} />
       <Route path="/cadastro" component={CadastroPage} />
+      <Route path="/scraping" component={ScrapingPage} />
       <Route component={NotFound} />
     </Switch>
   );

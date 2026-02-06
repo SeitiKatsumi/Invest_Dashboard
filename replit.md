@@ -86,6 +86,32 @@ TypeScript interfaces are defined in `shared/schema.ts` and shared between front
 - `SESSION_SECRET` - Secret for session management
 
 ## Recent Changes (February 2026)
+
+### AI Scraping Integration
+- New `/scraping` page with full integration to external AI scraping API
+- **Architecture**: Backend proxy routes in `server/scraping.ts` → External API at `SCRAPING_API_URL`
+- **Onboarding flow**: AI agent analyzes site structure (HTML patterns, URL patterns, pagination), generates scraping config
+  - Config saved as JSON in `scraping_config` field on Directus `input_library_url` collection
+  - Persists across deploys (not dependent on API's temporary config IDs)
+- **Scraping flow**: Uses saved config to extract property URLs from auction sites
+  - Async job execution with job_id tracking
+  - N8n webhook callback at `https://n8n-invest.server04.11mind.com.br/webhook/retornascrapapi`
+  - Real-time progress polling (5s interval) showing % complete and URLs found
+- **Jobs panel**: Auto-refreshing list of active/recent scraping jobs with status badges
+- **Sites table**: Full list of leiloeiros from Directus with search, filter by config status, pagination
+- Backend endpoints:
+  - GET `/api/scraping/status` - API health check
+  - GET `/api/scraping/sites` - Sites with scraping_config field
+  - POST `/api/scraping/onboard` - Start site analysis (uses OPENAI_API_KEY)
+  - POST `/api/scraping/scrape` - Launch scraping job with saved config
+  - GET `/api/scraping/jobs` - List recent jobs
+  - GET `/api/scraping/jobs/:jobId` - Job details/progress
+  - DELETE `/api/scraping/jobs/:jobId` - Remove job
+  - POST `/api/scraping/save-config` - Save config to Directus
+- **Environment variable**: `SCRAPING_API_URL` = `https://api-scrap-invest.server04.11mind.com.br`
+- **Schema**: Added `scraping_config` field to `Site` interface, new `ScrapingJob` interface
+
+### Manual Registration
 - Created manual auction registration form at `/cadastro`:
   - Comprehensive form with all auction fields (site, property info, values, dates, address, links)
   - Site dropdown (required field) fetched from Directus

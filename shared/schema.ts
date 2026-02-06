@@ -9,6 +9,26 @@ export interface Site {
   liga_desliga: string | null;
   date_created: string | null;
   date_updated: string | null;
+  scraping_config: string | null;
+}
+
+export interface ScrapingJob {
+  job_id: string;
+  status: string;
+  site_url?: string;
+  progress?: number;
+  urls_found?: number;
+  total_pages?: number;
+  pages_processed?: number;
+  error?: string;
+  started_at?: string;
+  completed_at?: string;
+  result?: {
+    urls?: string[];
+    total_urls?: number;
+    pages_processed?: number;
+    duration_seconds?: number;
+  };
 }
 
 export interface Leilao {
