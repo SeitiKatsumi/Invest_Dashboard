@@ -156,6 +156,62 @@ export async function updateSiteStatus(siteId: number, ligaDesliga: "ligado" | "
   return response.json();
 }
 
+export async function bulkUpdateSiteStatus(siteIds: number[], ligaDesliga: "ligado" | "desligado") {
+  if (!DIRECTUS_URL || !DIRECTUS_TOKEN) {
+    throw new Error("DIRECTUS_URL and DIRECTUS_TOKEN must be set");
+  }
+
+  if (!siteIds || siteIds.length === 0) {
+    throw new Error("At least one site ID is required");
+  }
+
+  const maxConcurrency = 10;
+  const updatePromises: Promise<{ siteId: number; status: "fulfilled" | "rejected"; result?: unknown; error?: string }>[] = [];
+  
+  for (let i = 0; i < siteIds.length; i++) {
+    // Control concurrency by waiting for previous batch if we reach max
+    if (i >= maxConcurrency) {
+      await Promise.race(updatePromises.slice(i - maxConcurrency, i));
+    }
+
+    const siteId = siteIds[i];
+    const promise = updateSiteStatus(siteId, ligaDesliga)
+      .then(() => ({ siteId, status: "fulfilled" as const }))
+      .catch((error) => ({
+        siteId,
+        status: "rejected" as const,
+        error: error instanceof Error ? error.message : "Unknown error",
+      }));
+
+    updatePromises.push(promise);
+  }
+
+  // Wait for all remaining promises to settle
+  const results = await Promise.allSettled(updatePromises);
+
+  const processed = results.map((result) => {
+    if (result.status === "fulfilled") {
+      return result.value;
+    } else {
+      return {
+        siteId: -1,
+        status: "rejected" as const,
+        error: result.reason instanceof Error ? result.reason.message : "Unknown error",
+      };
+    }
+  });
+
+  const succeeded = processed.filter((r) => r.status === "fulfilled").length;
+  const failed = processed.filter((r) => r.status === "rejected").length;
+
+  return {
+    total: siteIds.length,
+    succeeded,
+    failed,
+    results: processed,
+  };
+}
+
 export async function getSitesWithConfig() {
   if (!DIRECTUS_URL || !DIRECTUS_TOKEN) {
     throw new Error("DIRECTUS_URL and DIRECTUS_TOKEN must be set");

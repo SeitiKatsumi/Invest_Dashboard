@@ -14,6 +14,7 @@ import {
   saveSiteScrapingConfig,
   updateSiteScrapingStats,
   updateSiteStatus,
+  bulkUpdateSiteStatus,
 } from "./scraping";
 
 export async function registerRoutes(
@@ -321,6 +322,26 @@ export async function registerRoutes(
       console.error("Error updating site status:", error);
       res.status(500).json({
         error: "Failed to update site status",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  app.patch("/api/scraping/sites/bulk-status", async (req, res) => {
+    try {
+      const { siteIds, liga_desliga } = req.body;
+      if (!siteIds || !Array.isArray(siteIds) || siteIds.length === 0) {
+        return res.status(400).json({ error: "siteIds (non-empty array) is required" });
+      }
+      if (!liga_desliga || !["ligado", "desligado"].includes(liga_desliga)) {
+        return res.status(400).json({ error: "liga_desliga (ligado/desligado) is required" });
+      }
+      const result = await bulkUpdateSiteStatus(siteIds, liga_desliga);
+      res.json({ success: true, ...result });
+    } catch (error) {
+      console.error("Error updating bulk site status:", error);
+      res.status(500).json({
+        error: "Failed to update bulk site status",
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
