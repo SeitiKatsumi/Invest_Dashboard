@@ -107,6 +107,62 @@ export async function saveSiteScrapingConfig(siteId: number, config: Record<stri
   return response.json();
 }
 
+export async function saveSiteScrapingError(siteId: number, error: string, analysis: string | null) {
+  if (!DIRECTUS_URL || !DIRECTUS_TOKEN) {
+    throw new Error("DIRECTUS_URL and DIRECTUS_TOKEN must be set");
+  }
+
+  const response = await fetch(`${DIRECTUS_URL}/items/input_library_url/${siteId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      scraping_error: error,
+      scraping_error_analysis: analysis || null,
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    console.warn(`Could not save scraping error to Directus (fields may not exist yet): ${response.status} - ${err}`);
+    return null;
+  }
+
+  return response.json();
+}
+
+export async function clearSiteScrapingError(siteId: number) {
+  if (!DIRECTUS_URL || !DIRECTUS_TOKEN) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${DIRECTUS_URL}/items/input_library_url/${siteId}`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        scraping_error: null,
+        scraping_error_analysis: null,
+      }),
+    });
+
+    if (!response.ok) {
+      console.warn(`Could not clear scraping error in Directus (fields may not exist yet): ${response.status}`);
+      return null;
+    }
+
+    return response.json();
+  } catch (e) {
+    console.warn("Could not clear scraping error:", e);
+    return null;
+  }
+}
+
 export async function updateSiteScrapingStats(siteId: number, lastScrapingAt: string, urlsFound: number) {
   if (!DIRECTUS_URL || !DIRECTUS_TOKEN) {
     throw new Error("DIRECTUS_URL and DIRECTUS_TOKEN must be set");
@@ -217,12 +273,15 @@ export async function getSitesWithConfig() {
     throw new Error("DIRECTUS_URL and DIRECTUS_TOKEN must be set");
   }
 
+  const baseFields = "id,nome_site,url_site,url_listagem,liga_desliga,status,scraping_config,last_scraping_at,last_scraping_urls_found";
+  const extendedFields = `${baseFields},scraping_error,scraping_error_analysis`;
+
   const url = new URL(`${DIRECTUS_URL}/items/input_library_url`);
   url.searchParams.set("limit", "-1");
-  url.searchParams.set("fields", "id,nome_site,url_site,url_listagem,liga_desliga,status,scraping_config,last_scraping_at,last_scraping_urls_found");
+  url.searchParams.set("fields", extendedFields);
   url.searchParams.set("sort", "nome_site");
 
-  const response = await fetch(url.toString(), {
+  let response = await fetch(url.toString(), {
     headers: {
       Authorization: `Bearer ${DIRECTUS_TOKEN}`,
       "Content-Type": "application/json",
@@ -230,8 +289,18 @@ export async function getSitesWithConfig() {
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Failed to fetch sites: ${response.status} - ${error}`);
+    url.searchParams.set("fields", baseFields);
+    response = await fetch(url.toString(), {
+      headers: {
+        Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to fetch sites: ${response.status} - ${error}`);
+    }
   }
 
   const result = await response.json();

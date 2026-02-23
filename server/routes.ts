@@ -12,6 +12,8 @@ import {
   deleteJob,
   getSitesWithConfig,
   saveSiteScrapingConfig,
+  saveSiteScrapingError,
+  clearSiteScrapingError,
   updateSiteScrapingStats,
   updateSiteStatus,
   bulkUpdateSiteStatus,
@@ -177,17 +179,38 @@ export async function registerRoutes(
       if (siteId && result.config) {
         try {
           await saveSiteScrapingConfig(siteId, result.config);
+          await clearSiteScrapingError(siteId);
         } catch (saveError) {
           console.error("Error saving config to Directus:", saveError);
+        }
+      }
+
+      if (siteId && !result.config) {
+        try {
+          const errorMsg = result.error || result.message || "Onboarding não retornou configuração";
+          const analysis = result.analysis || result.agent_analysis || result.details || null;
+          await saveSiteScrapingError(siteId, errorMsg, typeof analysis === "string" ? analysis : analysis ? JSON.stringify(analysis) : null);
+        } catch (saveError) {
+          console.error("Error saving scraping error to Directus:", saveError);
         }
       }
 
       res.json(result);
     } catch (error) {
       console.error("Error during onboarding:", error);
+      const errorMsg = error instanceof Error ? error.message : "Erro desconhecido";
+
+      if (req.body.siteId) {
+        try {
+          await saveSiteScrapingError(req.body.siteId, errorMsg, null);
+        } catch (saveError) {
+          console.error("Error saving scraping error to Directus:", saveError);
+        }
+      }
+
       res.status(500).json({
         error: "Falha no onboarding",
-        message: error instanceof Error ? error.message : "Erro desconhecido",
+        message: errorMsg,
       });
     }
   });

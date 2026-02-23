@@ -55,6 +55,7 @@ import {
   PlayCircle,
   Pause,
   RotateCcw,
+  AlertTriangle,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -65,13 +66,15 @@ function SitesTable({
   onStartOnboarding,
   onStartScraping,
   onViewConfig,
+  onViewError,
 }: {
   onStartOnboarding: (site: Site) => void;
   onStartScraping: (site: Site) => void;
   onViewConfig: (site: Site) => void;
+  onViewError: (site: Site) => void;
 }) {
   const [search, setSearch] = useState("");
-  const [filterConfig, setFilterConfig] = useState<"all" | "with" | "without">("all");
+  const [filterConfig, setFilterConfig] = useState<"all" | "with" | "without" | "error">("all");
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("active");
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -119,7 +122,8 @@ function SitesTable({
     const matchConfig =
       filterConfig === "all" ||
       (filterConfig === "with" && site.scraping_config) ||
-      (filterConfig === "without" && !site.scraping_config);
+      (filterConfig === "without" && !site.scraping_config && !site.scraping_error) ||
+      (filterConfig === "error" && !!site.scraping_error);
     const matchStatus =
       filterStatus === "all" ||
       (filterStatus === "active" && site.liga_desliga === "ligado") ||
@@ -239,6 +243,15 @@ function SitesTable({
             >
               Sem Config
             </Button>
+            <Button
+              variant={filterConfig === "error" ? "destructive" : "outline"}
+              size="sm"
+              onClick={() => setFilterConfig("error")}
+              data-testid="button-filter-with-error"
+            >
+              <AlertTriangle className="h-3.5 w-3.5 mr-1" />
+              Com Erro
+            </Button>
           </div>
         </div>
 
@@ -349,6 +362,16 @@ function SitesTable({
                             data-testid={`button-view-config-${site.id}`}
                           >
                             <CheckCircle2 className="h-4 w-4 text-green-500" />
+                          </Button>
+                        ) : site.scraping_error ? (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => onViewError(site)}
+                            data-testid={`button-view-error-${site.id}`}
+                            title="Ver erro do onboarding"
+                          >
+                            <AlertTriangle className="h-4 w-4 text-red-500" />
                           </Button>
                         ) : (
                           <XCircle className="h-4 w-4 text-muted-foreground mx-auto" />
@@ -948,6 +971,57 @@ function ConfigDialog({
   );
 }
 
+function ErrorDialog({
+  site,
+  open,
+  onOpenChange,
+}: {
+  site: Site | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-red-500">
+            <AlertTriangle className="h-5 w-5" />
+            Erro no Onboarding
+          </DialogTitle>
+          <DialogDescription>
+            {site?.nome_site || `Site #${site?.id}`} — {site?.url_site || site?.url_listagem}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="overflow-auto flex-1 min-h-0 space-y-4">
+          <div>
+            <Label className="text-sm font-medium text-red-500">Mensagem de Erro</Label>
+            <div className="mt-1 p-3 bg-red-500/10 border border-red-500/20 rounded-md">
+              <p className="text-sm whitespace-pre-wrap" data-testid="text-error-message">
+                {site?.scraping_error || "Erro desconhecido"}
+              </p>
+            </div>
+          </div>
+          {site?.scraping_error_analysis && (
+            <div>
+              <Label className="text-sm font-medium">Análise do Agente IA</Label>
+              <div className="mt-1 p-3 bg-muted rounded-md">
+                <p className="text-sm whitespace-pre-wrap" data-testid="text-error-analysis">
+                  {site.scraping_error_analysis}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="button-close-error">
+            Fechar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 type QueueItemStatus = "waiting" | "onboarding" | "scraping" | "completed" | "error";
 
 interface QueueItem {
@@ -1319,6 +1393,7 @@ export default function ScrapingPage() {
   const [onboardSite, setOnboardSite] = useState<Site | null>(null);
   const [scrapeSite, setScrapeSite] = useState<Site | null>(null);
   const [configSite, setConfigSite] = useState<Site | null>(null);
+  const [errorSite, setErrorSite] = useState<Site | null>(null);
 
   const { data: allSites } = useQuery<Site[]>({
     queryKey: ["/api/scraping/sites"],
@@ -1361,6 +1436,7 @@ export default function ScrapingPage() {
               onStartOnboarding={setOnboardSite}
               onStartScraping={setScrapeSite}
               onViewConfig={setConfigSite}
+              onViewError={setErrorSite}
             />
           </div>
           <div>
@@ -1383,6 +1459,11 @@ export default function ScrapingPage() {
         site={configSite}
         open={!!configSite}
         onOpenChange={(open) => { if (!open) setConfigSite(null); }}
+      />
+      <ErrorDialog
+        site={errorSite}
+        open={!!errorSite}
+        onOpenChange={(open) => { if (!open) setErrorSite(null); }}
       />
     </div>
   );
