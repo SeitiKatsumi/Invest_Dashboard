@@ -34,6 +34,7 @@ import {
   tryAutoConnect,
   getWhatsAppGroups,
   resolveInviteLink,
+  buildLeilaoMessage,
 } from "./whatsapp";
 
 export async function registerRoutes(
@@ -542,9 +543,27 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/whatsapp/preview/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "ID inválido" });
+      }
+      const leilao = await getLeilaoById(id);
+      if (!leilao) {
+        return res.status(404).json({ error: "Leilão não encontrado" });
+      }
+      const mensagem = buildLeilaoMessage(leilao);
+      res.json({ mensagem });
+    } catch (error) {
+      console.error("Error building preview:", error);
+      res.status(500).json({ error: "Falha ao gerar preview" });
+    }
+  });
+
   app.post("/api/whatsapp/disparar", async (req, res) => {
     try {
-      const { leilaoId, grupoIds } = req.body;
+      const { leilaoId, grupoIds, mensagem } = req.body;
       if (!leilaoId || !grupoIds || !Array.isArray(grupoIds) || grupoIds.length === 0) {
         return res.status(400).json({ error: "leilaoId e grupoIds são obrigatórios" });
       }
@@ -580,7 +599,7 @@ export async function registerRoutes(
         }
       }
 
-      const result = await sendLeilaoToGroups(leilao, groupJids, imageUrl);
+      const result = await sendLeilaoToGroups(leilao, groupJids, imageUrl, mensagem || null);
 
       for (const grupo of selectedGrupos) {
         const wasSent = result.sent.includes(grupo.jid);

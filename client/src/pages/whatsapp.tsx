@@ -664,6 +664,8 @@ function DisparoPanel() {
   const [leilao, setLeilao] = useState<Leilao | null>(null);
   const [selectedGrupos, setSelectedGrupos] = useState<number[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [mensagem, setMensagem] = useState("");
+  const [showMensagem, setShowMensagem] = useState(false);
 
   const { data: status } = useQuery<{ status: string }>({
     queryKey: ["/api/whatsapp/status"],
@@ -691,6 +693,13 @@ function DisparoPanel() {
       }
       const data = await resp.json();
       setLeilao(data);
+
+      const previewResp = await fetch(`/api/whatsapp/preview/${id}`);
+      if (previewResp.ok) {
+        const previewData = await previewResp.json();
+        setMensagem(previewData.mensagem);
+        setShowMensagem(true);
+      }
     } catch (error) {
       toast({
         title: "Leilão não encontrado",
@@ -698,13 +707,15 @@ function DisparoPanel() {
         variant: "destructive",
       });
       setLeilao(null);
+      setMensagem("");
+      setShowMensagem(false);
     } finally {
       setIsSearching(false);
     }
   };
 
   const dispararMutation = useMutation({
-    mutationFn: (data: { leilaoId: number; grupoIds: number[] }) =>
+    mutationFn: (data: { leilaoId: number; grupoIds: number[]; mensagem: string }) =>
       apiRequest("POST", "/api/whatsapp/disparar", data).then((r) => r.json()),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/disparos"] });
@@ -732,7 +743,25 @@ function DisparoPanel() {
       toast({ title: "Selecione ao menos um grupo", variant: "destructive" });
       return;
     }
-    dispararMutation.mutate({ leilaoId: leilao.id, grupoIds: selectedGrupos });
+    if (!mensagem.trim()) {
+      toast({ title: "A mensagem não pode estar vazia", variant: "destructive" });
+      return;
+    }
+    dispararMutation.mutate({ leilaoId: leilao.id, grupoIds: selectedGrupos, mensagem });
+  };
+
+  const resetMensagem = async () => {
+    if (!leilao) return;
+    try {
+      const resp = await fetch(`/api/whatsapp/preview/${leilao.id}`);
+      if (resp.ok) {
+        const data = await resp.json();
+        setMensagem(data.mensagem);
+        toast({ title: "Template restaurado" });
+      }
+    } catch {
+      toast({ title: "Erro ao restaurar template", variant: "destructive" });
+    }
   };
 
   const toggleGrupo = (id: number) => {
@@ -851,6 +880,36 @@ function DisparoPanel() {
                 {leilao.descricao}
               </p>
             )}
+          </div>
+        )}
+
+        {leilao && showMensagem && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-base font-semibold flex items-center gap-2">
+                <Edit className="h-4 w-4" />
+                Mensagem do Disparo
+              </Label>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={resetMensagem}
+                className="gap-1 text-xs"
+                data-testid="button-reset-template"
+              >
+                <RefreshCw className="h-3 w-3" />
+                Restaurar original
+              </Button>
+            </div>
+            <textarea
+              value={mensagem}
+              onChange={(e) => setMensagem(e.target.value)}
+              className="w-full min-h-[300px] p-4 rounded-lg border bg-background font-mono text-sm resize-y focus:outline-none focus:ring-2 focus:ring-ring"
+              data-testid="textarea-mensagem"
+            />
+            <p className="text-xs text-muted-foreground">
+              Edite o texto acima livremente. Use *texto* para negrito no WhatsApp. Clique em "Restaurar original" para voltar ao template padrão.
+            </p>
           </div>
         )}
 

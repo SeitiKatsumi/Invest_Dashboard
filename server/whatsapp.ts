@@ -158,12 +158,13 @@ export async function sendLeilaoToGroups(
   leilao: Leilao,
   groupJids: string[],
   imageUrl?: string | null,
+  customMessage?: string | null,
 ): Promise<{ sent: string[]; failed: { jid: string; error: string }[] }> {
   if (!sock || connectionStatus !== "connected") {
     throw new Error("WhatsApp não está conectado");
   }
 
-  const message = buildLeilaoMessage(leilao);
+  const message = customMessage || buildLeilaoMessage(leilao);
   const sent: string[] = [];
   const failed: { jid: string; error: string }[] = [];
 
@@ -211,7 +212,7 @@ export async function sendLeilaoToGroups(
   return { sent, failed };
 }
 
-function buildLeilaoMessage(leilao: Leilao): string {
+export function buildLeilaoMessage(leilao: Leilao): string {
   const lines: string[] = [];
 
   lines.push("🏠 *LEILÃO DE IMÓVEL*");
