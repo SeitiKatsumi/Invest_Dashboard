@@ -358,6 +358,36 @@ export async function getDisparos(limit = 50): Promise<WhatsAppDisparo[]> {
   return result?.data || [];
 }
 
+export async function getWhatsAppGroups(): Promise<{ id: string; subject: string; size: number }[]> {
+  if (!sock || connectionStatus !== "connected") {
+    throw new Error("WhatsApp não está conectado");
+  }
+
+  const groups = await sock.groupFetchAllParticipating();
+  return Object.values(groups).map((g: any) => ({
+    id: g.id,
+    subject: g.subject || "Sem nome",
+    size: g.participants?.length || 0,
+  }));
+}
+
+export async function resolveInviteLink(link: string): Promise<{ jid: string; subject: string }> {
+  if (!sock || connectionStatus !== "connected") {
+    throw new Error("WhatsApp não está conectado");
+  }
+
+  const code = link.replace(/^https?:\/\/chat\.whatsapp\.com\//, "").trim();
+  if (!code) {
+    throw new Error("Link de convite inválido");
+  }
+
+  const metadata = await sock.groupGetInviteInfo(code);
+  return {
+    jid: metadata.id,
+    subject: metadata.subject || "Sem nome",
+  };
+}
+
 export async function tryAutoConnect() {
   const fs = await import("fs");
   const path = await import("path");

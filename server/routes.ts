@@ -32,6 +32,8 @@ import {
   createDisparo,
   getDisparos,
   tryAutoConnect,
+  getWhatsAppGroups,
+  resolveInviteLink,
 } from "./whatsapp";
 
 export async function registerRoutes(
@@ -447,6 +449,36 @@ export async function registerRoutes(
       res.json({ qr, status: getConnectionStatus().status });
     } catch (error) {
       res.status(500).json({ error: "Erro ao buscar QR" });
+    }
+  });
+
+  app.get("/api/whatsapp/my-groups", async (req, res) => {
+    try {
+      const groups = await getWhatsAppGroups();
+      res.json(groups);
+    } catch (error) {
+      console.error("Error fetching WhatsApp groups:", error);
+      res.status(500).json({
+        error: "Falha ao buscar grupos do WhatsApp",
+        message: error instanceof Error ? error.message : "Erro desconhecido",
+      });
+    }
+  });
+
+  app.post("/api/whatsapp/resolve-invite", async (req, res) => {
+    try {
+      const { link } = req.body;
+      if (!link) {
+        return res.status(400).json({ error: "Link de convite é obrigatório" });
+      }
+      const result = await resolveInviteLink(link);
+      res.json(result);
+    } catch (error) {
+      console.error("Error resolving invite link:", error);
+      res.status(500).json({
+        error: "Falha ao resolver link de convite",
+        message: error instanceof Error ? error.message : "Erro desconhecido",
+      });
     }
   });
 

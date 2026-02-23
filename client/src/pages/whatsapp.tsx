@@ -49,6 +49,8 @@ import {
   Users,
   History,
   ArrowLeft,
+  Download,
+  Link as LinkIcon,
 } from "lucide-react";
 
 function ConnectionPanel() {
@@ -175,11 +177,29 @@ function ConnectionPanel() {
 function GruposPanel() {
   const { toast } = useToast();
   const [showDialog, setShowDialog] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
   const [editGrupo, setEditGrupo] = useState<WhatsAppGrupo | null>(null);
-  const [form, setForm] = useState({ nome: "", jid: "", regiao: "" });
+  const [form, setForm] = useState({ nome: "", inviteLink: "", regiao: "", jid: "" });
+  const [isResolvingLink, setIsResolvingLink] = useState(false);
+  const [importSearch, setImportSearch] = useState("");
+  const [selectedImports, setSelectedImports] = useState<Set<string>>(new Set());
+  const [importRegiao, setImportRegiao] = useState("");
+
+  const { data: status } = useQuery<{ status: string }>({
+    queryKey: ["/api/whatsapp/status"],
+  });
+
+  const isConnected = status?.status === "connected";
 
   const { data: grupos, isLoading } = useQuery<WhatsAppGrupo[]>({
     queryKey: ["/api/whatsapp/grupos"],
+  });
+
+  const { data: waGroups, isLoading: isLoadingWaGroups, refetch: refetchWaGroups } = useQuery<
+    { id: string; subject: string; size: number }[]
+  >({
+    queryKey: ["/api/whatsapp/my-groups"],
+    enabled: false,
   });
 
   const createMutation = useMutation({
@@ -188,7 +208,7 @@ function GruposPanel() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/grupos"] });
       setShowDialog(false);
-      setForm({ nome: "", jid: "", regiao: "" });
+      setForm({ nome: "", inviteLink: "", regiao: "", jid: "" });
       toast({ title: "Grupo criado com sucesso" });
     },
     onError: (error: Error) => {
@@ -203,7 +223,7 @@ function GruposPanel() {
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/grupos"] });
       setShowDialog(false);
       setEditGrupo(null);
-      setForm({ nome: "", jid: "", regiao: "" });
+      setForm({ nome: "", inviteLink: "", regiao: "", jid: "" });
       toast({ title: "Grupo atualizado" });
     },
   });
@@ -226,32 +246,106 @@ function GruposPanel() {
 
   const openCreate = () => {
     setEditGrupo(null);
-    setForm({ nome: "", jid: "", regiao: "" });
+    setForm({ nome: "", inviteLink: "", regiao: "", jid: "" });
     setShowDialog(true);
   };
 
   const openEdit = (g: WhatsAppGrupo) => {
     setEditGrupo(g);
-    setForm({ nome: g.nome, jid: g.jid, regiao: g.regiao || "" });
+    setForm({ nome: g.nome, inviteLink: "", regiao: g.regiao || "", jid: g.jid });
     setShowDialog(true);
+  };
+
+  const resolveLink = async () => {
+    if (!form.inviteLink) return;
+    setIsResolvingLink(true);
+    try {
+      const resp = await apiRequest("POST", "/api/whatsapp/resolve-invite", { link: form.inviteLink });
+      const data = await resp.json();
+      setForm((prev) => ({
+        ...prev,
+        jid: data.jid,
+        nome: prev.nome || data.subject,
+      }));
+      toast({ title: "Link resolvido!", description: `Grupo: ${data.subject}` });
+    } catch (error) {
+      toast({
+        title: "Erro ao resolver link",
+        description: error instanceof Error ? error.message : "Verifique o link e tente novamente",
+        variant: "destructive",
+      });
+    } finally {
+      setIsResolvingLink(false);
+    }
   };
 
   const handleSubmit = () => {
     if (!form.nome || !form.jid) {
-      toast({ title: "Preencha Nome e JID do grupo", variant: "destructive" });
+      toast({ title: "Preencha o Nome e resolva o link ou informe o JID", variant: "destructive" });
       return;
     }
     if (editGrupo) {
-      updateMutation.mutate({ id: editGrupo.id, data: form });
+      updateMutation.mutate({ id: editGrupo.id, data: { nome: form.nome, jid: form.jid, regiao: form.regiao } });
     } else {
-      createMutation.mutate(form);
+      createMutation.mutate({ nome: form.nome, jid: form.jid, regiao: form.regiao });
     }
   };
+
+  const openImport = () => {
+    setSelectedImports(new Set());
+    setImportSearch("");
+    setImportRegiao("");
+    refetchWaGroups();
+    setShowImportDialog(true);
+  };
+
+  const toggleImport = (id: string) => {
+    setSelectedImports((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const importSelectedGroups = async () => {
+    if (selectedImports.size === 0) return;
+    const existingJids = new Set(grupos?.map((g) => g.jid) || []);
+    const toImport = (waGroups || []).filter(
+      (g) => selectedImports.has(g.id) && !existingJids.has(g.id)
+    );
+
+    let created = 0;
+    for (const g of toImport) {
+      try {
+        await apiRequest("POST", "/api/whatsapp/grupos", {
+          nome: g.subject,
+          jid: g.id,
+          regiao: importRegiao || null,
+        });
+        created++;
+      } catch (e) {
+        console.error("Error importing group:", e);
+      }
+    }
+
+    queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/grupos"] });
+    setShowImportDialog(false);
+    toast({
+      title: `${created} grupo${created !== 1 ? "s" : ""} importado${created !== 1 ? "s" : ""}`,
+    });
+  };
+
+  const filteredWaGroups = (waGroups || []).filter((g) =>
+    g.subject.toLowerCase().includes(importSearch.toLowerCase())
+  );
+
+  const existingJids = new Set(grupos?.map((g) => g.jid) || []);
 
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
@@ -261,10 +355,18 @@ function GruposPanel() {
               Cadastre os grupos do WhatsApp organizados por região
             </CardDescription>
           </div>
-          <Button onClick={openCreate} className="gap-2" data-testid="button-add-grupo">
-            <Plus className="h-4 w-4" />
-            Novo Grupo
-          </Button>
+          <div className="flex items-center gap-2">
+            {isConnected && (
+              <Button variant="outline" onClick={openImport} className="gap-2" data-testid="button-import-grupos">
+                <Download className="h-4 w-4" />
+                Importar Meus Grupos
+              </Button>
+            )}
+            <Button onClick={openCreate} className="gap-2" data-testid="button-add-grupo">
+              <Plus className="h-4 w-4" />
+              Novo Grupo
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -277,7 +379,11 @@ function GruposPanel() {
           <div className="text-center py-8 text-muted-foreground">
             <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
             <p>Nenhum grupo cadastrado</p>
-            <p className="text-sm">Adicione grupos para começar a disparar</p>
+            <p className="text-sm">
+              {isConnected
+                ? 'Use "Importar Meus Grupos" ou adicione manualmente'
+                : "Conecte o WhatsApp e importe seus grupos, ou adicione manualmente"}
+            </p>
           </div>
         ) : (
           <Table>
@@ -360,19 +466,57 @@ function GruposPanel() {
                   data-testid="input-grupo-nome"
                 />
               </div>
+
+              {!editGrupo && isConnected && (
+                <div className="space-y-2">
+                  <Label htmlFor="grupo-invite">Link de Convite do Grupo</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="grupo-invite"
+                      placeholder="https://chat.whatsapp.com/AbCdEfGh..."
+                      value={form.inviteLink}
+                      onChange={(e) => setForm({ ...form, inviteLink: e.target.value })}
+                      data-testid="input-grupo-invite"
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={resolveLink}
+                      disabled={!form.inviteLink || isResolvingLink}
+                      data-testid="button-resolve-link"
+                    >
+                      {isResolvingLink ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <LinkIcon className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Cole o link de convite e clique no botão para preencher o JID automaticamente
+                  </p>
+                </div>
+              )}
+
               <div className="space-y-2">
-                <Label htmlFor="grupo-jid">JID do Grupo *</Label>
+                <Label htmlFor="grupo-jid">
+                  JID do Grupo *
+                  {form.jid && <span className="ml-2 text-green-600 text-xs font-normal">(preenchido)</span>}
+                </Label>
                 <Input
                   id="grupo-jid"
                   placeholder="Ex: 120363012345678@g.us"
                   value={form.jid}
                   onChange={(e) => setForm({ ...form, jid: e.target.value })}
                   data-testid="input-grupo-jid"
+                  className={form.jid ? "border-green-300 bg-green-50 dark:bg-green-900/10" : ""}
                 />
                 <p className="text-xs text-muted-foreground">
-                  O JID é o identificador único do grupo no WhatsApp (formato: números@g.us)
+                  {isConnected
+                    ? "Preenchido automaticamente pelo link de convite, ou digite manualmente"
+                    : "O JID é o identificador único do grupo (formato: números@g.us)"}
                 </p>
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="grupo-regiao">Região</Label>
                 <Input
@@ -397,6 +541,114 @@ function GruposPanel() {
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
                 )}
                 {editGrupo ? "Salvar" : "Criar"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Download className="h-5 w-5" />
+                Importar Grupos do WhatsApp
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Buscar grupo por nome..."
+                  value={importSearch}
+                  onChange={(e) => setImportSearch(e.target.value)}
+                  data-testid="input-import-search"
+                />
+                <Input
+                  placeholder="Região (opcional)"
+                  value={importRegiao}
+                  onChange={(e) => setImportRegiao(e.target.value)}
+                  className="w-40"
+                  data-testid="input-import-regiao"
+                />
+              </div>
+
+              {isLoadingWaGroups ? (
+                <div className="flex items-center justify-center py-8 gap-2">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                  <span>Buscando seus grupos...</span>
+                </div>
+              ) : filteredWaGroups.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>Nenhum grupo encontrado</p>
+                </div>
+              ) : (
+                <div className="max-h-[400px] overflow-y-auto border rounded-lg">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-10"></TableHead>
+                        <TableHead>Nome do Grupo</TableHead>
+                        <TableHead className="text-right">Membros</TableHead>
+                        <TableHead className="text-right">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredWaGroups.map((g) => {
+                        const alreadyAdded = existingJids.has(g.id);
+                        return (
+                          <TableRow
+                            key={g.id}
+                            className={alreadyAdded ? "opacity-50" : "cursor-pointer hover:bg-muted/50"}
+                            onClick={() => !alreadyAdded && toggleImport(g.id)}
+                            data-testid={`row-import-grupo-${g.id}`}
+                          >
+                            <TableCell>
+                              <Checkbox
+                                checked={selectedImports.has(g.id)}
+                                disabled={alreadyAdded}
+                                onCheckedChange={() => !alreadyAdded && toggleImport(g.id)}
+                              />
+                            </TableCell>
+                            <TableCell className="font-medium">{g.subject}</TableCell>
+                            <TableCell className="text-right text-muted-foreground">{g.size}</TableCell>
+                            <TableCell className="text-right">
+                              {alreadyAdded ? (
+                                <Badge variant="secondary" className="gap-1">
+                                  <CheckCircle2 className="h-3 w-3" />
+                                  Já cadastrado
+                                </Badge>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">Disponível</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              {filteredWaGroups.length > 0 && (
+                <p className="text-sm text-muted-foreground">
+                  {selectedImports.size} grupo{selectedImports.size !== 1 ? "s" : ""} selecionado{selectedImports.size !== 1 ? "s" : ""}
+                  {" | "}
+                  {filteredWaGroups.length} grupo{filteredWaGroups.length !== 1 ? "s" : ""} encontrado{filteredWaGroups.length !== 1 ? "s" : ""}
+                </p>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowImportDialog(false)}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={importSelectedGroups}
+                disabled={selectedImports.size === 0}
+                className="gap-2"
+                data-testid="button-confirm-import"
+              >
+                <Download className="h-4 w-4" />
+                Importar {selectedImports.size} grupo{selectedImports.size !== 1 ? "s" : ""}
               </Button>
             </DialogFooter>
           </DialogContent>
