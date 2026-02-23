@@ -8,6 +8,7 @@ import Dashboard from "@/pages/dashboard";
 import LogsPage from "@/pages/logs";
 import CadastroPage from "@/pages/cadastro";
 import ScrapingPage from "@/pages/scraping";
+import WhatsAppPage from "@/pages/whatsapp";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -17,6 +18,7 @@ function Router() {
       <Route path="/logs" component={LogsPage} />
       <Route path="/cadastro" component={CadastroPage} />
       <Route path="/scraping" component={ScrapingPage} />
+      <Route path="/whatsapp" component={WhatsAppPage} />
       <Route component={NotFound} />
     </Switch>
   );

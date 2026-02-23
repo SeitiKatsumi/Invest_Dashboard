@@ -70,7 +70,7 @@ TypeScript interfaces are defined in `shared/schema.ts` and shared between front
 - **Purpose**: Primary data source for all dashboard data
 - **Authentication**: Bearer token via `DIRECTUS_TOKEN` environment variable
 - **Base URL**: Configured via `DIRECTUS_URL` environment variable
-- **Collections Accessed**: input_library_url, leiloes_imovel, log_scrapings
+- **Collections Accessed**: input_library_url, leiloes_imovel, log_scrapings, whatsapp_grupos, whatsapp_disparos
 
 ### Database
 - **Type**: PostgreSQL
@@ -110,6 +110,30 @@ TypeScript interfaces are defined in `shared/schema.ts` and shared between front
   - POST `/api/scraping/save-config` - Save config to Directus
 - **Environment variable**: `SCRAPING_API_URL` = `https://api-scrap-invest.server04.11mind.com.br`
 - **Schema**: Added `scraping_config` field to `Site` interface, new `ScrapingJob` interface
+
+### WhatsApp Broadcast Module
+- New `/whatsapp` page for sending auction listings to WhatsApp community groups
+- **Architecture**: Backend service in `server/whatsapp.ts` using @whiskeysockets/baileys (WhatsApp Web protocol)
+- **Connection**: QR code based authentication, auto-reconnect, persistent auth in `./whatsapp_auth/`
+- **Group management**: CRUD operations for WhatsApp groups stored in Directus `whatsapp_grupos` collection
+  - Groups organized by region (SP, RJ, Sul, Nacional, etc.)
+  - Active/inactive toggle per group
+- **Disparo flow**: Search auction by Directus ID → preview → select groups → send with formatted message + image
+  - Message template includes: name, type, values, dates, location, description, edital link
+  - 2-second delay between group sends to avoid spam detection
+  - Images fetched server-side (never exposes Directus tokens)
+- **History**: Dispatch history stored in Directus `whatsapp_disparos` collection with sent/error status
+- **Navigation**: Green "WhatsApp" button in dashboard header
+- Backend endpoints:
+  - GET `/api/whatsapp/status` - Connection status
+  - POST `/api/whatsapp/connect` - Start connection (returns QR code)
+  - POST `/api/whatsapp/disconnect` - Logout and clear auth
+  - GET `/api/whatsapp/qr` - Get current QR code
+  - GET/POST/PATCH/DELETE `/api/whatsapp/grupos` - Group CRUD
+  - GET `/api/whatsapp/leilao/:id` - Fetch auction from Directus
+  - POST `/api/whatsapp/disparar` - Send auction to selected groups
+  - GET `/api/whatsapp/disparos` - Dispatch history
+- **Schema**: New `WhatsAppGrupo` and `WhatsAppDisparo` interfaces in shared/schema.ts
 
 ### Manual Registration
 - Created manual auction registration form at `/cadastro`:

@@ -18,6 +18,21 @@ import {
   updateSiteStatus,
   bulkUpdateSiteStatus,
 } from "./scraping";
+import {
+  connectWhatsApp,
+  disconnectWhatsApp,
+  getConnectionStatus,
+  getCurrentQR,
+  getGrupos,
+  createGrupo,
+  updateGrupo,
+  deleteGrupo,
+  getLeilaoById,
+  sendLeilaoToGroups,
+  createDisparo,
+  getDisparos,
+  tryAutoConnect,
+} from "./whatsapp";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -388,6 +403,193 @@ export async function registerRoutes(
         error: "Failed to save config",
         message: error instanceof Error ? error.message : "Unknown error",
       });
+    }
+  });
+
+  // ==================== WhatsApp Routes ====================
+
+  tryAutoConnect();
+
+  app.get("/api/whatsapp/status", async (req, res) => {
+    try {
+      res.json(getConnectionStatus());
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao verificar status" });
+    }
+  });
+
+  app.post("/api/whatsapp/connect", async (req, res) => {
+    try {
+      const result = await connectWhatsApp();
+      res.json(result);
+    } catch (error) {
+      console.error("Error connecting WhatsApp:", error);
+      res.status(500).json({
+        error: "Falha ao conectar WhatsApp",
+        message: error instanceof Error ? error.message : "Erro desconhecido",
+      });
+    }
+  });
+
+  app.post("/api/whatsapp/disconnect", async (req, res) => {
+    try {
+      await disconnectWhatsApp();
+      res.json({ status: "disconnected" });
+    } catch (error) {
+      console.error("Error disconnecting WhatsApp:", error);
+      res.status(500).json({ error: "Falha ao desconectar" });
+    }
+  });
+
+  app.get("/api/whatsapp/qr", async (req, res) => {
+    try {
+      const qr = getCurrentQR();
+      res.json({ qr, status: getConnectionStatus().status });
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar QR" });
+    }
+  });
+
+  app.get("/api/whatsapp/grupos", async (req, res) => {
+    try {
+      const grupos = await getGrupos();
+      res.json(grupos);
+    } catch (error) {
+      console.error("Error fetching grupos:", error);
+      res.status(500).json({ error: "Falha ao buscar grupos" });
+    }
+  });
+
+  app.post("/api/whatsapp/grupos", async (req, res) => {
+    try {
+      const { nome, jid, regiao, ativo } = req.body;
+      if (!nome || !jid) {
+        return res.status(400).json({ error: "Nome e JID são obrigatórios" });
+      }
+      const grupo = await createGrupo({ nome, jid, regiao, ativo });
+      res.json(grupo);
+    } catch (error) {
+      console.error("Error creating grupo:", error);
+      res.status(500).json({ error: "Falha ao criar grupo" });
+    }
+  });
+
+  app.patch("/api/whatsapp/grupos/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const grupo = await updateGrupo(id, req.body);
+      res.json(grupo);
+    } catch (error) {
+      console.error("Error updating grupo:", error);
+      res.status(500).json({ error: "Falha ao atualizar grupo" });
+    }
+  });
+
+  app.delete("/api/whatsapp/grupos/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await deleteGrupo(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting grupo:", error);
+      res.status(500).json({ error: "Falha ao remover grupo" });
+    }
+  });
+
+  app.get("/api/whatsapp/leilao/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const leilao = await getLeilaoById(id);
+      if (!leilao) {
+        return res.status(404).json({ error: "Leilão não encontrado" });
+      }
+      res.json(leilao);
+    } catch (error) {
+      console.error("Error fetching leilao:", error);
+      res.status(500).json({ error: "Falha ao buscar leilão" });
+    }
+  });
+
+  app.post("/api/whatsapp/disparar", async (req, res) => {
+    try {
+      const { leilaoId, grupoIds } = req.body;
+      if (!leilaoId || !grupoIds || !Array.isArray(grupoIds) || grupoIds.length === 0) {
+        return res.status(400).json({ error: "leilaoId e grupoIds são obrigatórios" });
+      }
+
+      const leilao = await getLeilaoById(leilaoId);
+      if (!leilao) {
+        return res.status(404).json({ error: "Leilão não encontrado" });
+      }
+
+      const grupos = await getGrupos();
+      const selectedGrupos = grupos.filter((g) => grupoIds.includes(g.id));
+      const groupJids = selectedGrupos.map((g) => g.jid);
+
+      if (groupJids.length === 0) {
+        return res.status(400).json({ error: "Nenhum grupo válido selecionado" });
+      }
+
+      let imageUrl = (leilao as any).link_imagem || null;
+      if (!imageUrl && (leilao as any).arquivo_imagem) {
+        const DIRECTUS_URL = process.env.DIRECTUS_URL?.trim();
+        const assetId = (leilao as any).arquivo_imagem;
+        try {
+          const imgResp = await fetch(`${DIRECTUS_URL}/assets/${assetId}`, {
+            headers: { Authorization: `Bearer ${process.env.DIRECTUS_TOKEN?.trim()}` },
+          });
+          if (imgResp.ok) {
+            const buf = Buffer.from(await imgResp.arrayBuffer());
+            const base64 = buf.toString("base64");
+            imageUrl = `data:image/jpeg;base64,${base64}`;
+          }
+        } catch (e) {
+          console.warn("Could not fetch Directus asset for WhatsApp:", e);
+        }
+      }
+
+      const result = await sendLeilaoToGroups(leilao, groupJids, imageUrl);
+
+      for (const grupo of selectedGrupos) {
+        const wasSent = result.sent.includes(grupo.jid);
+        const failInfo = result.failed.find((f) => f.jid === grupo.jid);
+        try {
+          await createDisparo({
+            leilao_id: leilao.id,
+            leilao_nome: leilao.nome_do_anuncio || `Leilão #${leilao.id}`,
+            grupo_id: grupo.id,
+            grupo_nome: grupo.nome,
+            status: wasSent ? "enviado" : "erro",
+            erro_mensagem: failInfo?.error || null,
+          });
+        } catch (e) {
+          console.error("Error saving disparo record:", e);
+        }
+      }
+
+      res.json({
+        success: true,
+        sent: result.sent.length,
+        failed: result.failed.length,
+        details: result,
+      });
+    } catch (error) {
+      console.error("Error sending WhatsApp:", error);
+      res.status(500).json({
+        error: "Falha no disparo",
+        message: error instanceof Error ? error.message : "Erro desconhecido",
+      });
+    }
+  });
+
+  app.get("/api/whatsapp/disparos", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const disparos = await getDisparos(limit);
+      res.json(disparos);
+    } catch (error) {
+      console.error("Error fetching disparos:", error);
+      res.status(500).json({ error: "Falha ao buscar histórico" });
     }
   });
 

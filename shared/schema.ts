@@ -151,6 +151,27 @@ export const leilaoInsertSchema = z.object({
 
 export type LeilaoInsert = z.infer<typeof leilaoInsertSchema>;
 
+export interface WhatsAppGrupo {
+  id: number;
+  nome: string;
+  jid: string;
+  regiao: string | null;
+  ativo: boolean;
+  date_created: string | null;
+  date_updated: string | null;
+}
+
+export interface WhatsAppDisparo {
+  id: number;
+  leilao_id: number;
+  leilao_nome: string | null;
+  grupo_id: number;
+  grupo_nome: string | null;
+  status: string;
+  erro_mensagem: string | null;
+  date_created: string | null;
+}
+
 export const dashboardStatsSchema = z.object({
   sites: z.object({
     total: z.number(),

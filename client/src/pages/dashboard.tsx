@@ -22,7 +22,8 @@ import {
   LayoutDashboard,
   FileText,
   Plus,
-  Bot
+  Bot,
+  MessageSquare
 } from "lucide-react";
 
 function LoadingSkeleton() {
@@ -137,6 +138,12 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Link href="/whatsapp">
+              <Button className="gap-2 bg-green-600 hover:bg-green-700" data-testid="button-whatsapp-page">
+                <MessageSquare className="h-4 w-4" />
+                <span className="hidden sm:inline">WhatsApp</span>
+              </Button>
+            </Link>
             <Link href="/scraping">
               <Button className="gap-2" data-testid="button-scraping-page">
                 <Bot className="h-4 w-4" />

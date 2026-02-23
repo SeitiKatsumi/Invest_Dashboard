@@ -1,0 +1,800 @@
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { WhatsAppGrupo, WhatsAppDisparo, Leilao } from "@shared/schema";
+import { Link } from "wouter";
+import { ThemeToggle } from "@/components/theme-toggle";
+import investLogo from "@assets/Icon_Invest_1769010072868.jpg";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  MessageSquare,
+  Wifi,
+  WifiOff,
+  QrCode,
+  Plus,
+  Trash2,
+  Edit,
+  Send,
+  Search,
+  RefreshCw,
+  LayoutDashboard,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Loader2,
+  Phone,
+  MapPin,
+  Users,
+  History,
+  ArrowLeft,
+} from "lucide-react";
+
+function ConnectionPanel() {
+  const { toast } = useToast();
+
+  const { data: status, refetch: refetchStatus } = useQuery<{
+    status: string;
+    phone: string | null;
+    hasQR: boolean;
+  }>({
+    queryKey: ["/api/whatsapp/status"],
+    refetchInterval: 3000,
+  });
+
+  const { data: qrData, refetch: refetchQR } = useQuery<{
+    qr: string | null;
+    status: string;
+  }>({
+    queryKey: ["/api/whatsapp/qr"],
+    refetchInterval: status?.status === "connecting" ? 2000 : false,
+    enabled: status?.status !== "connected",
+  });
+
+  const connectMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/whatsapp/connect"),
+    onSuccess: () => {
+      refetchStatus();
+      refetchQR();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao conectar", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const disconnectMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/whatsapp/disconnect"),
+    onSuccess: () => {
+      refetchStatus();
+      toast({ title: "Desconectado", description: "WhatsApp foi desconectado" });
+    },
+  });
+
+  const isConnected = status?.status === "connected";
+  const isConnecting = status?.status === "connecting";
+  const qrCode = qrData?.qr;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Phone className="h-5 w-5" />
+          Conexão WhatsApp
+        </CardTitle>
+        <CardDescription>
+          Conecte seu WhatsApp para enviar mensagens aos grupos
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center gap-3">
+          <div className={`h-3 w-3 rounded-full ${isConnected ? "bg-green-500" : isConnecting ? "bg-yellow-500 animate-pulse" : "bg-red-500"}`} />
+          <span className="font-medium" data-testid="text-wa-status">
+            {isConnected ? "Conectado" : isConnecting ? "Conectando..." : "Desconectado"}
+          </span>
+          {isConnected && status?.phone && (
+            <Badge variant="secondary" data-testid="text-wa-phone">{status.phone}</Badge>
+          )}
+        </div>
+
+        {!isConnected && !isConnecting && (
+          <Button
+            onClick={() => connectMutation.mutate()}
+            disabled={connectMutation.isPending}
+            className="gap-2"
+            data-testid="button-wa-connect"
+          >
+            {connectMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
+            Conectar WhatsApp
+          </Button>
+        )}
+
+        {(isConnecting || qrCode) && !isConnected && (
+          <div className="flex flex-col items-center gap-3 p-4 border rounded-lg bg-white dark:bg-gray-900">
+            {qrCode ? (
+              <>
+                <p className="text-sm text-muted-foreground text-center">
+                  Escaneie o QR Code com seu WhatsApp
+                </p>
+                <img
+                  src={qrCode}
+                  alt="QR Code WhatsApp"
+                  className="w-64 h-64"
+                  data-testid="img-qr-code"
+                />
+                <p className="text-xs text-muted-foreground text-center">
+                  Abra o WhatsApp → Configurações → Aparelhos conectados → Conectar aparelho
+                </p>
+              </>
+            ) : (
+              <div className="flex items-center gap-2 py-8">
+                <Loader2 className="h-6 w-6 animate-spin" />
+                <span>Gerando QR Code...</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {isConnected && (
+          <Button
+            variant="destructive"
+            onClick={() => disconnectMutation.mutate()}
+            disabled={disconnectMutation.isPending}
+            className="gap-2"
+            data-testid="button-wa-disconnect"
+          >
+            <WifiOff className="h-4 w-4" />
+            Desconectar
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function GruposPanel() {
+  const { toast } = useToast();
+  const [showDialog, setShowDialog] = useState(false);
+  const [editGrupo, setEditGrupo] = useState<WhatsAppGrupo | null>(null);
+  const [form, setForm] = useState({ nome: "", jid: "", regiao: "" });
+
+  const { data: grupos, isLoading } = useQuery<WhatsAppGrupo[]>({
+    queryKey: ["/api/whatsapp/grupos"],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: { nome: string; jid: string; regiao: string }) =>
+      apiRequest("POST", "/api/whatsapp/grupos", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/grupos"] });
+      setShowDialog(false);
+      setForm({ nome: "", jid: "", regiao: "" });
+      toast({ title: "Grupo criado com sucesso" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<WhatsAppGrupo> }) =>
+      apiRequest("PATCH", `/api/whatsapp/grupos/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/grupos"] });
+      setShowDialog(false);
+      setEditGrupo(null);
+      setForm({ nome: "", jid: "", regiao: "" });
+      toast({ title: "Grupo atualizado" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/whatsapp/grupos/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/grupos"] });
+      toast({ title: "Grupo removido" });
+    },
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: ({ id, ativo }: { id: number; ativo: boolean }) =>
+      apiRequest("PATCH", `/api/whatsapp/grupos/${id}`, { ativo }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/grupos"] });
+    },
+  });
+
+  const openCreate = () => {
+    setEditGrupo(null);
+    setForm({ nome: "", jid: "", regiao: "" });
+    setShowDialog(true);
+  };
+
+  const openEdit = (g: WhatsAppGrupo) => {
+    setEditGrupo(g);
+    setForm({ nome: g.nome, jid: g.jid, regiao: g.regiao || "" });
+    setShowDialog(true);
+  };
+
+  const handleSubmit = () => {
+    if (!form.nome || !form.jid) {
+      toast({ title: "Preencha Nome e JID do grupo", variant: "destructive" });
+      return;
+    }
+    if (editGrupo) {
+      updateMutation.mutate({ id: editGrupo.id, data: form });
+    } else {
+      createMutation.mutate(form);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Grupos de Disparo
+            </CardTitle>
+            <CardDescription>
+              Cadastre os grupos do WhatsApp organizados por região
+            </CardDescription>
+          </div>
+          <Button onClick={openCreate} className="gap-2" data-testid="button-add-grupo">
+            <Plus className="h-4 w-4" />
+            Novo Grupo
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        ) : !grupos || grupos.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
+            <p>Nenhum grupo cadastrado</p>
+            <p className="text-sm">Adicione grupos para começar a disparar</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nome</TableHead>
+                <TableHead>JID</TableHead>
+                <TableHead>Região</TableHead>
+                <TableHead>Ativo</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {grupos.map((g) => (
+                <TableRow key={g.id} data-testid={`row-grupo-${g.id}`}>
+                  <TableCell className="font-medium">{g.nome}</TableCell>
+                  <TableCell className="font-mono text-xs max-w-[200px] truncate">{g.jid}</TableCell>
+                  <TableCell>
+                    {g.regiao ? (
+                      <Badge variant="outline" className="gap-1">
+                        <MapPin className="h-3 w-3" />
+                        {g.regiao}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Checkbox
+                      checked={g.ativo}
+                      onCheckedChange={(checked) =>
+                        toggleMutation.mutate({ id: g.id, ativo: !!checked })
+                      }
+                      data-testid={`checkbox-grupo-ativo-${g.id}`}
+                    />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEdit(g)}
+                        data-testid={`button-edit-grupo-${g.id}`}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          if (confirm("Remover este grupo?")) {
+                            deleteMutation.mutate(g.id);
+                          }
+                        }}
+                        data-testid={`button-delete-grupo-${g.id}`}
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+
+        <Dialog open={showDialog} onOpenChange={setShowDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{editGrupo ? "Editar Grupo" : "Novo Grupo"}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="grupo-nome">Nome do Grupo *</Label>
+                <Input
+                  id="grupo-nome"
+                  placeholder="Ex: Grupo SP Capital"
+                  value={form.nome}
+                  onChange={(e) => setForm({ ...form, nome: e.target.value })}
+                  data-testid="input-grupo-nome"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="grupo-jid">JID do Grupo *</Label>
+                <Input
+                  id="grupo-jid"
+                  placeholder="Ex: 120363012345678@g.us"
+                  value={form.jid}
+                  onChange={(e) => setForm({ ...form, jid: e.target.value })}
+                  data-testid="input-grupo-jid"
+                />
+                <p className="text-xs text-muted-foreground">
+                  O JID é o identificador único do grupo no WhatsApp (formato: números@g.us)
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="grupo-regiao">Região</Label>
+                <Input
+                  id="grupo-regiao"
+                  placeholder="Ex: SP, RJ, Sul, Nacional"
+                  value={form.regiao}
+                  onChange={(e) => setForm({ ...form, regiao: e.target.value })}
+                  data-testid="input-grupo-regiao"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowDialog(false)}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleSubmit}
+                disabled={createMutation.isPending || updateMutation.isPending}
+                data-testid="button-save-grupo"
+              >
+                {(createMutation.isPending || updateMutation.isPending) && (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                )}
+                {editGrupo ? "Salvar" : "Criar"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DisparoPanel() {
+  const { toast } = useToast();
+  const [leilaoId, setLeilaoId] = useState("");
+  const [leilao, setLeilao] = useState<Leilao | null>(null);
+  const [selectedGrupos, setSelectedGrupos] = useState<number[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  const { data: status } = useQuery<{ status: string }>({
+    queryKey: ["/api/whatsapp/status"],
+  });
+
+  const { data: grupos } = useQuery<WhatsAppGrupo[]>({
+    queryKey: ["/api/whatsapp/grupos"],
+  });
+
+  const activeGrupos = grupos?.filter((g) => g.ativo) || [];
+  const isConnected = status?.status === "connected";
+
+  const searchLeilao = async () => {
+    const id = parseInt(leilaoId);
+    if (!id || isNaN(id)) {
+      toast({ title: "Digite um ID válido", variant: "destructive" });
+      return;
+    }
+    setIsSearching(true);
+    try {
+      const resp = await fetch(`/api/whatsapp/leilao/${id}`);
+      if (!resp.ok) {
+        const err = await resp.json();
+        throw new Error(err.error || "Leilão não encontrado");
+      }
+      const data = await resp.json();
+      setLeilao(data);
+    } catch (error) {
+      toast({
+        title: "Leilão não encontrado",
+        description: error instanceof Error ? error.message : "Verifique o ID",
+        variant: "destructive",
+      });
+      setLeilao(null);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const dispararMutation = useMutation({
+    mutationFn: (data: { leilaoId: number; grupoIds: number[] }) =>
+      apiRequest("POST", "/api/whatsapp/disparar", data).then((r) => r.json()),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/disparos"] });
+      toast({
+        title: "Disparo realizado!",
+        description: `${result.sent} enviados, ${result.failed} falharam`,
+      });
+      setSelectedGrupos([]);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro no disparo",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDisparar = () => {
+    if (!leilao) {
+      toast({ title: "Busque um leilão primeiro", variant: "destructive" });
+      return;
+    }
+    if (selectedGrupos.length === 0) {
+      toast({ title: "Selecione ao menos um grupo", variant: "destructive" });
+      return;
+    }
+    dispararMutation.mutate({ leilaoId: leilao.id, grupoIds: selectedGrupos });
+  };
+
+  const toggleGrupo = (id: number) => {
+    setSelectedGrupos((prev) =>
+      prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]
+    );
+  };
+
+  const selectAll = () => {
+    if (selectedGrupos.length === activeGrupos.length) {
+      setSelectedGrupos([]);
+    } else {
+      setSelectedGrupos(activeGrupos.map((g) => g.id));
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Send className="h-5 w-5" />
+          Disparo de Leilão
+        </CardTitle>
+        <CardDescription>
+          Busque um leilão pelo ID e envie para os grupos selecionados
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {!isConnected && (
+          <div className="flex items-center gap-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 rounded-lg text-sm">
+            <WifiOff className="h-4 w-4 flex-shrink-0" />
+            Conecte o WhatsApp primeiro para poder disparar mensagens
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <Label htmlFor="leilao-id" className="sr-only">ID do Leilão</Label>
+            <Input
+              id="leilao-id"
+              placeholder="Digite o ID do leilão no Directus"
+              value={leilaoId}
+              onChange={(e) => setLeilaoId(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && searchLeilao()}
+              type="number"
+              data-testid="input-leilao-id"
+            />
+          </div>
+          <Button
+            onClick={searchLeilao}
+            disabled={isSearching}
+            className="gap-2"
+            data-testid="button-search-leilao"
+          >
+            {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+            Buscar
+          </Button>
+        </div>
+
+        {leilao && (
+          <div className="border rounded-lg p-4 space-y-3 bg-muted/30" data-testid="card-leilao-preview">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 space-y-1">
+                <h3 className="font-semibold text-lg" data-testid="text-leilao-nome">
+                  {leilao.nome_do_anuncio || `Leilão #${leilao.id}`}
+                </h3>
+                <div className="flex items-center gap-2 flex-wrap text-sm text-muted-foreground">
+                  {leilao.tipo_do_imovel && <Badge variant="outline">{leilao.tipo_do_imovel}</Badge>}
+                  {leilao.tipo_de_leilao && <Badge variant="outline">{leilao.tipo_de_leilao}</Badge>}
+                  {leilao.estado_uf && (
+                    <Badge variant="secondary" className="gap-1">
+                      <MapPin className="h-3 w-3" />{leilao.estado_uf}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              {(leilao as any).link_imagem && (
+                <img
+                  src={(leilao as any).link_imagem}
+                  alt="Imagem do leilão"
+                  className="w-24 h-24 rounded-lg object-cover"
+                  onError={(e) => (e.currentTarget.style.display = "none")}
+                />
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              {leilao.valor_avalaiacao_imovel && (
+                <div>
+                  <span className="text-muted-foreground">Avaliação:</span>{" "}
+                  <strong>R$ {leilao.valor_avalaiacao_imovel}</strong>
+                </div>
+              )}
+              {leilao.desconto && (
+                <div>
+                  <span className="text-muted-foreground">Desconto:</span>{" "}
+                  <strong className="text-green-600">{leilao.desconto}</strong>
+                </div>
+              )}
+              {leilao.cidade && (
+                <div>
+                  <span className="text-muted-foreground">Cidade:</span>{" "}
+                  <strong>{leilao.cidade}</strong>
+                </div>
+              )}
+              {leilao.praca_1 && (
+                <div>
+                  <span className="text-muted-foreground">1ª Praça:</span>{" "}
+                  <strong>{leilao.praca_1}</strong>
+                </div>
+              )}
+            </div>
+
+            {leilao.descricao && (
+              <p className="text-sm text-muted-foreground line-clamp-3">
+                {leilao.descricao}
+              </p>
+            )}
+          </div>
+        )}
+
+        {leilao && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-base font-semibold">Selecione os grupos</Label>
+              <Button variant="ghost" size="sm" onClick={selectAll} data-testid="button-select-all-grupos">
+                {selectedGrupos.length === activeGrupos.length ? "Desmarcar todos" : "Selecionar todos"}
+              </Button>
+            </div>
+
+            {activeGrupos.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Nenhum grupo ativo cadastrado. Adicione grupos na seção acima.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {activeGrupos.map((g) => (
+                  <div
+                    key={g.id}
+                    className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                      selectedGrupos.includes(g.id)
+                        ? "border-primary bg-primary/5"
+                        : "hover:bg-muted/50"
+                    }`}
+                    onClick={() => toggleGrupo(g.id)}
+                    data-testid={`card-select-grupo-${g.id}`}
+                  >
+                    <Checkbox
+                      checked={selectedGrupos.includes(g.id)}
+                      onCheckedChange={() => toggleGrupo(g.id)}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{g.nome}</p>
+                      {g.regiao && (
+                        <p className="text-xs text-muted-foreground">{g.regiao}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <Button
+              onClick={handleDisparar}
+              disabled={
+                !isConnected ||
+                selectedGrupos.length === 0 ||
+                dispararMutation.isPending
+              }
+              className="w-full gap-2"
+              size="lg"
+              data-testid="button-disparar"
+            >
+              {dispararMutation.isPending ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Send className="h-5 w-5" />
+              )}
+              Disparar para {selectedGrupos.length} grupo{selectedGrupos.length !== 1 ? "s" : ""}
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function HistoricoPanel() {
+  const { data: disparos, isLoading } = useQuery<WhatsAppDisparo[]>({
+    queryKey: ["/api/whatsapp/disparos"],
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <History className="h-5 w-5" />
+          Histórico de Disparos
+        </CardTitle>
+        <CardDescription>
+          Últimos disparos realizados
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        ) : !disparos || disparos.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <History className="h-12 w-12 mx-auto mb-2 opacity-50" />
+            <p>Nenhum disparo realizado</p>
+          </div>
+        ) : (
+          <div className="max-h-[400px] overflow-y-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Leilão</TableHead>
+                  <TableHead>Grupo</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Data</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {disparos.map((d) => (
+                  <TableRow key={d.id} data-testid={`row-disparo-${d.id}`}>
+                    <TableCell className="font-medium max-w-[200px] truncate">
+                      {d.leilao_nome || `#${d.leilao_id}`}
+                    </TableCell>
+                    <TableCell>{d.grupo_nome || `#${d.grupo_id}`}</TableCell>
+                    <TableCell>
+                      {d.status === "enviado" ? (
+                        <Badge className="gap-1 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Enviado
+                        </Badge>
+                      ) : d.status === "erro" ? (
+                        <Badge variant="destructive" className="gap-1">
+                          <XCircle className="h-3 w-3" />
+                          Erro
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="gap-1">
+                          <Clock className="h-3 w-3" />
+                          Pendente
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {d.date_created
+                        ? new Date(d.date_created).toLocaleString("pt-BR", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : "-"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function WhatsAppPage() {
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        <header className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-4">
+            <img
+              src={investLogo}
+              alt="Invest Leilões"
+              className="h-12 w-12 rounded-xl object-contain"
+            />
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2">
+                <MessageSquare className="h-7 w-7 text-green-600" />
+                Disparo WhatsApp
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Envie leilões para os grupos da comunidade Invest
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link href="/">
+              <Button variant="outline" className="gap-2" data-testid="button-back-dashboard">
+                <ArrowLeft className="h-4 w-4" />
+                <span className="hidden sm:inline">Dashboard</span>
+              </Button>
+            </Link>
+            <ThemeToggle />
+          </div>
+        </header>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="space-y-6">
+            <ConnectionPanel />
+            <HistoricoPanel />
+          </div>
+          <div className="lg:col-span-2 space-y-6">
+            <DisparoPanel />
+            <GruposPanel />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

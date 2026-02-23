@@ -1,0 +1,371 @@
+import makeWASocket, {
+  useMultiFileAuthState,
+  fetchLatestBaileysVersion,
+  DisconnectReason,
+  WASocket,
+  delay,
+} from "@whiskeysockets/baileys";
+import { Boom } from "@hapi/boom";
+import * as QRCode from "qrcode";
+import P from "pino";
+import { WhatsAppGrupo, WhatsAppDisparo, Leilao } from "@shared/schema";
+
+const DIRECTUS_URL = process.env.DIRECTUS_URL?.trim();
+const DIRECTUS_TOKEN = process.env.DIRECTUS_TOKEN?.trim();
+
+let sock: WASocket | null = null;
+let currentQR: string | null = null;
+let connectionStatus: "disconnected" | "connecting" | "connected" = "disconnected";
+let connectedPhone: string | null = null;
+let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+
+function getLogger() {
+  return P({ level: "silent" }) as any;
+}
+
+export function getConnectionStatus() {
+  return {
+    status: connectionStatus,
+    phone: connectedPhone,
+    hasQR: !!currentQR,
+  };
+}
+
+export function getCurrentQR(): string | null {
+  return currentQR;
+}
+
+export async function connectWhatsApp(): Promise<{ qr?: string; status: string }> {
+  if (connectionStatus === "connected" && sock) {
+    return { status: "already_connected" };
+  }
+
+  if (connectionStatus === "connecting") {
+    if (currentQR) {
+      return { qr: currentQR, status: "waiting_qr" };
+    }
+    return { status: "connecting" };
+  }
+
+  connectionStatus = "connecting";
+  currentQR = null;
+
+  try {
+    const { state, saveCreds } = await useMultiFileAuthState("./whatsapp_auth");
+    const { version } = await fetchLatestBaileysVersion();
+
+    sock = makeWASocket({
+      version,
+      auth: state,
+      printQRInTerminal: false,
+      logger: getLogger(),
+      browser: ["Invest Leilões", "Chrome", "1.0.0"],
+      connectTimeoutMs: 60000,
+      defaultQueryTimeoutMs: 60000,
+      generateHighQualityLinkPreview: false,
+    });
+
+    sock.ev.on("creds.update", saveCreds);
+
+    return new Promise<{ qr?: string; status: string }>((resolve) => {
+      let resolved = false;
+
+      sock!.ev.on("connection.update", async (update) => {
+        const { connection, lastDisconnect, qr } = update;
+
+        if (qr) {
+          const qrDataUrl = await QRCode.toDataURL(qr, { width: 300, margin: 2 });
+          currentQR = qrDataUrl;
+          if (!resolved) {
+            resolved = true;
+            resolve({ qr: qrDataUrl, status: "waiting_qr" });
+          }
+        }
+
+        if (connection === "open") {
+          connectionStatus = "connected";
+          currentQR = null;
+          connectedPhone = sock?.user?.id?.split(":")[0] || null;
+          console.log("WhatsApp connected:", connectedPhone);
+          if (!resolved) {
+            resolved = true;
+            resolve({ status: "connected" });
+          }
+        }
+
+        if (connection === "close") {
+          const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
+          const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+
+          connectionStatus = "disconnected";
+          connectedPhone = null;
+          sock = null;
+
+          if (shouldReconnect) {
+            console.log("WhatsApp disconnected, reconnecting in 5s...");
+            if (reconnectTimeout) clearTimeout(reconnectTimeout);
+            reconnectTimeout = setTimeout(() => {
+              connectWhatsApp().catch(console.error);
+            }, 5000);
+          } else {
+            console.log("WhatsApp logged out");
+            currentQR = null;
+          }
+
+          if (!resolved) {
+            resolved = true;
+            resolve({ status: "disconnected" });
+          }
+        }
+      });
+
+      setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          resolve({ status: "connecting" });
+        }
+      }, 5000);
+    });
+  } catch (error) {
+    connectionStatus = "disconnected";
+    sock = null;
+    throw error;
+  }
+}
+
+export async function disconnectWhatsApp(): Promise<void> {
+  if (reconnectTimeout) {
+    clearTimeout(reconnectTimeout);
+    reconnectTimeout = null;
+  }
+  if (sock) {
+    await sock.logout().catch(() => {});
+    sock = null;
+  }
+  connectionStatus = "disconnected";
+  connectedPhone = null;
+  currentQR = null;
+
+  const fs = await import("fs");
+  const path = await import("path");
+  const authDir = path.join(process.cwd(), "whatsapp_auth");
+  if (fs.existsSync(authDir)) {
+    fs.rmSync(authDir, { recursive: true, force: true });
+  }
+}
+
+export async function sendLeilaoToGroups(
+  leilao: Leilao,
+  groupJids: string[],
+  imageUrl?: string | null,
+): Promise<{ sent: string[]; failed: { jid: string; error: string }[] }> {
+  if (!sock || connectionStatus !== "connected") {
+    throw new Error("WhatsApp não está conectado");
+  }
+
+  const message = buildLeilaoMessage(leilao);
+  const sent: string[] = [];
+  const failed: { jid: string; error: string }[] = [];
+
+  for (const jid of groupJids) {
+    try {
+      if (imageUrl) {
+        let imageSource: { url: string } | Buffer;
+        
+        if (imageUrl.startsWith("data:")) {
+          const base64Data = imageUrl.split(",")[1];
+          imageSource = Buffer.from(base64Data, "base64");
+        } else if (imageUrl.startsWith("http")) {
+          try {
+            const imgResp = await fetch(imageUrl);
+            if (imgResp.ok) {
+              const arrayBuf = await imgResp.arrayBuffer();
+              imageSource = Buffer.from(arrayBuf);
+            } else {
+              imageSource = { url: imageUrl };
+            }
+          } catch {
+            imageSource = { url: imageUrl };
+          }
+        } else {
+          imageSource = { url: imageUrl };
+        }
+
+        await sock.sendMessage(jid, {
+          image: imageSource,
+          caption: message,
+        });
+      } else {
+        await sock.sendMessage(jid, { text: message });
+      }
+      sent.push(jid);
+      await delay(2000);
+    } catch (error) {
+      failed.push({
+        jid,
+        error: error instanceof Error ? error.message : "Erro desconhecido",
+      });
+    }
+  }
+
+  return { sent, failed };
+}
+
+function buildLeilaoMessage(leilao: Leilao): string {
+  const lines: string[] = [];
+
+  lines.push("🏠 *LEILÃO DE IMÓVEL*");
+  lines.push("");
+
+  if (leilao.nome_do_anuncio) {
+    lines.push(`📌 *${leilao.nome_do_anuncio}*`);
+    lines.push("");
+  }
+
+  if (leilao.tipo_do_imovel) {
+    lines.push(`🏢 *Tipo:* ${leilao.tipo_do_imovel}`);
+  }
+
+  if (leilao.tipo_de_leilao) {
+    lines.push(`⚖️ *Modalidade:* ${leilao.tipo_de_leilao}`);
+  }
+
+  if (leilao.area_imovel) {
+    lines.push(`📐 *Área:* ${leilao.area_imovel}`);
+  }
+
+  if (leilao.valor_avalaiacao_imovel) {
+    lines.push(`💰 *Avaliação:* R$ ${leilao.valor_avalaiacao_imovel}`);
+  }
+
+  if (leilao.desconto) {
+    lines.push(`🔥 *Desconto:* ${leilao.desconto}`);
+  }
+
+  lines.push("");
+
+  if (leilao.praca_1) {
+    lines.push(`📅 *1ª Praça:* ${leilao.praca_1}`);
+  }
+  if (leilao.praca_2) {
+    lines.push(`📅 *2ª Praça:* ${leilao.praca_2}`);
+  }
+  if (leilao.praca_3) {
+    lines.push(`📅 *3ª Praça:* ${leilao.praca_3}`);
+  }
+
+  const enderecoParts: string[] = [];
+  if (leilao.endereco) enderecoParts.push(leilao.endereco);
+  if (leilao.cidade) enderecoParts.push(leilao.cidade);
+  if (leilao.estado_uf) enderecoParts.push(leilao.estado_uf);
+
+  if (enderecoParts.length > 0) {
+    lines.push("");
+    lines.push(`📍 *Localização:* ${enderecoParts.join(", ")}`);
+  }
+
+  if (leilao.descricao) {
+    lines.push("");
+    const desc = leilao.descricao.length > 300
+      ? leilao.descricao.substring(0, 300) + "..."
+      : leilao.descricao;
+    lines.push(`📝 ${desc}`);
+  }
+
+  if (leilao.link_edital) {
+    lines.push("");
+    lines.push(`📄 *Edital:* ${leilao.link_edital}`);
+  }
+
+  lines.push("");
+  lines.push("─────────────────");
+  lines.push("🔗 *Invest Leilões Brasil*");
+
+  return lines.join("\n");
+}
+
+async function directusRequest(method: string, endpoint: string, body?: unknown) {
+  if (!DIRECTUS_URL || !DIRECTUS_TOKEN) {
+    throw new Error("DIRECTUS_URL and DIRECTUS_TOKEN must be set");
+  }
+
+  const response = await fetch(`${DIRECTUS_URL}/items/${endpoint}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`Directus error ${response.status}: ${err}`);
+  }
+
+  if (response.status === 204) return null;
+  return response.json();
+}
+
+export async function getGrupos(): Promise<WhatsAppGrupo[]> {
+  const result = await directusRequest("GET", "whatsapp_grupos?sort=nome&limit=-1");
+  return result?.data || [];
+}
+
+export async function createGrupo(data: { nome: string; jid: string; regiao?: string; ativo?: boolean }): Promise<WhatsAppGrupo> {
+  const result = await directusRequest("POST", "whatsapp_grupos", {
+    nome: data.nome,
+    jid: data.jid,
+    regiao: data.regiao || null,
+    ativo: data.ativo !== false,
+  });
+  return result?.data;
+}
+
+export async function updateGrupo(id: number, data: Partial<{ nome: string; jid: string; regiao: string; ativo: boolean }>): Promise<WhatsAppGrupo> {
+  const result = await directusRequest("PATCH", `whatsapp_grupos/${id}`, data);
+  return result?.data;
+}
+
+export async function deleteGrupo(id: number): Promise<void> {
+  await directusRequest("DELETE", `whatsapp_grupos/${id}`);
+}
+
+export async function getLeilaoById(id: number): Promise<Leilao | null> {
+  try {
+    const result = await directusRequest("GET", `leiloes_imovel/${id}`);
+    return result?.data || null;
+  } catch (e) {
+    console.error("Error fetching leilao:", e);
+    return null;
+  }
+}
+
+export async function createDisparo(data: {
+  leilao_id: number;
+  leilao_nome: string | null;
+  grupo_id: number;
+  grupo_nome: string | null;
+  status: string;
+  erro_mensagem?: string | null;
+}): Promise<WhatsAppDisparo> {
+  const result = await directusRequest("POST", "whatsapp_disparos", data);
+  return result?.data;
+}
+
+export async function getDisparos(limit = 50): Promise<WhatsAppDisparo[]> {
+  const result = await directusRequest("GET", `whatsapp_disparos?sort=-date_created&limit=${limit}`);
+  return result?.data || [];
+}
+
+export async function tryAutoConnect() {
+  const fs = await import("fs");
+  const path = await import("path");
+  const authDir = path.join(process.cwd(), "whatsapp_auth");
+  if (fs.existsSync(authDir) && fs.readdirSync(authDir).length > 0) {
+    console.log("WhatsApp auth found, auto-connecting...");
+    connectWhatsApp().catch((err) => {
+      console.error("WhatsApp auto-connect failed:", err);
+    });
+  }
+}
