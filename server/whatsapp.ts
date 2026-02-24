@@ -217,9 +217,25 @@ export async function sendLeilaoToGroups(
 }
 
 function formatBRL(value: string | number): string {
-  const num = typeof value === "string" ? parseFloat(value.replace(/[^\d.,\-]/g, "").replace(",", ".")) : value;
-  if (isNaN(num)) return String(value);
-  return num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const str = String(value).trim();
+  if (/^\d{1,3}(\.\d{3})*(,\d{2})?$/.test(str)) {
+    return str;
+  }
+  const cleaned = str.replace(/[^\d.,\-]/g, "");
+  if (cleaned.includes(",") && cleaned.includes(".")) {
+    const lastComma = cleaned.lastIndexOf(",");
+    const lastDot = cleaned.lastIndexOf(".");
+    if (lastComma > lastDot) {
+      const num = parseFloat(cleaned.replace(/\./g, "").replace(",", "."));
+      if (!isNaN(num)) return num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    } else {
+      const num = parseFloat(cleaned.replace(/,/g, ""));
+      if (!isNaN(num)) return num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+  }
+  const num = parseFloat(cleaned.replace(",", "."));
+  if (!isNaN(num)) return num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return str;
 }
 
 export function buildLeilaoMessage(leilao: Leilao): string {
