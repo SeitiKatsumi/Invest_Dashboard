@@ -433,6 +433,16 @@ export async function getWhatsAppGroups(): Promise<{
           size: child.participants?.length || 0,
         }));
 
+      if (linked.length === 0) {
+        results.push({
+          id: g.id,
+          subject: g.subject || "Sem nome",
+          size: g.participants?.length || 0,
+          isCommunity: false,
+        });
+        continue;
+      }
+
       results.push({
         id: g.id,
         subject: g.subject || "Sem nome",
