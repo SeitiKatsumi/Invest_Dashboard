@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { WhatsAppGrupo, WhatsAppDisparo, Leilao } from "@shared/schema";
@@ -51,6 +51,9 @@ import {
   ArrowLeft,
   Download,
   Link as LinkIcon,
+  ChevronDown,
+  ChevronRight,
+  Network,
 } from "lucide-react";
 
 function ConnectionPanel() {
@@ -195,12 +198,21 @@ function GruposPanel() {
     queryKey: ["/api/whatsapp/grupos"],
   });
 
-  const { data: waGroups, isLoading: isLoadingWaGroups, refetch: refetchWaGroups } = useQuery<
-    { id: string; subject: string; size: number }[]
-  >({
+  type WAGroup = {
+    id: string;
+    subject: string;
+    size: number;
+    isCommunity: boolean;
+    linkedParent?: string;
+    linkedGroups?: { id: string; subject: string; size: number }[];
+  };
+
+  const { data: waGroups, isLoading: isLoadingWaGroups, refetch: refetchWaGroups } = useQuery<WAGroup[]>({
     queryKey: ["/api/whatsapp/my-groups"],
     enabled: false,
   });
+
+  const [expandedCommunities, setExpandedCommunities] = useState<Set<string>>(new Set());
 
   const createMutation = useMutation({
     mutationFn: (data: { nome: string; jid: string; regiao: string }) =>
@@ -299,7 +311,38 @@ function GruposPanel() {
     setShowImportDialog(true);
   };
 
+  const toggleCommunityExpand = (id: string) => {
+    setExpandedCommunities((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const toggleImport = (id: string) => {
+    const group = (waGroups || []).find((g) => g.id === id);
+    setSelectedImports((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+        if (group?.isCommunity && group.linkedGroups) {
+          group.linkedGroups.forEach((lg) => next.delete(lg.id));
+        }
+      } else {
+        next.add(id);
+        if (group?.isCommunity && group.linkedGroups) {
+          group.linkedGroups.forEach((lg) => {
+            if (!existingJids.has(lg.id)) next.add(lg.id);
+          });
+          setExpandedCommunities((prev) => new Set(prev).add(id));
+        }
+      }
+      return next;
+    });
+  };
+
+  const toggleLinkedGroupImport = (id: string) => {
     setSelectedImports((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -310,13 +353,24 @@ function GruposPanel() {
 
   const importSelectedGroups = async () => {
     if (selectedImports.size === 0) return;
-    const existingJids = new Set(grupos?.map((g) => g.jid) || []);
-    const toImport = (waGroups || []).filter(
-      (g) => selectedImports.has(g.id) && !existingJids.has(g.id)
-    );
+    const existingJidsSet = new Set(grupos?.map((g) => g.jid) || []);
+
+    const allImportable: { id: string; subject: string }[] = [];
+    for (const g of waGroups || []) {
+      if (g.isCommunity && g.linkedGroups) {
+        for (const lg of g.linkedGroups) {
+          if (selectedImports.has(lg.id) && !existingJidsSet.has(lg.id)) {
+            allImportable.push({ id: lg.id, subject: lg.subject });
+          }
+        }
+      }
+      if (!g.isCommunity && selectedImports.has(g.id) && !existingJidsSet.has(g.id)) {
+        allImportable.push({ id: g.id, subject: g.subject });
+      }
+    }
 
     let created = 0;
-    for (const g of toImport) {
+    for (const g of allImportable) {
       try {
         await apiRequest("POST", "/api/whatsapp/grupos", {
           nome: g.subject,
@@ -336,9 +390,18 @@ function GruposPanel() {
     });
   };
 
-  const filteredWaGroups = (waGroups || []).filter((g) =>
-    g.subject.toLowerCase().includes(importSearch.toLowerCase())
+  const allGroupIds = new Set((waGroups || []).map((g) => g.id));
+  const topLevelGroups = (waGroups || []).filter(
+    (g) => !g.linkedParent || !allGroupIds.has(g.linkedParent)
   );
+  const filteredWaGroups = topLevelGroups.filter((g) => {
+    const search = importSearch.toLowerCase();
+    if (g.subject.toLowerCase().includes(search)) return true;
+    if (g.isCommunity && g.linkedGroups) {
+      return g.linkedGroups.some((lg) => lg.subject.toLowerCase().includes(search));
+    }
+    return false;
+  });
 
   const existingJids = new Set(grupos?.map((g) => g.jid) || []);
 
@@ -587,13 +650,103 @@ function GruposPanel() {
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-10"></TableHead>
-                        <TableHead>Nome do Grupo</TableHead>
+                        <TableHead>Nome</TableHead>
                         <TableHead className="text-right">Membros</TableHead>
                         <TableHead className="text-right">Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredWaGroups.map((g) => {
+                        if (g.isCommunity) {
+                          const isExpanded = expandedCommunities.has(g.id);
+                          const linkedGroups = g.linkedGroups || [];
+                          const allLinkedSelected = linkedGroups.length > 0 && linkedGroups.every(
+                            (lg) => selectedImports.has(lg.id) || existingJids.has(lg.id)
+                          );
+                          const someLinkedSelected = linkedGroups.some(
+                            (lg) => selectedImports.has(lg.id)
+                          );
+                          return (
+                            <Fragment key={g.id}>
+                              <TableRow
+                                className="cursor-pointer hover:bg-muted/50 bg-muted/20"
+                                data-testid={`row-import-community-${g.id}`}
+                              >
+                                <TableCell>
+                                  <Checkbox
+                                    checked={allLinkedSelected}
+                                    ref={(el) => {
+                                      if (el) {
+                                        (el as any).indeterminate = someLinkedSelected && !allLinkedSelected;
+                                      }
+                                    }}
+                                    onCheckedChange={() => toggleImport(g.id)}
+                                  />
+                                </TableCell>
+                                <TableCell
+                                  className="font-semibold"
+                                  onClick={() => toggleCommunityExpand(g.id)}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    {isExpanded ? (
+                                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                    ) : (
+                                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                    )}
+                                    <Network className="h-4 w-4 text-primary" />
+                                    {g.subject}
+                                    <Badge variant="outline" className="text-xs ml-1">
+                                      Comunidade · {linkedGroups.length} grupo{linkedGroups.length !== 1 ? "s" : ""}
+                                    </Badge>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-right text-muted-foreground">{g.size}</TableCell>
+                                <TableCell className="text-right">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={(e) => { e.stopPropagation(); toggleCommunityExpand(g.id); }}
+                                    className="text-xs"
+                                  >
+                                    {isExpanded ? "Ocultar" : "Ver grupos"}
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                              {isExpanded && linkedGroups.map((lg) => {
+                                const lgAlreadyAdded = existingJids.has(lg.id);
+                                return (
+                                  <TableRow
+                                    key={lg.id}
+                                    className={`${lgAlreadyAdded ? "opacity-50" : "cursor-pointer hover:bg-muted/50"}`}
+                                    onClick={() => !lgAlreadyAdded && toggleLinkedGroupImport(lg.id)}
+                                    data-testid={`row-import-linked-${lg.id}`}
+                                  >
+                                    <TableCell className="pl-6">
+                                      <Checkbox
+                                        checked={selectedImports.has(lg.id)}
+                                        disabled={lgAlreadyAdded}
+                                        onCheckedChange={() => !lgAlreadyAdded && toggleLinkedGroupImport(lg.id)}
+                                      />
+                                    </TableCell>
+                                    <TableCell className="pl-12 text-sm">{lg.subject}</TableCell>
+                                    <TableCell className="text-right text-muted-foreground text-sm">{lg.size}</TableCell>
+                                    <TableCell className="text-right">
+                                      {lgAlreadyAdded ? (
+                                        <Badge variant="secondary" className="gap-1 text-xs">
+                                          <CheckCircle2 className="h-3 w-3" />
+                                          Já cadastrado
+                                        </Badge>
+                                      ) : (
+                                        <span className="text-xs text-muted-foreground">Disponível</span>
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </Fragment>
+                          );
+                        }
+
                         const alreadyAdded = existingJids.has(g.id);
                         return (
                           <TableRow
@@ -609,7 +762,12 @@ function GruposPanel() {
                                 onCheckedChange={() => !alreadyAdded && toggleImport(g.id)}
                               />
                             </TableCell>
-                            <TableCell className="font-medium">{g.subject}</TableCell>
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                <Users className="h-4 w-4 text-muted-foreground" />
+                                {g.subject}
+                              </div>
+                            </TableCell>
                             <TableCell className="text-right text-muted-foreground">{g.size}</TableCell>
                             <TableCell className="text-right">
                               {alreadyAdded ? (

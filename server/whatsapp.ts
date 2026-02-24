@@ -384,17 +384,87 @@ export async function getDisparos(limit = 50): Promise<WhatsAppDisparo[]> {
   return result?.data || [];
 }
 
-export async function getWhatsAppGroups(): Promise<{ id: string; subject: string; size: number }[]> {
+export async function getWhatsAppGroups(): Promise<{
+  id: string;
+  subject: string;
+  size: number;
+  isCommunity: boolean;
+  linkedParent?: string;
+  linkedGroups?: { id: string; subject: string; size: number }[];
+}[]> {
   if (!sock || connectionStatus !== "connected") {
     throw new Error("WhatsApp não está conectado");
   }
 
-  const groups = await sock.groupFetchAllParticipating();
-  return Object.values(groups).map((g: any) => ({
-    id: g.id,
-    subject: g.subject || "Sem nome",
-    size: g.participants?.length || 0,
-  }));
+  const allGroups = await sock.groupFetchAllParticipating();
+  const groupValues = Object.values(allGroups) as any[];
+
+  const communityJids = new Set<string>();
+  const childToParent = new Map<string, string>();
+
+  for (const g of groupValues) {
+    if (g.linkedParent) {
+      childToParent.set(g.id, g.linkedParent);
+      communityJids.add(g.linkedParent);
+    }
+    if (g.isCommunity) {
+      communityJids.add(g.id);
+    }
+  }
+
+  const results: {
+    id: string;
+    subject: string;
+    size: number;
+    isCommunity: boolean;
+    linkedParent?: string;
+    linkedGroups?: { id: string; subject: string; size: number }[];
+  }[] = [];
+
+  for (const g of groupValues) {
+    const isCommunity = communityJids.has(g.id) && !childToParent.has(g.id);
+
+    if (isCommunity) {
+      const linked = groupValues
+        .filter((child: any) => child.linkedParent === g.id)
+        .map((child: any) => ({
+          id: child.id,
+          subject: child.subject || "Sem nome",
+          size: child.participants?.length || 0,
+        }));
+
+      results.push({
+        id: g.id,
+        subject: g.subject || "Sem nome",
+        size: g.participants?.length || 0,
+        isCommunity: true,
+        linkedGroups: linked,
+      });
+    } else if (!childToParent.has(g.id)) {
+      results.push({
+        id: g.id,
+        subject: g.subject || "Sem nome",
+        size: g.participants?.length || 0,
+        isCommunity: false,
+      });
+    } else {
+      results.push({
+        id: g.id,
+        subject: g.subject || "Sem nome",
+        size: g.participants?.length || 0,
+        isCommunity: false,
+        linkedParent: childToParent.get(g.id),
+      });
+    }
+  }
+
+  results.sort((a, b) => {
+    if (a.isCommunity && !b.isCommunity) return -1;
+    if (!a.isCommunity && b.isCommunity) return 1;
+    return a.subject.localeCompare(b.subject);
+  });
+
+  return results;
 }
 
 export async function resolveInviteLink(link: string): Promise<{ jid: string; subject: string }> {
