@@ -238,6 +238,21 @@ function formatBRL(value: string | number): string {
   return str;
 }
 
+function formatDateBR(dateStr: string): string {
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year = d.getFullYear();
+    const hours = String(d.getHours()).padStart(2, "0");
+    const minutes = String(d.getMinutes()).padStart(2, "0");
+    return `${day}/${month}/${year} às ${hours}:${minutes}`;
+  } catch {
+    return dateStr;
+  }
+}
+
 export function buildLeilaoMessage(leilao: Leilao): string {
   const lines: string[] = [];
 
@@ -270,10 +285,10 @@ export function buildLeilaoMessage(leilao: Leilao): string {
   lines.push("");
 
   if (leilao.praca_1) {
-    lines.push(`📅 *1ª Praça:* ${leilao.praca_1}`);
+    lines.push(`📅 *1ª Praça:* ${formatDateBR(leilao.praca_1)}`);
   }
   if (leilao.praca_2) {
-    lines.push(`📅 *2ª Praça:* ${leilao.praca_2}`);
+    lines.push(`📅 *2ª Praça:* ${formatDateBR(leilao.praca_2)}`);
   }
 
   const locParts: string[] = [];
@@ -289,8 +304,8 @@ export function buildLeilaoMessage(leilao: Leilao): string {
   lines.push("─────────────────");
   lines.push(`🔗 *Link do Imóvel:* https://app.investleiloesbrasil.com.br/imovel/?id=${leilao.id}`);
   lines.push(`📲 *Está com dúvidas? Fale com um consultor:* https://bit.ly/imovel-mais`);
-  lines.push("_____________________");
-  lines.push("⚠️ Solicite análise desse imóvel até 7 dias antes da finalização do Leilão");
+  lines.push("");
+  lines.push("⚠️ Solicite análise desse imóvel até 7 dias antes da finalização do leilão");
 
   return lines.join("\n");
 }
