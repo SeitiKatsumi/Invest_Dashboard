@@ -1,4 +1,4 @@
-import makeWASocket, {
+import baileysMod, {
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
   DisconnectReason,
@@ -6,9 +6,13 @@ import makeWASocket, {
   delay,
 } from "@whiskeysockets/baileys";
 import { Boom } from "@hapi/boom";
-import * as QRCode from "qrcode";
-import P from "pino";
+import QRCodeMod from "qrcode";
+import pinoMod from "pino";
 import { WhatsAppGrupo, WhatsAppDisparo, Leilao } from "@shared/schema";
+
+const makeWASocket = (typeof baileysMod === "function" ? baileysMod : (baileysMod as any).default) as typeof baileysMod;
+const QRCode = (typeof QRCodeMod === "object" && QRCodeMod !== null && "toDataURL" in QRCodeMod ? QRCodeMod : (QRCodeMod as any).default || QRCodeMod) as typeof QRCodeMod;
+const P = (typeof pinoMod === "function" ? pinoMod : (pinoMod as any).default) as typeof pinoMod;
 
 const DIRECTUS_URL = process.env.DIRECTUS_URL?.trim();
 const DIRECTUS_TOKEN = process.env.DIRECTUS_TOKEN?.trim();
