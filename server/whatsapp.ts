@@ -216,23 +216,27 @@ export async function sendLeilaoToGroups(
   return { sent, failed };
 }
 
+function formatBRL(value: string | number): string {
+  const num = typeof value === "string" ? parseFloat(value.replace(/[^\d.,\-]/g, "").replace(",", ".")) : value;
+  if (isNaN(num)) return String(value);
+  return num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 export function buildLeilaoMessage(leilao: Leilao): string {
   const lines: string[] = [];
 
-  lines.push("🏠 *LEILÃO DE IMÓVEL*");
+  const titleParts: string[] = [];
+  if (leilao.tipo_do_imovel) titleParts.push(leilao.tipo_do_imovel);
+  if (leilao.cidade) titleParts.push(leilao.cidade);
+  if (leilao.estado_uf) titleParts.push(leilao.estado_uf);
+  const title = titleParts.length > 0
+    ? `${titleParts[0]}${titleParts.length > 1 ? ", " + titleParts.slice(1).join(" - ") : ""}`
+    : leilao.nome_do_anuncio || `Leilão #${leilao.id}`;
+  lines.push(`🏠 *${title}*`);
   lines.push("");
-
-  if (leilao.nome_do_anuncio) {
-    lines.push(`📌 *${leilao.nome_do_anuncio}*`);
-    lines.push("");
-  }
 
   if (leilao.tipo_do_imovel) {
     lines.push(`🏢 *Tipo:* ${leilao.tipo_do_imovel}`);
-  }
-
-  if (leilao.tipo_de_leilao) {
-    lines.push(`⚖️ *Modalidade:* ${leilao.tipo_de_leilao}`);
   }
 
   if (leilao.area_imovel) {
@@ -240,10 +244,10 @@ export function buildLeilaoMessage(leilao: Leilao): string {
   }
 
   if (leilao.valor_avalaiacao_imovel) {
-    lines.push(`💰 *Avaliação:* R$ ${leilao.valor_avalaiacao_imovel}`);
+    lines.push(`💰 *Avaliação:* R$ ${formatBRL(leilao.valor_avalaiacao_imovel)}`);
   }
 
-  if (leilao.desconto) {
+  if (leilao.desconto !== undefined && leilao.desconto !== null) {
     lines.push(`🔥 *Desconto:* ${leilao.desconto}`);
   }
 
@@ -255,36 +259,22 @@ export function buildLeilaoMessage(leilao: Leilao): string {
   if (leilao.praca_2) {
     lines.push(`📅 *2ª Praça:* ${leilao.praca_2}`);
   }
-  if (leilao.praca_3) {
-    lines.push(`📅 *3ª Praça:* ${leilao.praca_3}`);
-  }
 
-  const enderecoParts: string[] = [];
-  if (leilao.endereco) enderecoParts.push(leilao.endereco);
-  if (leilao.cidade) enderecoParts.push(leilao.cidade);
-  if (leilao.estado_uf) enderecoParts.push(leilao.estado_uf);
+  const locParts: string[] = [];
+  if (leilao.cidade) locParts.push(leilao.cidade);
+  if (leilao.estado_uf) locParts.push(leilao.estado_uf);
 
-  if (enderecoParts.length > 0) {
+  if (locParts.length > 0) {
     lines.push("");
-    lines.push(`📍 *Localização:* ${enderecoParts.join(", ")}`);
-  }
-
-  if (leilao.descricao) {
-    lines.push("");
-    const desc = leilao.descricao.length > 300
-      ? leilao.descricao.substring(0, 300) + "..."
-      : leilao.descricao;
-    lines.push(`📝 ${desc}`);
-  }
-
-  if (leilao.link_edital) {
-    lines.push("");
-    lines.push(`📄 *Edital:* ${leilao.link_edital}`);
+    lines.push(`📍 *Localização:* ${locParts.join(", ")}`);
   }
 
   lines.push("");
   lines.push("─────────────────");
-  lines.push("🔗 *Invest Leilões Brasil*");
+  lines.push(`🔗 *Link do Imóvel:* https://app.investleiloesbrasil.com.br/imovel/?id=${leilao.id}`);
+  lines.push(`📲 *Está com dúvidas? Fale com um consultor:* https://bit.ly/imovel-mais`);
+  lines.push("_____________________");
+  lines.push("⚠️ Solicite análise desse imóvel até 7 dias antes da finalização do Leilão");
 
   return lines.join("\n");
 }
