@@ -380,7 +380,7 @@ function GruposPanel() {
           }
         }
       }
-      if (!g.isCommunity && selectedImports.has(g.id) && !existingJidsSet.has(g.id)) {
+      if (!g.isCommunity && !g.linkedParent && selectedImports.has(g.id) && !existingJidsSet.has(g.id)) {
         allImportable.push({ id: g.id, subject: g.subject });
       }
     }
