@@ -390,6 +390,8 @@ export async function getWhatsAppGroups(): Promise<{
   size: number;
   isCommunity: boolean;
   linkedParent?: string;
+  announceGroupId?: string;
+  announceGroupSubject?: string;
   linkedGroups?: { id: string; subject: string; size: number }[];
 }[]> {
   if (!sock || connectionStatus !== "connected") {
@@ -418,6 +420,8 @@ export async function getWhatsAppGroups(): Promise<{
     size: number;
     isCommunity: boolean;
     linkedParent?: string;
+    announceGroupId?: string;
+    announceGroupSubject?: string;
     linkedGroups?: { id: string; subject: string; size: number }[];
   }[] = [];
 
@@ -425,15 +429,19 @@ export async function getWhatsAppGroups(): Promise<{
     const isCommunity = communityJids.has(g.id) && !childToParent.has(g.id);
 
     if (isCommunity) {
-      const linked = groupValues
-        .filter((child: any) => child.linkedParent === g.id)
+      const children = groupValues.filter((child: any) => child.linkedParent === g.id);
+
+      const announceGroup = children.find((child: any) => child.isCommunityAnnounce === true);
+
+      const linked = children
+        .filter((child: any) => child.isCommunityAnnounce !== true)
         .map((child: any) => ({
           id: child.id,
           subject: child.subject || "Sem nome",
           size: child.participants?.length || 0,
         }));
 
-      if (linked.length === 0) {
+      if (linked.length === 0 && !announceGroup) {
         results.push({
           id: g.id,
           subject: g.subject || "Sem nome",
@@ -448,6 +456,8 @@ export async function getWhatsAppGroups(): Promise<{
         subject: g.subject || "Sem nome",
         size: g.participants?.length || 0,
         isCommunity: true,
+        announceGroupId: announceGroup?.id,
+        announceGroupSubject: announceGroup?.subject || "Grupo de Avisos",
         linkedGroups: linked,
       });
     } else if (!childToParent.has(g.id)) {

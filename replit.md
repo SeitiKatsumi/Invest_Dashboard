@@ -118,6 +118,11 @@ TypeScript interfaces are defined in `shared/schema.ts` and shared between front
 - **Group management**: CRUD operations for WhatsApp groups stored in Directus `whatsapp_grupos` collection
   - Groups organized by region (SP, RJ, Sul, Nacional, etc.)
   - Active/inactive toggle per group
+- **Community support**: Detects WhatsApp communities via Baileys `isCommunity`/`linkedParent`/`isCommunityAnnounce` metadata
+  - Identifies the **Grupo de Avisos** (announcement group) separately using `isCommunityAnnounce: true`
+  - Announcement group shown prominently in import dialog with Megaphone icon and "Avisos" badge
+  - Sending to announcement group broadcasts to all community members
+  - Communities with 0 linked groups treated as regular groups
 - **Disparo flow**: Search auction by Directus ID → preview → select groups → send with formatted message + image
   - Message template includes: name, type, values, dates, location, description, edital link
   - 2-second delay between group sends to avoid spam detection
