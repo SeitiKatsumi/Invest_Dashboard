@@ -1415,7 +1415,7 @@ function HistoricoPanel() {
 export default function WhatsAppPage() {
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 space-y-6">
         <header className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-4">
             <img
@@ -1444,16 +1444,14 @@ export default function WhatsAppPage() {
           </div>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="space-y-6">
-            <ConnectionPanel />
-            <HistoricoPanel />
-          </div>
-          <div className="lg:col-span-2 space-y-6">
-            <DisparoPanel />
-            <GruposPanel />
-          </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <ConnectionPanel />
+          <HistoricoPanel />
         </div>
+
+        <DisparoPanel />
+
+        <GruposPanel />
       </div>
     </div>
   );
