@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from "react";
+import { useState, useEffect, useRef, useCallback, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { WhatsAppGrupo, WhatsAppDisparo, Leilao } from "@shared/schema";
@@ -55,6 +55,9 @@ import {
   ChevronRight,
   Network,
   Megaphone,
+  LayoutList,
+  Hash,
+  ExternalLink,
 } from "lucide-react";
 
 function ConnectionPanel() {
@@ -883,6 +886,11 @@ function DisparoPanel() {
   const [isSearching, setIsSearching] = useState(false);
   const [mensagem, setMensagem] = useState("");
   const [showMensagem, setShowMensagem] = useState(false);
+  const [searchMode, setSearchMode] = useState<"listing" | "id">("listing");
+  const [iframeHeight, setIframeHeight] = useState(800);
+  const [showWidget, setShowWidget] = useState(true);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
 
   const { data: status } = useQuery<{ status: string }>({
     queryKey: ["/api/whatsapp/status"],
@@ -895,12 +903,7 @@ function DisparoPanel() {
   const activeGrupos = grupos?.filter((g) => g.ativo) || [];
   const isConnected = status?.status === "connected";
 
-  const searchLeilao = async () => {
-    const id = parseInt(leilaoId);
-    if (!id || isNaN(id)) {
-      toast({ title: "Digite um ID válido", variant: "destructive" });
-      return;
-    }
+  const searchLeilaoById = useCallback(async (id: number) => {
     setIsSearching(true);
     try {
       const resp = await fetch(`/api/whatsapp/leilao/${id}`);
@@ -910,6 +913,7 @@ function DisparoPanel() {
       }
       const data = await resp.json();
       setLeilao(data);
+      setShowWidget(false);
 
       const previewResp = await fetch(`/api/whatsapp/preview/${id}`);
       if (previewResp.ok) {
@@ -917,6 +921,10 @@ function DisparoPanel() {
         setMensagem(previewData.mensagem);
         setShowMensagem(true);
       }
+
+      setTimeout(() => {
+        previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
     } catch (error) {
       toast({
         title: "Leilão não encontrado",
@@ -926,10 +934,47 @@ function DisparoPanel() {
       setLeilao(null);
       setMensagem("");
       setShowMensagem(false);
+      setShowWidget(true);
     } finally {
       setIsSearching(false);
     }
+  }, [toast]);
+
+  const searchLeilao = async () => {
+    const id = parseInt(leilaoId);
+    if (!id || isNaN(id)) {
+      toast({ title: "Digite um ID válido", variant: "destructive" });
+      return;
+    }
+    await searchLeilaoById(id);
   };
+
+  useEffect(() => {
+    const WIDGET_ORIGIN = "https://investleiloes.replit.app";
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== WIDGET_ORIGIN) return;
+
+      const data = event.data;
+      if (!data || !data.type) return;
+
+      if (data.type === "LEILOES_PROPERTY_CLICK" && data.id) {
+        const id = parseInt(data.id);
+        if (!isNaN(id) && isFinite(id)) {
+          setLeilaoId(String(id));
+          searchLeilaoById(id);
+        }
+      }
+
+      if (data.type === "LEILOES_RESIZE" && typeof data.height === "number" && isFinite(data.height)) {
+        const newHeight = Math.min(Math.max(data.height, 300), 3000);
+        setIframeHeight(newHeight);
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [searchLeilaoById]);
 
   const dispararMutation = useMutation({
     mutationFn: (data: { leilaoId: number; grupoIds: number[]; mensagem: string }) =>
@@ -995,6 +1040,14 @@ function DisparoPanel() {
     }
   };
 
+  const handleChangeProperty = () => {
+    setLeilao(null);
+    setMensagem("");
+    setShowMensagem(false);
+    setSelectedGrupos([]);
+    setShowWidget(true);
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -1003,7 +1056,7 @@ function DisparoPanel() {
           Disparo de Leilão
         </CardTitle>
         <CardDescription>
-          Busque um leilão pelo ID e envie para os grupos selecionados
+          Selecione um imóvel da listagem ou busque pelo ID para disparar
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -1014,37 +1067,105 @@ function DisparoPanel() {
           </div>
         )}
 
-        <div className="flex gap-2">
-          <div className="flex-1">
-            <Label htmlFor="leilao-id" className="sr-only">ID do Leilão</Label>
-            <Input
-              id="leilao-id"
-              placeholder="Digite o ID do leilão no Directus"
-              value={leilaoId}
-              onChange={(e) => setLeilaoId(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && searchLeilao()}
-              type="number"
-              data-testid="input-leilao-id"
-            />
-          </div>
-          <Button
-            onClick={searchLeilao}
-            disabled={isSearching}
-            className="gap-2"
-            data-testid="button-search-leilao"
+        <div className="flex gap-1 p-1 bg-muted rounded-lg" data-testid="search-mode-tabs">
+          <button
+            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+              searchMode === "listing"
+                ? "bg-background shadow-sm text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+            onClick={() => setSearchMode("listing")}
+            data-testid="tab-listing"
           >
-            {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-            Buscar
-          </Button>
+            <LayoutList className="h-4 w-4" />
+            Buscar na Listagem
+          </button>
+          <button
+            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+              searchMode === "id"
+                ? "bg-background shadow-sm text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+            onClick={() => setSearchMode("id")}
+            data-testid="tab-id"
+          >
+            <Hash className="h-4 w-4" />
+            Buscar por ID
+          </button>
         </div>
 
+        {searchMode === "id" && (
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <Label htmlFor="leilao-id" className="sr-only">ID do Leilão</Label>
+              <Input
+                id="leilao-id"
+                placeholder="Digite o ID do leilão no Directus"
+                value={leilaoId}
+                onChange={(e) => setLeilaoId(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && searchLeilao()}
+                type="number"
+                data-testid="input-leilao-id"
+              />
+            </div>
+            <Button
+              onClick={searchLeilao}
+              disabled={isSearching}
+              className="gap-2"
+              data-testid="button-search-leilao"
+            >
+              {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+              Buscar
+            </Button>
+          </div>
+        )}
+
+        {searchMode === "listing" && showWidget && (
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Clique em um imóvel abaixo para selecioná-lo para o disparo
+            </p>
+            <div className="border rounded-lg overflow-hidden bg-background">
+              <iframe
+                ref={iframeRef}
+                src="https://investleiloes.replit.app/embed/listing?wpBaseUrl=__select__"
+                style={{ width: "100%", height: `${iframeHeight}px`, border: "none" }}
+                loading="lazy"
+                data-testid="iframe-listing-widget"
+              />
+            </div>
+          </div>
+        )}
+
+        {searchMode === "listing" && !showWidget && !leilao && (
+          <div className="flex items-center justify-center p-8 border rounded-lg border-dashed">
+            <div className="text-center space-y-2">
+              <LayoutList className="h-8 w-8 mx-auto text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Carregando imóvel...</p>
+            </div>
+          </div>
+        )}
+
+        {isSearching && (
+          <div className="flex items-center justify-center gap-2 p-4 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Buscando imóvel...
+          </div>
+        )}
+
         {leilao && (
-          <div className="border rounded-lg p-4 space-y-3 bg-muted/30" data-testid="card-leilao-preview">
+          <div ref={previewRef} className="border rounded-lg p-4 space-y-3 bg-muted/30" data-testid="card-leilao-preview">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 space-y-1">
-                <h3 className="font-semibold text-lg" data-testid="text-leilao-nome">
-                  {leilao.nome_do_anuncio || `Leilão #${leilao.id}`}
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold text-lg" data-testid="text-leilao-nome">
+                    {leilao.nome_do_anuncio || `Leilão #${leilao.id}`}
+                  </h3>
+                  <Badge variant="outline" className="text-xs gap-1">
+                    <Hash className="h-3 w-3" />
+                    {leilao.id}
+                  </Badge>
+                </div>
                 <div className="flex items-center gap-2 flex-wrap text-sm text-muted-foreground">
                   {leilao.tipo_do_imovel && <Badge variant="outline">{leilao.tipo_do_imovel}</Badge>}
                   {leilao.tipo_de_leilao && <Badge variant="outline">{leilao.tipo_de_leilao}</Badge>}
@@ -1097,6 +1218,17 @@ function DisparoPanel() {
                 {leilao.descricao}
               </p>
             )}
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleChangeProperty}
+              className="gap-2 text-xs"
+              data-testid="button-change-property"
+            >
+              <RefreshCw className="h-3 w-3" />
+              Trocar imóvel
+            </Button>
           </div>
         )}
 

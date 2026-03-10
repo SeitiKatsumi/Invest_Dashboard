@@ -123,7 +123,12 @@ TypeScript interfaces are defined in `shared/schema.ts` and shared between front
   - Announcement group shown prominently in import dialog with Megaphone icon and "Avisos" badge
   - Sending to announcement group broadcasts to all community members
   - Communities with 0 linked groups treated as regular groups
-- **Disparo flow**: Search auction by Directus ID → preview → select groups → send with formatted message + image
+- **Disparo flow**: Two search modes — browse via embedded listing widget or manual ID entry
+  - **Listing widget**: Iframe from `https://investleiloes.replit.app/embed/listing` embedded in dispatch panel
+    - Captures `LEILOES_PROPERTY_CLICK` postMessage events to auto-select property
+    - Auto-resizes via `LEILOES_RESIZE` postMessage events
+    - Widget hides after selection; "Trocar imóvel" button to re-show
+  - **ID search**: Manual Directus ID input (fallback mode)
   - Message template includes: name, type, values, dates, location, description, edital link
   - 2-second delay between group sends to avoid spam detection
   - Images fetched server-side (never exposes Directus tokens)
