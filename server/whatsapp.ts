@@ -238,6 +238,16 @@ function formatBRL(value: string | number): string {
   return str;
 }
 
+function parseNumericValue(str: string): number {
+  const cleaned = str.replace(/[R$\s]/g, "").trim();
+  if (!cleaned) return 0;
+  if (/^\d{1,3}(\.\d{3})*(,\d+)?$/.test(cleaned)) {
+    return parseFloat(cleaned.replace(/\./g, "").replace(",", "."));
+  }
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? 0 : num;
+}
+
 function formatDateBR(dateStr: string): string {
   try {
     const d = new Date(dateStr);
@@ -278,8 +288,25 @@ export function buildLeilaoMessage(leilao: Leilao): string {
     lines.push(`💰 *Avaliação:* R$ ${formatBRL(leilao.valor_avalaiacao_imovel)}`);
   }
 
-  if (leilao.desconto !== undefined && leilao.desconto !== null) {
-    lines.push(`🔥 *Desconto:* ${leilao.desconto}`);
+  if (leilao.valor_leilao) {
+    lines.push(`💵 *Valor de Leilão:* R$ ${formatBRL(leilao.valor_leilao)}`);
+  }
+
+  let descontoStr = "";
+  if (leilao.desconto && String(leilao.desconto).trim() !== "" && String(leilao.desconto).trim() !== "0" && String(leilao.desconto).trim() !== "0%") {
+    descontoStr = String(leilao.desconto);
+  } else if (leilao.valor_avalaiacao_imovel && leilao.valor_leilao) {
+    const avaliacao = parseNumericValue(String(leilao.valor_avalaiacao_imovel));
+    const leilaoVal = parseNumericValue(String(leilao.valor_leilao));
+    if (avaliacao > 0 && leilaoVal > 0 && leilaoVal < avaliacao) {
+      const pct = Math.round(((avaliacao - leilaoVal) / avaliacao) * 100);
+      if (pct > 0) {
+        descontoStr = `${pct}%`;
+      }
+    }
+  }
+  if (descontoStr) {
+    lines.push(`🔥 *Desconto:* ${descontoStr}`);
   }
 
   lines.push("");
