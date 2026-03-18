@@ -1130,6 +1130,7 @@ function DisparoPanel() {
                 ref={iframeRef}
                 src="https://investleiloes.replit.app/embed/listing?wpBaseUrl=__select__"
                 style={{ width: "100%", height: `${iframeHeight}px`, border: "none" }}
+                sandbox="allow-scripts allow-same-origin allow-popups"
                 loading="lazy"
                 data-testid="iframe-listing-widget"
               />
