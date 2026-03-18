@@ -56,11 +56,110 @@ import {
   Pause,
   RotateCcw,
   AlertTriangle,
+  Pencil,
+  Save,
+  X,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 
 const ITEMS_PER_PAGE = 15;
+
+function EditableUrlCell({ site }: { site: Site }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(site.url_listagem || site.url_site || "");
+  const { toast } = useToast();
+
+  const mutation = useMutation({
+    mutationFn: async (newUrl: string) => {
+      const response = await apiRequest("PATCH", `/api/scraping/sites/${site.id}/url-listagem`, {
+        url_listagem: newUrl,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/scraping/sites"] });
+      toast({ title: "URL atualizada", description: "O link de listagem foi salvo no Directus." });
+      setEditing(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleSave = () => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    mutation.mutate(trimmed);
+  };
+
+  const handleCancel = () => {
+    setValue(site.url_listagem || site.url_site || "");
+    setEditing(false);
+  };
+
+  useEffect(() => {
+    setValue(site.url_listagem || site.url_site || "");
+  }, [site.url_listagem, site.url_site]);
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <Input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          className="h-7 text-xs"
+          placeholder="https://..."
+          data-testid={`input-url-${site.id}`}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleSave();
+            if (e.key === "Escape") handleCancel();
+          }}
+          autoFocus
+        />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0"
+          onClick={handleSave}
+          disabled={mutation.isPending}
+          data-testid={`button-save-url-${site.id}`}
+        >
+          {mutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5 text-green-500" />}
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0"
+          onClick={handleCancel}
+          disabled={mutation.isPending}
+          data-testid={`button-cancel-url-${site.id}`}
+        >
+          <X className="h-3.5 w-3.5 text-muted-foreground" />
+        </Button>
+      </div>
+    );
+  }
+
+  const displayUrl = site.url_listagem || site.url_site || "—";
+  return (
+    <div className="flex items-center gap-1 group">
+      <span className="text-muted-foreground text-xs truncate max-w-[250px] block" title={displayUrl}>
+        {displayUrl}
+      </span>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+        onClick={() => setEditing(true)}
+        data-testid={`button-edit-url-${site.id}`}
+        title="Editar URL de listagem"
+      >
+        <Pencil className="h-3 w-3 text-muted-foreground" />
+      </Button>
+    </div>
+  );
+}
 
 function SitesTable({
   onStartOnboarding,
@@ -118,6 +217,7 @@ function SitesTable({
     const matchSearch =
       !search ||
       site.nome_site?.toLowerCase().includes(search.toLowerCase()) ||
+      site.url_listagem?.toLowerCase().includes(search.toLowerCase()) ||
       site.url_site?.toLowerCase().includes(search.toLowerCase());
     const matchConfig =
       filterConfig === "all" ||
@@ -306,7 +406,7 @@ function SitesTable({
                     />
                   </th>
                   <th className="text-left p-3 font-medium">Site</th>
-                  <th className="text-left p-3 font-medium hidden md:table-cell">URL</th>
+                  <th className="text-left p-3 font-medium hidden md:table-cell">URL Listagem</th>
                   <th className="text-center p-3 font-medium">Status</th>
                   <th className="text-center p-3 font-medium">Config</th>
                   <th className="text-center p-3 font-medium hidden lg:table-cell">Último Scraping</th>
@@ -334,9 +434,7 @@ function SitesTable({
                         <span className="font-medium">{site.nome_site || `Site #${site.id}`}</span>
                       </td>
                       <td className="p-3 hidden md:table-cell">
-                        <span className="text-muted-foreground text-xs truncate max-w-[300px] block">
-                          {site.url_site || site.url_listagem || "—"}
-                        </span>
+                        <EditableUrlCell site={site} />
                       </td>
                       <td className="p-3 text-center">
                         <button
@@ -628,7 +726,7 @@ function OnboardingDialog({
     mutationFn: async () => {
       const response = await apiRequest("POST", "/api/scraping/onboard", {
         siteId: site?.id,
-        siteUrl: site?.url_site || site?.url_listagem,
+        siteUrl: site?.url_listagem || site?.url_site,
         maxPages: parseInt(maxPages) || 30,
         model,
       });
@@ -674,7 +772,7 @@ function OnboardingDialog({
           <div>
             <Label className="text-sm font-medium">Site</Label>
             <p className="text-sm font-semibold mt-1">{site?.nome_site || `Site #${site?.id}`}</p>
-            <p className="text-xs text-muted-foreground">{site?.url_site || site?.url_listagem}</p>
+            <p className="text-xs text-muted-foreground">{site?.url_listagem || site?.url_site}</p>
           </div>
 
           <div>
@@ -799,7 +897,7 @@ function ScrapingDialog({
   const mutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("POST", "/api/scraping/scrape", {
-        siteUrl: site?.url_site || site?.url_listagem,
+        siteUrl: site?.url_listagem || site?.url_site,
         config,
         maxPages: parseInt(maxPages) || 100,
         concurrentRequests: parseInt(concurrentRequests) || 10,
@@ -840,7 +938,7 @@ function ScrapingDialog({
           <div>
             <Label className="text-sm font-medium">Site</Label>
             <p className="text-sm font-semibold mt-1">{site?.nome_site || `Site #${site?.id}`}</p>
-            <p className="text-xs text-muted-foreground">{site?.url_site || site?.url_listagem}</p>
+            <p className="text-xs text-muted-foreground">{site?.url_listagem || site?.url_site}</p>
           </div>
 
           {!config && (
@@ -989,7 +1087,7 @@ function ErrorDialog({
             Erro no Onboarding
           </DialogTitle>
           <DialogDescription>
-            {site?.nome_site || `Site #${site?.id}`} — {site?.url_site || site?.url_listagem}
+            {site?.nome_site || `Site #${site?.id}`} — {site?.url_listagem || site?.url_site}
           </DialogDescription>
         </DialogHeader>
         <div className="overflow-auto flex-1 min-h-0 space-y-4">
@@ -1071,7 +1169,7 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           siteId: item.site.id,
-          siteUrl: item.site.url_site || item.site.url_listagem,
+          siteUrl: item.site.url_listagem || item.site.url_site,
           maxPages: 30,
           model: "gpt-4o-mini",
         }),
@@ -1095,7 +1193,7 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          siteUrl: item.site.url_site || item.site.url_listagem,
+          siteUrl: item.site.url_listagem || item.site.url_site,
           config,
           maxPages: 100,
           concurrentRequests: 10,

@@ -16,6 +16,7 @@ import {
   clearSiteScrapingError,
   updateSiteScrapingStats,
   updateSiteStatus,
+  updateSiteListingUrl,
   bulkUpdateSiteStatus,
 } from "./scraping";
 import {
@@ -289,7 +290,7 @@ export async function registerRoutes(
           try {
             const jobDomain = new URL(jobUrl).hostname.replace(/^www\./, "");
             const matchedSite = sites.find((s: any) => {
-              const siteUrl = s.url_site || s.url_listagem || "";
+              const siteUrl = s.url_listagem || s.url_site || "";
               if (!siteUrl) return false;
               try {
                 const siteDomain = new URL(siteUrl).hostname.replace(/^www\./, "");
@@ -307,7 +308,7 @@ export async function registerRoutes(
                   matchedSite.last_scraping_urls_found = totalUrls;
                 }
               }
-              return { ...job, site_name: matchedSite.nome_site, site_url: matchedSite.url_site || matchedSite.url_listagem };
+              return { ...job, site_name: matchedSite.nome_site, site_url: matchedSite.url_listagem || matchedSite.url_site };
             }
           } catch {}
         }
@@ -363,6 +364,32 @@ export async function registerRoutes(
       console.error("Error updating site status:", error);
       res.status(500).json({
         error: "Failed to update site status",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  app.patch("/api/scraping/sites/:siteId/url-listagem", async (req, res) => {
+    try {
+      const siteId = parseInt(req.params.siteId);
+      const { url_listagem } = req.body;
+      if (!siteId || !url_listagem || typeof url_listagem !== "string") {
+        return res.status(400).json({ error: "siteId e url_listagem são obrigatórios" });
+      }
+      try {
+        const parsed = new URL(url_listagem.trim());
+        if (!["http:", "https:"].includes(parsed.protocol)) {
+          return res.status(400).json({ error: "URL deve usar protocolo http ou https" });
+        }
+      } catch {
+        return res.status(400).json({ error: "URL inválida" });
+      }
+      await updateSiteListingUrl(siteId, url_listagem.trim());
+      res.json({ success: true, url_listagem: url_listagem.trim() });
+    } catch (error) {
+      console.error("Error updating listing URL:", error);
+      res.status(500).json({
+        error: "Falha ao atualizar URL de listagem",
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }

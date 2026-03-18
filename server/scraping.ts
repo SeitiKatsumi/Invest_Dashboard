@@ -188,6 +188,30 @@ export async function updateSiteScrapingStats(siteId: number, lastScrapingAt: st
   return response.json();
 }
 
+export async function updateSiteListingUrl(siteId: number, urlListagem: string) {
+  if (!DIRECTUS_URL || !DIRECTUS_TOKEN) {
+    throw new Error("DIRECTUS_URL and DIRECTUS_TOKEN must be set");
+  }
+
+  const response = await fetch(`${DIRECTUS_URL}/items/input_library_url/${siteId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      url_listagem: urlListagem,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to update listing URL: ${response.status} - ${error}`);
+  }
+
+  return response.json();
+}
+
 export async function updateSiteStatus(siteId: number, ligaDesliga: "ligado" | "desligado") {
   if (!DIRECTUS_URL || !DIRECTUS_TOKEN) {
     throw new Error("DIRECTUS_URL and DIRECTUS_TOKEN must be set");

@@ -99,6 +99,8 @@ TypeScript interfaces are defined in `shared/schema.ts` and shared between front
   - Real-time progress polling (5s interval) showing % complete and URLs found
 - **Jobs panel**: Auto-refreshing list of active/recent scraping jobs with status badges
 - **Sites table**: Full list of leiloeiros from Directus with search, filter by config status, pagination
+  - Inline editable `url_listagem` field — click pencil icon to update the listing page URL directly in Directus
+  - Scraping uses `url_listagem` (listing page) as primary URL, falls back to `url_site` (main site)
 - Backend endpoints:
   - GET `/api/scraping/status` - API health check
   - GET `/api/scraping/sites` - Sites with scraping_config field
@@ -108,6 +110,7 @@ TypeScript interfaces are defined in `shared/schema.ts` and shared between front
   - GET `/api/scraping/jobs/:jobId` - Job details/progress
   - DELETE `/api/scraping/jobs/:jobId` - Remove job
   - POST `/api/scraping/save-config` - Save config to Directus
+  - PATCH `/api/scraping/sites/:siteId/url-listagem` - Update listing URL in Directus
 - **Environment variable**: `SCRAPING_API_URL` = `https://api-scrap-invest.server04.11mind.com.br`
 - **Schema**: Added `scraping_config` field to `Site` interface, new `ScrapingJob` interface
 
