@@ -17,6 +17,8 @@ import {
   updateSiteScrapingStats,
   updateSiteStatus,
   updateSiteListingUrl,
+  updateSiteName,
+  getAuctionCountsBySite,
   bulkUpdateSiteStatus,
 } from "./scraping";
 import {
@@ -390,6 +392,96 @@ export async function registerRoutes(
       console.error("Error updating listing URL:", error);
       res.status(500).json({
         error: "Falha ao atualizar URL de listagem",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  app.patch("/api/scraping/sites/:siteId/nome-site", async (req, res) => {
+    try {
+      const siteId = parseInt(req.params.siteId);
+      const { nome_site } = req.body;
+      if (!siteId || !nome_site || typeof nome_site !== "string" || !nome_site.trim()) {
+        return res.status(400).json({ error: "siteId e nome_site são obrigatórios" });
+      }
+      await updateSiteName(siteId, nome_site.trim());
+      res.json({ success: true, nome_site: nome_site.trim() });
+    } catch (error) {
+      console.error("Error updating site name:", error);
+      res.status(500).json({
+        error: "Falha ao atualizar nome do site",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  app.get("/api/scraping/sites/auction-counts", async (req, res) => {
+    try {
+      const counts = await getAuctionCountsBySite();
+      res.json(counts);
+    } catch (error) {
+      console.error("Error fetching auction counts:", error);
+      res.status(500).json({
+        error: "Falha ao buscar contagem de leilões",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  app.get("/api/scraping/sites/:siteId/last-job-urls", async (req, res) => {
+    try {
+      const siteId = parseInt(req.params.siteId);
+      if (!siteId) {
+        return res.status(400).json({ error: "siteId é obrigatório" });
+      }
+
+      const sites = await getSitesWithConfig();
+      const site = sites.find((s: any) => s.id === siteId);
+      if (!site) {
+        return res.status(404).json({ error: "Site não encontrado" });
+      }
+
+      const siteUrl = site.url_listagem || site.url_site || "";
+      if (!siteUrl) {
+        return res.json({ urls: [], total: 0 });
+      }
+
+      let siteDomain: string;
+      try {
+        siteDomain = new URL(siteUrl).hostname.replace(/^www\./, "");
+      } catch {
+        return res.json({ urls: [], total: 0 });
+      }
+
+      const jobsResult = await getJobs(100);
+      const jobsList = jobsResult?.jobs || [];
+
+      const completedJobs = jobsList
+        .filter((j: any) => j.status === "completed")
+        .filter((j: any) => {
+          const jobUrl = j.url || j.site_url || j.result?.urls_found?.[0] || j.config_used?.url || "";
+          if (!jobUrl) return false;
+          try {
+            return new URL(jobUrl).hostname.replace(/^www\./, "") === siteDomain;
+          } catch { return false; }
+        })
+        .sort((a: any, b: any) => {
+          const da = new Date(a.completed_at || 0).getTime();
+          const db = new Date(b.completed_at || 0).getTime();
+          return db - da;
+        });
+
+      if (completedJobs.length === 0) {
+        return res.json({ urls: [], total: 0 });
+      }
+
+      const lastJob = completedJobs[0];
+      const urls: string[] = lastJob.result?.urls_found || [];
+      res.json({ urls, total: urls.length, job_id: lastJob.job_id || lastJob.id });
+    } catch (error) {
+      console.error("Error fetching last job URLs:", error);
+      res.status(500).json({
+        error: "Falha ao buscar URLs do último job",
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }

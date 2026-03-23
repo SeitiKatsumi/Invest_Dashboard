@@ -188,6 +188,61 @@ export async function updateSiteScrapingStats(siteId: number, lastScrapingAt: st
   return response.json();
 }
 
+export async function updateSiteName(siteId: number, nomeSite: string) {
+  if (!DIRECTUS_URL || !DIRECTUS_TOKEN) {
+    throw new Error("DIRECTUS_URL and DIRECTUS_TOKEN must be set");
+  }
+
+  const response = await fetch(`${DIRECTUS_URL}/items/input_library_url/${siteId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      nome_site: nomeSite,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to update site name: ${response.status} - ${error}`);
+  }
+
+  return response.json();
+}
+
+export async function getAuctionCountsBySite(): Promise<Record<number, number>> {
+  if (!DIRECTUS_URL || !DIRECTUS_TOKEN) {
+    throw new Error("DIRECTUS_URL and DIRECTUS_TOKEN must be set");
+  }
+
+  const url = new URL(`${DIRECTUS_URL}/items/leiloes_imovel`);
+  url.searchParams.set("aggregate[count]", "id");
+  url.searchParams.set("groupBy[]", "site");
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to fetch auction counts: ${response.status} - ${error}`);
+  }
+
+  const result = await response.json();
+  const counts: Record<number, number> = {};
+  for (const row of result.data || []) {
+    if (row.site != null) {
+      counts[row.site] = parseInt(row.count?.id || row.count || "0", 10);
+    }
+  }
+  return counts;
+}
+
 export async function updateSiteListingUrl(siteId: number, urlListagem: string) {
   if (!DIRECTUS_URL || !DIRECTUS_TOKEN) {
     throw new Error("DIRECTUS_URL and DIRECTUS_TOKEN must be set");

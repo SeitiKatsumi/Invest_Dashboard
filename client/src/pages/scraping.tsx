@@ -161,6 +161,170 @@ function EditableUrlCell({ site }: { site: Site }) {
   );
 }
 
+function EditableNameCell({ site }: { site: Site }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(site.nome_site || "");
+  const { toast } = useToast();
+
+  const mutation = useMutation({
+    mutationFn: async (newName: string) => {
+      const response = await apiRequest("PATCH", `/api/scraping/sites/${site.id}/nome-site`, {
+        nome_site: newName,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/scraping/sites"] });
+      toast({ title: "Nome atualizado", description: "O nome do site foi salvo no Directus." });
+      setEditing(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleSave = () => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    mutation.mutate(trimmed);
+  };
+
+  const handleCancel = () => {
+    setValue(site.nome_site || "");
+    setEditing(false);
+  };
+
+  useEffect(() => {
+    setValue(site.nome_site || "");
+  }, [site.nome_site]);
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <Input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          className="h-7 text-xs font-medium"
+          data-testid={`input-name-${site.id}`}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleSave();
+            if (e.key === "Escape") handleCancel();
+          }}
+          autoFocus
+        />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0"
+          onClick={handleSave}
+          disabled={mutation.isPending}
+          data-testid={`button-save-name-${site.id}`}
+        >
+          {mutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5 text-green-500" />}
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0"
+          onClick={handleCancel}
+          disabled={mutation.isPending}
+          data-testid={`button-cancel-name-${site.id}`}
+        >
+          <X className="h-3.5 w-3.5 text-muted-foreground" />
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1 group">
+      <span className="font-medium">{site.nome_site || `Site #${site.id}`}</span>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+        onClick={() => setEditing(true)}
+        data-testid={`button-edit-name-${site.id}`}
+        title="Editar nome do site"
+      >
+        <Pencil className="h-3 w-3 text-muted-foreground" />
+      </Button>
+    </div>
+  );
+}
+
+function UrlsPreviewDialog({
+  site,
+  open,
+  onOpenChange,
+}: {
+  site: Site | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { data, isLoading } = useQuery<{ urls: string[]; total: number; job_id?: string }>({
+    queryKey: ["/api/scraping/sites", site?.id, "last-job-urls"],
+    queryFn: async () => {
+      const res = await fetch(`/api/scraping/sites/${site?.id}/last-job-urls`);
+      if (!res.ok) throw new Error("Failed to fetch URLs");
+      return res.json();
+    },
+    enabled: open && !!site?.id,
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Globe className="h-5 w-5" />
+            URLs Extraídas — {site?.nome_site || `Site #${site?.id}`}
+          </DialogTitle>
+          <DialogDescription>
+            {data ? `${data.total} URLs encontradas no último scraping` : "Carregando..."}
+            {data?.job_id && <span className="ml-2 text-xs font-mono">(Job: {data.job_id})</span>}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="overflow-y-auto flex-1 min-h-0">
+          {isLoading ? (
+            <div className="space-y-2 p-2">
+              {[...Array(5)].map((_, i) => (
+                <Skeleton key={i} className="h-8 w-full" />
+              ))}
+            </div>
+          ) : !data || data.urls.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">
+              Nenhuma URL encontrada nos jobs recentes deste site.
+            </p>
+          ) : (
+            <div className="space-y-1 p-1">
+              {data.urls.map((url, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 text-xs"
+                  data-testid={`url-preview-item-${idx}`}
+                >
+                  <span className="text-muted-foreground w-8 text-right shrink-0">{idx + 1}.</span>
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 hover:underline truncate flex-1"
+                    title={url}
+                  >
+                    {url}
+                  </a>
+                  <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function SitesTable({
   onStartOnboarding,
   onStartScraping,
@@ -179,8 +343,14 @@ function SitesTable({
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const { toast } = useToast();
 
+  const [urlsPreviewSite, setUrlsPreviewSite] = useState<Site | null>(null);
+
   const { data: sites, isLoading } = useQuery<Site[]>({
     queryKey: ["/api/scraping/sites"],
+  });
+
+  const { data: auctionCounts } = useQuery<Record<number, number>>({
+    queryKey: ["/api/scraping/sites/auction-counts"],
   });
 
   const toggleStatusMutation = useMutation({
@@ -408,6 +578,7 @@ function SitesTable({
                   <th className="text-left p-3 font-medium">Site</th>
                   <th className="text-left p-3 font-medium hidden md:table-cell">URL Listagem</th>
                   <th className="text-center p-3 font-medium">Status</th>
+                  <th className="text-center p-3 font-medium hidden lg:table-cell">Leilões</th>
                   <th className="text-center p-3 font-medium">Config</th>
                   <th className="text-center p-3 font-medium hidden lg:table-cell">Último Scraping</th>
                   <th className="text-center p-3 font-medium hidden lg:table-cell">URLs</th>
@@ -431,7 +602,7 @@ function SitesTable({
                         />
                       </td>
                       <td className="p-3">
-                        <span className="font-medium">{site.nome_site || `Site #${site.id}`}</span>
+                        <EditableNameCell site={site} />
                       </td>
                       <td className="p-3 hidden md:table-cell">
                         <EditableUrlCell site={site} />
@@ -450,6 +621,19 @@ function SitesTable({
                             {site.liga_desliga === "ligado" ? "Ativo" : "Inativo"}
                           </Badge>
                         </button>
+                      </td>
+                      <td className="p-3 text-center hidden lg:table-cell">
+                        {auctionCounts ? (
+                          auctionCounts[site.id] ? (
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800" data-testid={`badge-leiloes-${site.id}`}>
+                              {auctionCounts[site.id]}
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground" data-testid={`badge-leiloes-${site.id}`}>0</span>
+                          )
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
                       </td>
                       <td className="p-3 text-center">
                         {hasConfig ? (
@@ -486,9 +670,16 @@ function SitesTable({
                       </td>
                       <td className="p-3 text-center hidden lg:table-cell">
                         {site.last_scraping_urls_found != null && site.last_scraping_urls_found > 0 ? (
-                          <Badge variant="secondary" data-testid={`badge-urls-${site.id}`}>
-                            {site.last_scraping_urls_found}
-                          </Badge>
+                          <button
+                            onClick={() => setUrlsPreviewSite(site)}
+                            className="cursor-pointer"
+                            data-testid={`button-urls-preview-${site.id}`}
+                            title="Ver URLs extraídas"
+                          >
+                            <Badge variant="secondary" className="hover:bg-primary hover:text-primary-foreground transition-colors" data-testid={`badge-urls-${site.id}`}>
+                              {site.last_scraping_urls_found}
+                            </Badge>
+                          </button>
                         ) : (
                           <span className="text-xs text-muted-foreground">—</span>
                         )}
@@ -520,7 +711,7 @@ function SitesTable({
                 })}
                 {paged.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                    <td colSpan={9} className="p-8 text-center text-muted-foreground">
                       Nenhum site encontrado
                     </td>
                   </tr>
@@ -558,6 +749,12 @@ function SitesTable({
           </div>
         )}
       </CardContent>
+
+      <UrlsPreviewDialog
+        site={urlsPreviewSite}
+        open={!!urlsPreviewSite}
+        onOpenChange={(open) => !open && setUrlsPreviewSite(null)}
+      />
     </Card>
   );
 }
