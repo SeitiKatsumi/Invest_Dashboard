@@ -1721,19 +1721,14 @@ export default function ScrapingPage() {
 
         <BatchProcessingPanel sites={allSites || []} />
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <div className="xl:col-span-2">
-            <SitesTable
-              onStartOnboarding={setOnboardSite}
-              onStartScraping={setScrapeSite}
-              onViewConfig={setConfigSite}
-              onViewError={setErrorSite}
-            />
-          </div>
-          <div>
-            <JobsPanel />
-          </div>
-        </div>
+        <SitesTable
+          onStartOnboarding={setOnboardSite}
+          onStartScraping={setScrapeSite}
+          onViewConfig={setConfigSite}
+          onViewError={setErrorSite}
+        />
+
+        <JobsPanel />
       </div>
 
       <OnboardingDialog
