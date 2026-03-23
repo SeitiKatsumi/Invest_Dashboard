@@ -623,14 +623,10 @@ function SitesTable({
                         </button>
                       </td>
                       <td className="p-3 text-center hidden lg:table-cell">
-                        {auctionCounts ? (
-                          auctionCounts[site.id] ? (
-                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800" data-testid={`badge-leiloes-${site.id}`}>
-                              {auctionCounts[site.id]}
-                            </Badge>
-                          ) : (
-                            <span className="text-xs text-muted-foreground" data-testid={`badge-leiloes-${site.id}`}>0</span>
-                          )
+                        {auctionCounts && auctionCounts[site.id] ? (
+                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800" data-testid={`badge-leiloes-${site.id}`}>
+                            {auctionCounts[site.id]}
+                          </Badge>
                         ) : (
                           <span className="text-xs text-muted-foreground">—</span>
                         )}

@@ -220,6 +220,7 @@ export async function getAuctionCountsBySite(): Promise<Record<number, number>> 
   const url = new URL(`${DIRECTUS_URL}/items/leiloes_imovel`);
   url.searchParams.set("aggregate[count]", "id");
   url.searchParams.set("groupBy[]", "site");
+  url.searchParams.set("filter[status][_eq]", "published");
 
   const response = await fetch(url.toString(), {
     headers: {
