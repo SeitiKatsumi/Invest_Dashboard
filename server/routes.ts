@@ -459,7 +459,7 @@ export async function registerRoutes(
       const completedJobs = jobsList
         .filter((j: any) => j.status === "completed")
         .filter((j: any) => {
-          const jobUrl = j.url || j.site_url || j.result?.urls_found?.[0] || j.config_used?.url || "";
+          const jobUrl = j.url || j.site_url || j.result?.urls_found?.[0] || j.config_used?.url || j.result?.config_used?.url || "";
           if (!jobUrl) return false;
           try {
             return new URL(jobUrl).hostname.replace(/^www\./, "") === siteDomain;
