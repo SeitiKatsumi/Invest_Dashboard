@@ -131,6 +131,8 @@ export interface CrawlResult {
 
 export type JobStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
+export type ResultClassification = 'success' | 'empty' | 'error' | 'config_invalid' | 'config_suspect';
+
 export interface InternalJob {
   id: string;
   status: JobStatus;
@@ -148,6 +150,8 @@ export interface InternalJob {
   result?: CrawlResult | AnalysisResult;
   callbackUrl?: string;
   engine: 'internal';
+  resultClassification?: ResultClassification;
+  confidenceScore?: number;
 }
 
 export interface OnboardRequest {

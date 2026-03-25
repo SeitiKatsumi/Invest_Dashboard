@@ -26,6 +26,9 @@ import {
   getInternalJobs,
   getInternalJob,
   deleteInternalJob,
+  getBrowserPoolStats,
+  drainBrowserPool,
+  scoreConfig,
 } from "./scraping";
 import {
   connectWhatsApp,
@@ -209,7 +212,42 @@ export async function registerRoutes(
           siteUrl, process.env.OPENAI_API_KEY, siteId, maxPages, model
         );
 
-        if (siteId && result.config) {
+        let configConfidence: ReturnType<typeof scoreConfig> | undefined;
+        let miniScrapeResult: { urls_found: number; valid: boolean } | undefined;
+        const diagnostics: Record<string, unknown> = {};
+
+        if (result.config) {
+          configConfidence = scoreConfig(result.config as Record<string, unknown>);
+
+          try {
+            const { DeterministicCrawler } = await import('./internal-scraper/index.js');
+            const testCrawler = new DeterministicCrawler(result.config as any, { concurrentRequests: 3 });
+            const testResult = await testCrawler.crawl(siteUrl, 5, true);
+            miniScrapeResult = { urls_found: testResult.total_urls, valid: testResult.total_urls > 0 };
+
+            if (testResult.total_urls === 0 && configConfidence.confidence < 40) {
+              diagnostics.config_validation = 'config_invalid';
+              diagnostics.config_validation_message = `Mini-scrape de teste encontrou 0 URLs. Confiança da config: ${configConfidence.confidence}%. Config provavelmente inválida.`;
+            } else if (testResult.total_urls === 0) {
+              diagnostics.config_validation = 'config_suspect';
+              diagnostics.config_validation_message = `Mini-scrape de teste encontrou 0 URLs, mas confiança da config é ${configConfidence.confidence}%. Site pode estar temporariamente sem listagens.`;
+            } else {
+              diagnostics.config_validation = 'validated';
+              diagnostics.config_validation_message = `Mini-scrape encontrou ${testResult.total_urls} URLs. Config validada.`;
+            }
+          } catch (testErr) {
+            console.warn('[Onboarding] Mini-scrape test failed:', testErr);
+            diagnostics.config_validation = 'test_failed';
+          }
+
+          diagnostics.confidence_score = configConfidence?.confidence;
+          diagnostics.confidence_flags = configConfidence?.flags;
+          diagnostics.mini_scrape = miniScrapeResult;
+        }
+
+        const isConfigInvalid = diagnostics.config_validation === 'config_invalid';
+
+        if (siteId && result.config && !isConfigInvalid) {
           try {
             const configObj = typeof result.config === "object" && result.config !== null
               ? result.config as Record<string, unknown>
@@ -222,6 +260,14 @@ export async function registerRoutes(
           }
         }
 
+        if (siteId && result.config && isConfigInvalid) {
+          try {
+            await saveSiteScrapingError(siteId, String(diagnostics.config_validation_message || "Config invalidada por mini-scrape"), null);
+          } catch (saveError) {
+            console.error("Error saving config validation error:", saveError);
+          }
+        }
+
         if (siteId && !result.config) {
           try {
             const errorMsg = result.error || "Onboarding interno não retornou configuração";
@@ -231,7 +277,7 @@ export async function registerRoutes(
           }
         }
 
-        res.json(result);
+        res.json({ ...result, ...diagnostics });
       } else {
         const result = await startOnboarding(siteUrl, process.env.OPENAI_API_KEY, maxPages, model);
 
@@ -352,6 +398,8 @@ export async function registerRoutes(
         started_at: job.startedAt,
         completed_at: job.completedAt,
         engine: "internal",
+        result_classification: job.resultClassification,
+        confidence_score: job.confidenceScore,
         result: job.result && "urls_found" in job.result ? {
           total_urls: job.result.total_urls,
           urls_found: job.result.urls_found,
@@ -680,6 +728,108 @@ export async function registerRoutes(
         error: "Failed to save config",
         message: error instanceof Error ? error.message : "Unknown error",
       });
+    }
+  });
+
+  app.get("/api/scraping/resource-stats", async (_req, res) => {
+    try {
+      const poolStats = getBrowserPoolStats();
+      const memUsage = process.memoryUsage();
+      res.json({
+        browserPool: poolStats,
+        memory: {
+          heapUsedMB: Math.round(memUsage.heapUsed / 1024 / 1024),
+          heapTotalMB: Math.round(memUsage.heapTotal / 1024 / 1024),
+          rssMB: Math.round(memUsage.rss / 1024 / 1024),
+        },
+        activeJobs: getInternalJobs(200).filter(j => j.status === 'processing' || j.status === 'pending').length,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get resource stats" });
+    }
+  });
+
+  app.post("/api/scraping/drain-pool", async (_req, res) => {
+    try {
+      await drainBrowserPool();
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to drain browser pool" });
+    }
+  });
+
+  app.post("/api/scraping/score-config", async (req, res) => {
+    try {
+      const { config } = req.body;
+      if (!config) {
+        return res.status(400).json({ error: "config é obrigatório" });
+      }
+      let parsedConfig = config;
+      if (typeof config === "string") {
+        try { parsedConfig = JSON.parse(config); } catch { return res.status(400).json({ error: "Config JSON inválido" }); }
+      }
+      const score = scoreConfig(parsedConfig);
+      res.json(score);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to score config" });
+    }
+  });
+
+  app.get("/api/scraping/batch-report", async (_req, res) => {
+    try {
+      const allJobs = getInternalJobs(500);
+      const completedJobs = allJobs.filter(j => j.status === 'completed' || j.status === 'failed');
+
+      const report = {
+        total_jobs: completedJobs.length,
+        by_classification: {
+          success: completedJobs.filter(j => j.resultClassification === 'success').length,
+          empty: completedJobs.filter(j => j.resultClassification === 'empty').length,
+          config_suspect: completedJobs.filter(j => j.resultClassification === 'config_suspect').length,
+          config_invalid: completedJobs.filter(j => j.resultClassification === 'config_invalid').length,
+          error: completedJobs.filter(j => j.status === 'failed').length,
+          unclassified: completedJobs.filter(j => !j.resultClassification && j.status === 'completed').length,
+        },
+        avg_confidence: completedJobs.filter(j => j.confidenceScore !== undefined).length > 0
+          ? Math.round(completedJobs.filter(j => j.confidenceScore !== undefined).reduce((sum, j) => sum + (j.confidenceScore || 0), 0) / completedJobs.filter(j => j.confidenceScore !== undefined).length)
+          : null,
+        total_urls_found: completedJobs.reduce((sum, j) => sum + j.totalUrls, 0),
+        top_errors: Object.entries(
+          completedJobs
+            .filter(j => j.error)
+            .reduce((acc: Record<string, number>, j) => {
+              const key = (j.error || '').slice(0, 80);
+              acc[key] = (acc[key] || 0) + 1;
+              return acc;
+            }, {})
+        ).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([error, count]) => ({ error, count })),
+        sites_needing_attention: completedJobs
+          .filter(j => j.resultClassification === 'empty' || j.resultClassification === 'config_suspect' || j.resultClassification === 'config_invalid' || j.status === 'failed')
+          .map(j => ({
+            site_id: j.siteId,
+            site_url: j.siteUrl,
+            classification: j.resultClassification || 'error',
+            error: j.error,
+            confidence: j.confidenceScore,
+          })),
+        jobs: completedJobs.map(j => ({
+          id: j.id,
+          site_id: j.siteId,
+          site_url: j.siteUrl,
+          status: j.status,
+          classification: j.resultClassification,
+          confidence: j.confidenceScore,
+          urls_found: j.totalUrls,
+          pages_processed: j.pagesProcessed,
+          error: j.error,
+          started_at: j.startedAt,
+          completed_at: j.completedAt,
+        })),
+      };
+
+      res.json(report);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to generate batch report" });
     }
   });
 

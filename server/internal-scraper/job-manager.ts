@@ -1,4 +1,4 @@
-import type { InternalJob, JobStatus, CrawlResult, AnalysisResult } from './types.js';
+import type { InternalJob, JobStatus, CrawlResult, AnalysisResult, ResultClassification } from './types.js';
 import { generateId } from './utils.js';
 
 const MAX_JOBS = 200;
@@ -82,13 +82,12 @@ class InternalJobManager {
     job.status = 'processing';
   }
 
-  completeJob(jobId: string, result: CrawlResult | AnalysisResult): void {
+  completeJob(jobId: string, result: CrawlResult | AnalysisResult, classification?: ResultClassification, confidenceScore?: number): void {
     const job = this.jobs.get(jobId);
     if (!job) return;
 
     job.status = 'completed';
     job.progress = 100;
-    job.progressMessage = 'Concluído!';
     job.completedAt = new Date().toISOString();
     job.result = result;
 
@@ -96,6 +95,22 @@ class InternalJobManager {
       job.urlsFound = result.urls_found;
       job.totalUrls = result.total_urls;
       job.pagesProcessed = result.pages_processed;
+
+      if (classification) {
+        job.resultClassification = classification;
+      } else {
+        job.resultClassification = result.total_urls > 0 ? 'success' : 'empty';
+      }
+      job.progressMessage = job.resultClassification === 'success'
+        ? `Concluído! ${result.total_urls} URLs encontradas`
+        : 'Concluído sem URLs encontradas';
+    } else {
+      job.progressMessage = 'Concluído!';
+      job.resultClassification = classification || 'success';
+    }
+
+    if (confidenceScore !== undefined) {
+      job.confidenceScore = confidenceScore;
     }
 
     this.sendCallback(job);
@@ -135,6 +150,8 @@ class InternalJobManager {
           pages_processed: job.pagesProcessed,
           error: job.error,
           engine: 'internal',
+          result_classification: job.resultClassification,
+          confidence_score: job.confidenceScore,
         }),
       });
     } catch (e) {

@@ -30,7 +30,7 @@ Preferred communication style: Simple, everyday language.
 
 ### Key Features
 - **Dashboard**: Displays monitored sites, auction listings, scraping logs, and URL processing queue status.
-- **AI Scraping Integration**: Features an internal, TypeScript-based scraping engine with Explorer, Analyst, Crawler, and Job Manager modules. It supports AI-driven configuration generation and parallel crawling. An external AI scraping API is also integrated for comparison and dual-engine support.
+- **AI Scraping Integration**: Features an internal, TypeScript-based scraping engine with Explorer, Analyst, Crawler, and Job Manager modules. It supports AI-driven configuration generation and parallel crawling. An external AI scraping API is also integrated for comparison and dual-engine support. Includes a shared browser pool (max 3 browsers), config confidence scorer, mini-scrape onboarding validation, result classification (success/empty/config_suspect/config_invalid/error), batch diagnostic reporting with JSON export, and real-time resource monitoring (browser pool stats, memory, timing estimates).
 - **WhatsApp Broadcast Module**: Allows sending auction listings to WhatsApp community groups with QR code authentication, group management, and dispatch history. Supports community announcement groups.
 - **Manual Registration**: Provides a form for manual auction registration with comprehensive fields, CEP auto-fill via ViaCEP API, and AI Image Extraction using OpenAI GPT-4o Vision for automated data population from screenshots.
 - **Detailed Logs Page**: Offers a dedicated page for detailed scraping logs with filtering and search capabilities.

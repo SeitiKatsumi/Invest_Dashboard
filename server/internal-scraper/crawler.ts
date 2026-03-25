@@ -390,17 +390,26 @@ export class DeterministicCrawler {
     return this.buildResult();
   }
 
-  async crawlWithPlaywright(startUrl: string, maxPages: number): Promise<CrawlResult> {
-    const { chromium } = await import('playwright');
-    const browser = await chromium.launch({ headless: true, args: STEALTH_BROWSER_ARGS });
-    const context = await browser.newContext({
-      userAgent: randomUserAgent(),
-      locale: 'pt-BR',
-      timezoneId: 'America/Sao_Paulo',
-      viewport: { width: 1920, height: 1080 },
-    });
-    await context.addInitScript(STEALTH_INIT_SCRIPT);
-    const page = await context.newPage();
+  async crawlWithPlaywright(startUrl: string, maxPages: number, externalPage?: any): Promise<CrawlResult> {
+    let page: any;
+    let ownsBrowser = false;
+    let browser: any;
+
+    if (externalPage) {
+      page = externalPage;
+    } else {
+      const { chromium } = await import('playwright');
+      browser = await chromium.launch({ headless: true, args: STEALTH_BROWSER_ARGS });
+      const context = await browser.newContext({
+        userAgent: randomUserAgent(),
+        locale: 'pt-BR',
+        timezoneId: 'America/Sao_Paulo',
+        viewport: { width: 1920, height: 1080 },
+      });
+      await context.addInitScript(STEALTH_INIT_SCRIPT);
+      page = await context.newPage();
+      ownsBrowser = true;
+    }
 
     const urlsToVisit: string[] = [startUrl];
 
@@ -465,7 +474,11 @@ export class DeterministicCrawler {
         }
       }
     } finally {
-      await browser.close();
+      if (ownsBrowser && browser) {
+        await browser.close();
+      } else if (externalPage) {
+        try { await externalPage.context().close(); } catch {}
+      }
     }
 
     return this.buildResult();
@@ -516,10 +529,10 @@ export class DeterministicCrawler {
     };
   }
 
-  async crawl(startUrl: string, maxPages = 100, usePlaywright = true): Promise<CrawlResult> {
+  async crawl(startUrl: string, maxPages = 100, usePlaywright = true, externalPage?: any): Promise<CrawlResult> {
     if (usePlaywright) {
       try {
-        return await this.crawlWithPlaywright(startUrl, maxPages);
+        return await this.crawlWithPlaywright(startUrl, maxPages, externalPage);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         if (msg.includes("Executable doesn't exist") || msg.toLowerCase().includes('playwright')) {

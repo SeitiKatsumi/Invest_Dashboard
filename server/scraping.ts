@@ -5,6 +5,8 @@ import {
   jobManager,
 } from './internal-scraper/index.js';
 import type { ScrapingConfig } from './internal-scraper/types.js';
+import { browserPool } from './internal-scraper/browser-pool.js';
+import { scoreConfig } from './internal-scraper/config-scorer.js';
 
 const SCRAPING_API_URL = process.env.SCRAPING_API_URL?.trim() || "https://api-scrap-invest.server04.11mind.com.br";
 const DIRECTUS_URL = process.env.DIRECTUS_URL?.trim();
@@ -556,8 +558,16 @@ export async function startInternalScraping(
 ): Promise<{ job_id: string }> {
   const job = jobManager.createJob('scrape', siteUrl, siteId, N8N_WEBHOOK_URL);
 
+  const configConfidence = scoreConfig(config);
+
   (async () => {
+    let poolBrowser: any = null;
     try {
+      jobManager.updateProgress(job.id, 2, 'Aguardando navegador do pool...');
+
+      const poolEntry = await browserPool.acquire();
+      poolBrowser = poolEntry.browser;
+
       jobManager.updateProgress(job.id, 5, 'Inicializando crawler...');
 
       const crawlerConfig: ScrapingConfig = {
@@ -570,15 +580,22 @@ export async function startInternalScraping(
       } as ScrapingConfig;
 
       const crawler = new DeterministicCrawler(crawlerConfig, {
-        concurrentRequests: concurrentRequests || 10,
+        concurrentRequests: concurrentRequests || 5,
         onProgress: (progress: number, message: string) => {
           jobManager.updateProgress(job.id, progress, message);
         },
       });
 
-      const result = await crawler.crawl(siteUrl, maxPages || 100, true);
+      const result = await crawler.crawl(siteUrl, maxPages || 100, true, poolEntry.page);
 
-      jobManager.completeJob(job.id, result);
+      let classification: 'success' | 'empty' | 'config_suspect' = 'success';
+      if (result.total_urls === 0) {
+        classification = 'empty';
+      } else if (configConfidence.confidence < 30) {
+        classification = 'config_suspect';
+      }
+
+      jobManager.completeJob(job.id, result, classification, configConfidence.confidence);
 
       if (siteId) {
         try {
@@ -590,11 +607,25 @@ export async function startInternalScraping(
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       jobManager.failJob(job.id, msg);
+    } finally {
+      if (poolBrowser) {
+        await browserPool.release(poolBrowser);
+      }
     }
   })();
 
   return { job_id: job.id };
 }
+
+export function getBrowserPoolStats() {
+  return browserPool.stats;
+}
+
+export async function drainBrowserPool() {
+  await browserPool.drainIdle();
+}
+
+export { scoreConfig } from './internal-scraper/config-scorer.js';
 
 export function getInternalJobs(limit?: number) {
   return jobManager.listJobs(limit || 50);

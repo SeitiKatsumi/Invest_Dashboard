@@ -61,6 +61,14 @@ import {
   X,
   Cpu,
   Cloud,
+  Download,
+  BarChart3,
+  Activity,
+  Shield,
+  ShieldAlert,
+  ShieldX,
+  FileWarning,
+  HardDrive,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -1404,18 +1412,47 @@ interface QueueItem {
   status: QueueItemStatus;
   error?: string;
   jobId?: string;
+  classification?: string;
+  confidence?: number;
+}
+
+interface BatchReport {
+  total_jobs: number;
+  by_classification: Record<string, number>;
+  avg_confidence: number | null;
+  total_urls_found: number;
+  top_errors: Array<{ error: string; count: number }>;
+  sites_needing_attention: Array<{
+    site_id?: number;
+    site_url: string;
+    classification: string;
+    error?: string;
+    confidence?: number;
+  }>;
+}
+
+interface ResourceStats {
+  browserPool: { active: number; total: number; max: number; queued: number };
+  memory: { heapUsedMB: number; rssMB: number };
+  activeJobs: number;
 }
 
 function BatchProcessingPanel({ sites }: { sites: Site[] }) {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [report, setReport] = useState<BatchReport | null>(null);
+  const [resourceStats, setResourceStats] = useState<ResourceStats | null>(null);
+  const [startTime, setStartTime] = useState<number | null>(null);
   const pausedRef = useRef(false);
   const abortRef = useRef(false);
+  const resourceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { toast } = useToast();
 
   const MAX_ONBOARDING = 4;
-  const MAX_SCRAPING = 10;
+  const MAX_SCRAPING = 3;
+  const DELAY_BETWEEN_LAUNCHES_MS = 2000;
 
   const stats = {
     total: queue.length,
@@ -1428,6 +1465,19 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
 
   const progressPercent = stats.total > 0 ? Math.round(((stats.completed + stats.error) / stats.total) * 100) : 0;
 
+  const elapsedMs = startTime ? Date.now() - startTime : 0;
+  const processedCount = stats.completed + stats.error;
+  const avgTimePerSite = processedCount > 0 ? elapsedMs / processedCount : 0;
+  const remaining = stats.waiting + stats.onboarding + stats.scraping;
+  const estimatedRemainingMs = avgTimePerSite * remaining;
+
+  const formatTime = (ms: number) => {
+    if (ms <= 0) return "—";
+    const mins = Math.floor(ms / 60000);
+    const secs = Math.floor((ms % 60000) / 1000);
+    return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+  };
+
   const updateItem = (siteId: number, updates: Partial<QueueItem>) => {
     setQueue((prev) => prev.map((q) => q.site.id === siteId ? { ...q, ...updates } : q));
   };
@@ -1436,6 +1486,15 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
     while (pausedRef.current && !abortRef.current) {
       await new Promise((r) => setTimeout(r, 500));
     }
+  };
+
+  const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  const fetchResourceStats = async () => {
+    try {
+      const res = await fetch("/api/scraping/resource-stats");
+      if (res.ok) setResourceStats(await res.json());
+    } catch {}
   };
 
   const processOnboarding = async (item: QueueItem): Promise<Record<string, unknown> | null> => {
@@ -1457,6 +1516,18 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
         throw new Error(err);
       }
       const result = await response.json();
+      if (result.config_validation === "config_invalid") {
+        updateItem(item.site.id, {
+          status: "error",
+          error: `Config inválida: ${result.config_validation_message?.slice(0, 80)}`,
+          classification: "config_invalid",
+          confidence: result.confidence_score,
+        });
+        return null;
+      }
+      if (result.confidence_score !== undefined) {
+        updateItem(item.site.id, { confidence: result.confidence_score });
+      }
       return result.config || null;
     } catch (e: any) {
       updateItem(item.site.id, { status: "error", error: `Onboarding: ${e.message?.slice(0, 100)}` });
@@ -1474,7 +1545,7 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
           siteUrl: item.site.url_listagem || item.site.url_site,
           config,
           maxPages: 100,
-          concurrentRequests: 10,
+          concurrentRequests: 5,
           engine: item.site.scraping_engine || "internal",
           siteId: item.site.id,
         }),
@@ -1490,11 +1561,39 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
     }
   };
 
+  const fetchReport = async () => {
+    try {
+      const res = await fetch("/api/scraping/batch-report");
+      if (res.ok) {
+        const data = await res.json();
+        setReport(data);
+        setShowReport(true);
+      }
+    } catch {}
+  };
+
+  const exportReport = () => {
+    if (!report) return;
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `batch-report-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const runQueue = async (items: QueueItem[]) => {
     setIsRunning(true);
     setIsPaused(false);
+    setShowReport(false);
+    setReport(null);
+    setStartTime(Date.now());
     pausedRef.current = false;
     abortRef.current = false;
+
+    resourceIntervalRef.current = setInterval(fetchResourceStats, 5000);
+    fetchResourceStats();
 
     const needsOnboarding = items.filter((i) => !i.site.scraping_config);
     const hasConfig = items.filter((i) => !!i.site.scraping_config);
@@ -1516,6 +1615,7 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
         const p = (async () => {
           await waitWhilePaused();
           if (!abortRef.current) {
+            await delay(DELAY_BETWEEN_LAUNCHES_MS);
             await processScraping(scrapingQueue[idx].item, scrapingQueue[idx].config);
           }
           activeScrapingCount--;
@@ -1537,6 +1637,7 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
           (async () => {
             await waitWhilePaused();
             if (!abortRef.current) {
+              await delay(DELAY_BETWEEN_LAUNCHES_MS);
               const config = await processOnboarding(needsOnboarding[idx]);
               if (config && !abortRef.current) {
                 scrapingQueue.push({ item: needsOnboarding[idx], config });
@@ -1574,10 +1675,17 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
       await new Promise((r) => setTimeout(r, 200));
     }
 
+    if (resourceIntervalRef.current) {
+      clearInterval(resourceIntervalRef.current);
+      resourceIntervalRef.current = null;
+    }
+
     queryClient.invalidateQueries({ queryKey: ["/api/scraping/sites"] });
     queryClient.invalidateQueries({ queryKey: ["/api/scraping/jobs"] });
     setIsRunning(false);
     setIsPaused(false);
+
+    await fetchReport();
   };
 
   const startProcessing = (sitesToProcess: Site[]) => {
@@ -1590,9 +1698,16 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
     if (isPaused) {
       pausedRef.current = false;
       setIsPaused(false);
+      resourceIntervalRef.current = setInterval(fetchResourceStats, 5000);
+      fetchResourceStats();
     } else {
       pausedRef.current = true;
       setIsPaused(true);
+      if (resourceIntervalRef.current) {
+        clearInterval(resourceIntervalRef.current);
+        resourceIntervalRef.current = null;
+      }
+      fetch("/api/scraping/drain-pool", { method: "POST" }).catch(() => {});
     }
   };
 
@@ -1600,6 +1715,10 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
     abortRef.current = true;
     pausedRef.current = false;
     setIsPaused(false);
+    if (resourceIntervalRef.current) {
+      clearInterval(resourceIntervalRef.current);
+      resourceIntervalRef.current = null;
+    }
     toast({ title: "Processamento cancelado", description: "Aguardando tarefas em andamento finalizarem..." });
   };
 
@@ -1619,7 +1738,7 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
             Processe todos os sites ativos automaticamente. Sites sem configuração passarão pelo onboarding primeiro, depois pelo scraping.
           </p>
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <span>Limites: {MAX_ONBOARDING} onboarding simultâneos, {MAX_SCRAPING} scrapings simultâneos</span>
+            <span>Limites: {MAX_ONBOARDING} onboarding simultâneos, {MAX_SCRAPING} scrapings simultâneos (com pool de navegadores)</span>
           </div>
           <Button
             onClick={() => startProcessing(activeSites)}
@@ -1665,22 +1784,35 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
             </>
           )}
           {!isRunning && queue.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => { setQueue([]); }}
-              data-testid="button-clear-batch"
-            >
-              <RotateCcw className="h-3.5 w-3.5 mr-1" />
-              Limpar
-            </Button>
+            <>
+              {report && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowReport(!showReport)}
+                  data-testid="button-toggle-report"
+                >
+                  <BarChart3 className="h-3.5 w-3.5 mr-1" />
+                  {showReport ? "Ocultar Relatório" : "Ver Relatório"}
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { setQueue([]); setReport(null); setShowReport(false); }}
+                data-testid="button-clear-batch"
+              >
+                <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                Limpar
+              </Button>
+            </>
           )}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span>{stats.completed + stats.error} / {stats.total} processados</span>
+            <span>{processedCount} / {stats.total} processados</span>
             <span>{progressPercent}%</span>
           </div>
           <Progress value={progressPercent} className="h-2" />
@@ -1709,10 +1841,139 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
           </div>
         </div>
 
+        {(isRunning || resourceStats) && (
+          <div className="flex flex-wrap items-center gap-4 p-3 rounded-md bg-muted/30 text-xs">
+            {resourceStats && (
+              <>
+                <div className="flex items-center gap-1.5" data-testid="stat-browsers">
+                  <HardDrive className="h-3.5 w-3.5 text-purple-500" />
+                  <span>Browsers: {resourceStats.browserPool.active}/{resourceStats.browserPool.max}</span>
+                </div>
+                <div className="flex items-center gap-1.5" data-testid="stat-memory">
+                  <Activity className="h-3.5 w-3.5 text-orange-500" />
+                  <span>RAM: {resourceStats.memory.rssMB}MB</span>
+                </div>
+                <div className="flex items-center gap-1.5" data-testid="stat-active-jobs">
+                  <Loader2 className="h-3.5 w-3.5 text-blue-500" />
+                  <span>Jobs ativos: {resourceStats.activeJobs}</span>
+                </div>
+              </>
+            )}
+            {isRunning && processedCount > 0 && (
+              <>
+                <div className="flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span>Média: {formatTime(avgTimePerSite)}/site</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5 text-green-500" />
+                  <span>Estimativa: ~{formatTime(estimatedRemainingMs)}</span>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         {isPaused && (
           <div className="flex items-center gap-2 p-3 bg-yellow-500/10 rounded-md text-sm">
             <Pause className="h-4 w-4 text-yellow-500" />
-            <span>Processamento pausado. Clique em "Retomar" para continuar.</span>
+            <span>Processamento pausado. Navegadores ociosos liberados. Clique em "Retomar" para continuar.</span>
+          </div>
+        )}
+
+        {showReport && report && (
+          <div className="space-y-4 p-4 rounded-lg border bg-card" data-testid="batch-report">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Relatório Diagnóstico
+              </h3>
+              <Button variant="outline" size="sm" onClick={exportReport} data-testid="button-export-report">
+                <Download className="h-3.5 w-3.5 mr-1" />
+                Exportar JSON
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="text-center p-3 rounded-md bg-green-500/10 border border-green-500/20">
+                <Shield className="h-5 w-5 text-green-500 mx-auto mb-1" />
+                <p className="text-lg font-bold text-green-600">{report.by_classification.success || 0}</p>
+                <p className="text-xs text-muted-foreground">Sucesso Real</p>
+              </div>
+              <div className="text-center p-3 rounded-md bg-yellow-500/10 border border-yellow-500/20">
+                <FileWarning className="h-5 w-5 text-yellow-500 mx-auto mb-1" />
+                <p className="text-lg font-bold text-yellow-600">{report.by_classification.empty || 0}</p>
+                <p className="text-xs text-muted-foreground">Vazio (0 URLs)</p>
+              </div>
+              <div className="text-center p-3 rounded-md bg-orange-500/10 border border-orange-500/20">
+                <ShieldAlert className="h-5 w-5 text-orange-500 mx-auto mb-1" />
+                <p className="text-lg font-bold text-orange-600">{(report.by_classification.config_suspect || 0) + (report.by_classification.config_invalid || 0)}</p>
+                <p className="text-xs text-muted-foreground">Config Suspeita</p>
+              </div>
+              <div className="text-center p-3 rounded-md bg-red-500/10 border border-red-500/20">
+                <ShieldX className="h-5 w-5 text-red-500 mx-auto mb-1" />
+                <p className="text-lg font-bold text-red-600">{report.by_classification.error || 0}</p>
+                <p className="text-xs text-muted-foreground">Erros</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="p-3 rounded-md bg-muted/30">
+                <p className="text-muted-foreground text-xs">Total URLs Encontradas</p>
+                <p className="text-xl font-bold">{report.total_urls_found.toLocaleString()}</p>
+              </div>
+              <div className="p-3 rounded-md bg-muted/30">
+                <p className="text-muted-foreground text-xs">Confiança Média das Configs</p>
+                <p className="text-xl font-bold">{report.avg_confidence !== null ? `${report.avg_confidence}%` : "—"}</p>
+              </div>
+            </div>
+
+            {report.top_errors.length > 0 && (
+              <div>
+                <h4 className="text-xs font-semibold mb-2 text-muted-foreground">Top Erros Mais Comuns</h4>
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {report.top_errors.map((e, i) => (
+                    <div key={i} className="flex items-center justify-between text-xs py-1 px-2 rounded bg-red-500/5">
+                      <span className="truncate flex-1 text-muted-foreground">{e.error}</span>
+                      <Badge variant="outline" className="ml-2 shrink-0">{e.count}x</Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {report.sites_needing_attention.length > 0 && (
+              <div>
+                <h4 className="text-xs font-semibold mb-2 text-muted-foreground">
+                  Sites que Precisam de Atenção ({report.sites_needing_attention.length})
+                </h4>
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  {report.sites_needing_attention.slice(0, 30).map((s, i) => (
+                    <div key={i} className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-muted/30">
+                      <span className="truncate flex-1">{s.site_url}</span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {s.confidence !== undefined && (
+                          <span className="text-muted-foreground">{s.confidence}%</span>
+                        )}
+                        <Badge
+                          variant="outline"
+                          className={
+                            s.classification === "empty" ? "border-yellow-500 text-yellow-600" :
+                            s.classification === "config_suspect" || s.classification === "config_invalid" ? "border-orange-500 text-orange-600" :
+                            "border-red-500 text-red-600"
+                          }
+                        >
+                          {s.classification === "empty" ? "Vazio" :
+                           s.classification === "config_suspect" ? "Suspeito" :
+                           s.classification === "config_invalid" ? "Inválido" :
+                           "Erro"}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1724,6 +1985,9 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
               data-testid={`batch-item-${item.site.id}`}
             >
               <span className="truncate flex-1 font-medium">{item.site.nome_site}</span>
+              {item.confidence !== undefined && (
+                <span className="text-[10px] text-muted-foreground shrink-0">{item.confidence}%</span>
+              )}
               {item.status === "onboarding" && (
                 <Badge className="bg-blue-500 border-blue-500 text-white shrink-0">
                   <Loader2 className="h-3 w-3 animate-spin mr-1" />
@@ -1745,7 +2009,7 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
               {item.status === "error" && (
                 <Badge variant="destructive" className="shrink-0" title={item.error}>
                   <XCircle className="h-3 w-3 mr-1" />
-                  Erro
+                  {item.classification === "config_invalid" ? "Config Inválida" : "Erro"}
                 </Badge>
               )}
             </div>
