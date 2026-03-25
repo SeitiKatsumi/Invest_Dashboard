@@ -4,6 +4,7 @@ import { generateId } from './utils.js';
 const MAX_JOBS = 200;
 const JOB_EXPIRY_MS = 24 * 60 * 60 * 1000;
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+const JOB_TIMEOUT_MS = 30 * 60 * 1000;
 
 const BLOCKED_CALLBACK_HOSTS = [
   /^localhost$/i, /^127\.\d+\.\d+\.\d+$/, /^10\.\d+\.\d+\.\d+$/,
@@ -140,9 +141,22 @@ class InternalJobManager {
   }
 
   private cleanup(): void {
+    const now = Date.now();
+
+    for (const [id, job] of this.jobs) {
+      const age = now - new Date(job.startedAt).getTime();
+      if ((job.status === 'pending' || job.status === 'processing') && age > JOB_TIMEOUT_MS) {
+        job.status = 'failed';
+        job.progress = 0;
+        job.progressMessage = 'Job expirou por timeout';
+        job.error = `Job expirou após ${Math.round(JOB_TIMEOUT_MS / 60000)} minutos sem conclusão`;
+        job.completedAt = new Date().toISOString();
+        this.sendCallback(job);
+      }
+    }
+
     if (this.jobs.size < MAX_JOBS) return;
 
-    const now = Date.now();
     const toDelete: string[] = [];
 
     for (const [id, job] of this.jobs) {

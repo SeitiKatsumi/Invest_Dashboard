@@ -48,7 +48,17 @@ function looksLikeDetail(url: string): boolean {
   return DETAIL_PATTERNS.some(p => p.test(url));
 }
 
+const PAGINATION_PATTERNS = [
+  /[?&](page|pagina|p|offset|skip)=\d+/i,
+  /\/page\/\d+/i, /\/pagina\/\d+/i, /\/p\/\d+/i,
+];
+
+function looksLikePagination(url: string): boolean {
+  return PAGINATION_PATTERNS.some(p => p.test(url));
+}
+
 function classifyUrl(url: string): 'category' | 'detail' | 'pagination' | 'other' {
+  if (looksLikePagination(url)) return 'pagination';
   if (looksLikeDetail(url)) return 'detail';
   if (looksLikeCategory(url)) return 'category';
   return 'other';
@@ -382,7 +392,7 @@ async function exploreWithPlaywright(
 }
 
 export async function explore(options: ExplorerOptions): Promise<ExplorationResult> {
-  const { baseUrl, maxPages = 30, usePlaywright = false } = options;
+  const { baseUrl, maxPages = 30, usePlaywright = true } = options;
   const domain = extractDomain(baseUrl);
 
   if (usePlaywright) {
@@ -391,9 +401,9 @@ export async function explore(options: ExplorerOptions): Promise<ExplorationResu
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (msg.includes("Executable doesn't exist") || msg.toLowerCase().includes('playwright')) {
-        console.warn('[Explorer] Playwright não disponível, usando fetch:', msg.slice(0, 100));
+        console.warn('[Explorer] Playwright não disponível, usando fetch como fallback:', msg.slice(0, 100));
         const result = await exploreWithFetch(baseUrl, domain, maxPages);
-        result.warnings = ['Navegador não disponível. Usando fetch.'];
+        result.warnings = ['Navegador não disponível. Usando fetch como fallback.'];
         return result;
       }
       throw e;

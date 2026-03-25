@@ -45,8 +45,40 @@ const CATEGORY_HEURISTICS = [
   /\/buscar\/?$/i, /\/buscador\/?$/i,
 ];
 
+interface NormalizedConfig {
+  domain: string;
+  allowlist_patterns: string[];
+  blocklist_patterns: string[];
+  pagination_pattern: string | null;
+  listing_page_indicators: string[];
+  detail_page_indicators: string[];
+  category_patterns: string[];
+  link_selectors: string[];
+  max_listing_pages: number;
+  max_detail_pages: number;
+}
+
+function normalizeConfig(config: ScrapingConfig | Record<string, unknown>): NormalizedConfig {
+  const str = (v: unknown, fallback = ''): string => typeof v === 'string' ? v : fallback;
+  const strArr = (v: unknown): string[] => Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+  const num = (v: unknown, fallback: number): number => typeof v === 'number' && Number.isFinite(v) ? v : fallback;
+
+  return {
+    domain: str(config.domain),
+    allowlist_patterns: strArr(config.allowlist_patterns),
+    blocklist_patterns: strArr(config.blocklist_patterns),
+    pagination_pattern: typeof config.pagination_pattern === 'string' ? config.pagination_pattern : null,
+    listing_page_indicators: strArr(config.listing_page_indicators),
+    detail_page_indicators: strArr(config.detail_page_indicators),
+    category_patterns: strArr(config.category_patterns),
+    link_selectors: strArr(config.link_selectors).length > 0 ? strArr(config.link_selectors) : ['a[href]'],
+    max_listing_pages: num(config.max_listing_pages, 200),
+    max_detail_pages: num(config.max_detail_pages, 5000),
+  };
+}
+
 export class DeterministicCrawler {
-  private config: ScrapingConfig | Record<string, any>;
+  private normalized: NormalizedConfig;
   private domain: string;
   private useHeuristics: boolean;
   private opts: Required<CrawlerOptions>;
@@ -73,35 +105,35 @@ export class DeterministicCrawler {
   private abortSignal?: AbortSignal;
 
   constructor(
-    config: ScrapingConfig | Record<string, any>,
+    config: ScrapingConfig | Record<string, unknown>,
     options?: CrawlerOptions & {
       useHeuristics?: boolean;
       onProgress?: (progress: number, message: string) => void;
       abortSignal?: AbortSignal;
     },
   ) {
-    this.config = config;
-    this.domain = (config as any).domain || '';
+    this.normalized = normalizeConfig(config);
+    this.domain = this.normalized.domain;
     this.useHeuristics = options?.useHeuristics !== false;
     this.opts = { ...DEFAULT_OPTIONS, ...options };
     this.progressCallback = options?.onProgress;
     this.abortSignal = options?.abortSignal;
 
-    this.allowlist = compileRegexList((config as any).allowlist_patterns || []);
+    this.allowlist = compileRegexList(this.normalized.allowlist_patterns);
     this.blocklist = [
       ...getBuiltinBlocklist(),
-      ...compileRegexList((config as any).blocklist_patterns || []),
+      ...compileRegexList(this.normalized.blocklist_patterns),
     ];
 
-    const pp = (config as any).pagination_pattern;
+    const pp = this.normalized.pagination_pattern;
     this.paginationPattern = pp ? compileRegex(pp) : null;
 
-    this.listingIndicators = (config as any).listing_page_indicators || [];
-    this.detailIndicators = (config as any).detail_page_indicators || [];
-    this.categoryPatterns = compileRegexList((config as any).category_patterns || []);
-    this.linkSelectors = (config as any).link_selectors || ['a[href]'];
-    this.maxListing = (config as any).max_listing_pages || 200;
-    this.maxDetail = (config as any).max_detail_pages || 5000;
+    this.listingIndicators = this.normalized.listing_page_indicators;
+    this.detailIndicators = this.normalized.detail_page_indicators;
+    this.categoryPatterns = compileRegexList(this.normalized.category_patterns);
+    this.linkSelectors = this.normalized.link_selectors;
+    this.maxListing = this.normalized.max_listing_pages;
+    this.maxDetail = this.normalized.max_detail_pages;
   }
 
   private matchesAllowlist(url: string): boolean {
@@ -474,8 +506,8 @@ export class DeterministicCrawler {
       errors: this.errors.slice(0, 20),
       config_used: {
         domain: this.domain,
-        allowlist_patterns: (this.config as any).allowlist_patterns || [],
-        blocklist_patterns: ((this.config as any).blocklist_patterns || []).slice(0, 5),
+        allowlist_patterns: this.normalized.allowlist_patterns,
+        blocklist_patterns: this.normalized.blocklist_patterns.slice(0, 5),
       },
     };
   }

@@ -1,7 +1,7 @@
 export interface ExplorerOptions {
   baseUrl: string;
   maxPages?: number;
-  usePlaywright?: boolean;
+  usePlaywright?: boolean; // defaults to true — Playwright is primary, fetch is fallback
 }
 
 export interface PageData {
@@ -165,7 +165,7 @@ export interface OnboardRequest {
 
 export interface ScrapeRequest {
   url: string;
-  config: ScrapingConfig | Record<string, unknown>;
+  config: ScrapingConfig | Record<string, unknown>;  // use NormalizedConfig internally
   maxPages?: number;
   concurrentRequests?: number;
   usePlaywright?: boolean;
