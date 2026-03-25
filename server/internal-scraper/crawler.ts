@@ -3,7 +3,7 @@ import type { CrawlResult, CrawlerOptions, ScrapingConfig } from './types.js';
 import {
   normalizeUrl, isSameDomain, getBuiltinBlocklist,
   compileRegex, compileRegexList, randomUserAgent,
-  Semaphore, sleep,
+  Semaphore, sleep, STEALTH_INIT_SCRIPT, STEALTH_BROWSER_ARGS,
 } from './utils.js';
 
 const DEFAULT_OPTIONS: Required<CrawlerOptions> = {
@@ -392,10 +392,14 @@ export class DeterministicCrawler {
 
   async crawlWithPlaywright(startUrl: string, maxPages: number): Promise<CrawlResult> {
     const { chromium } = await import('playwright');
-    const browser = await chromium.launch({ headless: true });
+    const browser = await chromium.launch({ headless: true, args: STEALTH_BROWSER_ARGS });
     const context = await browser.newContext({
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      userAgent: randomUserAgent(),
+      locale: 'pt-BR',
+      timezoneId: 'America/Sao_Paulo',
+      viewport: { width: 1920, height: 1080 },
     });
+    await context.addInitScript(STEALTH_INIT_SCRIPT);
     const page = await context.newPage();
 
     const urlsToVisit: string[] = [startUrl];
@@ -512,44 +516,22 @@ export class DeterministicCrawler {
     };
   }
 
-  async crawl(startUrl: string, maxPages = 100, usePlaywright = false): Promise<CrawlResult> {
+  async crawl(startUrl: string, maxPages = 100, usePlaywright = true): Promise<CrawlResult> {
     if (usePlaywright) {
       try {
         return await this.crawlWithPlaywright(startUrl, maxPages);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         if (msg.includes("Executable doesn't exist") || msg.toLowerCase().includes('playwright')) {
-          console.warn('[Crawler] Playwright não disponível, usando fetch:', msg.slice(0, 100));
+          console.warn('[Crawler] Playwright não disponível, usando fetch como fallback:', msg.slice(0, 100));
           const result = await this.crawlWithFetch(startUrl, maxPages);
-          result.warnings = ['Navegador não disponível. Usando fetch.'];
+          result.warnings = ['Navegador não disponível. Usando fetch como fallback.'];
           return result;
         }
         throw e;
       }
     }
 
-    const result = await this.crawlWithFetch(startUrl, maxPages);
-
-    if (result.pages_processed < 3 && result.urls_found.length === 0) {
-      console.log('[Crawler] Resultados insuficientes, tentando Playwright...');
-      try {
-        this.visitedUrls.clear();
-        this.collectedUrls.clear();
-        this.listingCount = 0;
-        this.detailCount = 0;
-        this.errors = [];
-        return await this.crawlWithPlaywright(startUrl, maxPages);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        if (msg.includes("Executable doesn't exist") || msg.toLowerCase().includes('playwright')) {
-          console.warn('[Crawler] Navegador não disponível:', msg.slice(0, 100));
-          result.warnings = ['Navegador não disponível. Resultados podem ser limitados para sites com JavaScript.'];
-          return result;
-        }
-        throw e;
-      }
-    }
-
-    return result;
+    return await this.crawlWithFetch(startUrl, maxPages);
   }
 }

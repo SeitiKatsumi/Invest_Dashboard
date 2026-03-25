@@ -5,7 +5,7 @@ import type {
 } from './types.js';
 import {
   normalizeUrl, extractDomain, isSameDomain, isValidPageUrl,
-  randomUserAgent, sleep,
+  randomUserAgent, sleep, STEALTH_INIT_SCRIPT, STEALTH_BROWSER_ARGS,
 } from './utils.js';
 
 const CATEGORY_PATTERNS = [
@@ -292,10 +292,14 @@ async function exploreWithPlaywright(
   let detailSamples = 0;
   const maxDetailSamples = 10;
 
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({ headless: true, args: STEALTH_BROWSER_ARGS });
   const context = await browser.newContext({
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    userAgent: randomUserAgent(),
+    locale: 'pt-BR',
+    timezoneId: 'America/Sao_Paulo',
+    viewport: { width: 1920, height: 1080 },
   });
+  await context.addInitScript(STEALTH_INIT_SCRIPT);
   const page = await context.newPage();
 
   try {
