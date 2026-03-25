@@ -85,7 +85,23 @@ TypeScript interfaces are defined in `shared/schema.ts` and shared between front
 - `DATABASE_URL` - PostgreSQL connection string
 - `SESSION_SECRET` - Secret for session management
 
-## Recent Changes (February 2026)
+## Recent Changes (March 2026)
+
+### Internal Scraping Engine (TypeScript Port)
+- New `server/internal-scraper/` directory with complete TypeScript modules porting the external Python scraping API
+- **Architecture**: 4-module pipeline mirroring the external API:
+  1. **Explorer** (`explorer.ts`): Navigates up to 30 pages using `fetch` + `cheerio`, with automatic Playwright fallback for JS-heavy sites. URL classification (category/detail/pagination), BFS navigation with category priority
+  2. **Analyst** (`analyst.ts`): Sends exploration data to OpenAI GPT-4o-mini, generates JSON config with regex patterns (allowlist, blocklist, pagination, selectors). Includes regex validation and config-against-URLs coverage testing. Supports error feedback loop (previous errors fed into prompt)
+  3. **Crawler** (`crawler.ts`): Deterministic parallel crawling using AI-generated config. Semaphore-based concurrency control, BFS priority queue (pagination → categories → listing → detail), heuristic fallback when patterns insufficient. Supports both fetch and Playwright
+  4. **Job Manager** (`job-manager.ts`): In-memory job tracking with status (pending/processing/completed/failed), progress reporting, webhook callbacks, automatic cleanup
+- **Shared utilities** (`utils.ts`): URL normalization, domain extraction, regex compilation with error handling, user-agent rotation, semaphore implementation
+- **Type definitions** (`types.ts`): Full TypeScript interfaces for all modules
+- **Dependencies added**: `cheerio`, `playwright`
+- **Build config**: `cheerio` added to esbuild allowlist in `script/build.ts`; `playwright` kept external (native binaries)
+- **Status**: Modules are complete and type-checked. Not yet wired to Express routes (integration task pending)
+- **Coexistence**: External API integration in `server/scraping.ts` remains 100% functional and unchanged
+
+## Changes (February 2026)
 
 ### AI Scraping Integration
 - New `/scraping` page with full integration to external AI scraping API
