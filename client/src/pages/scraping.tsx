@@ -1650,11 +1650,14 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
         .slice(0, 10)
         .map(([error, count]) => ({ error, count })),
       sites_needing_attention: completed
-        .filter(q => q.status === "error")
+        .filter(q => {
+          const cls = q.classification || (q.status === "error" ? "error" : "success");
+          return cls !== "success";
+        })
         .map(q => ({
           site_id: q.site.id,
           site_url: q.site.url_listagem || q.site.url_site || '',
-          classification: q.classification || 'error',
+          classification: q.classification || (q.status === "error" ? 'error' : 'empty'),
           error: q.error,
           confidence: q.confidence,
         })),

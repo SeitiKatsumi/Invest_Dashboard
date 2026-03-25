@@ -16,8 +16,9 @@ export interface ConfigScore {
   };
 }
 
-const GENERIC_SELECTORS = ['a', 'a[href]', 'div', 'div a', '*', 'body a'];
-const GENERIC_PATTERNS = ['^/', '.*', '.+', '^https?://'];
+const GENERIC_SELECTORS = ['a', 'a[href]', 'div', 'div a', '*', 'body a', 'li a', 'ul a', 'span a'];
+const GENERIC_LISTING_SELECTORS = ['*', 'a', 'div', 'body', 'li', 'ul', 'span', 'p', 'section', 'main', 'article'];
+const GENERIC_PATTERNS = ['^/', '.*', '.+', '^https?://', '/.*', '/.+'];
 
 function patternSpecificity(pattern: string): number {
   let score = 0;
@@ -105,6 +106,24 @@ export function scoreConfig(config: ScrapingConfig | Record<string, unknown>): C
     flags.push('Sem seletores de link definidos');
   }
 
+  const listingSelector = typeof config.listing_selector === 'string' ? config.listing_selector.trim() : '';
+  if (listingSelector) {
+    if (GENERIC_LISTING_SELECTORS.includes(listingSelector.toLowerCase())) {
+      flags.push(`listing_selector genérico demais ("${listingSelector}")`);
+      score -= 10;
+    } else if (listingSelector.includes('[') || listingSelector.includes('.') || listingSelector.includes('#')) {
+      score += 5;
+    }
+  }
+
+  const linkSelector = typeof config.link_selector === 'string' ? config.link_selector.trim() : '';
+  if (linkSelector) {
+    if (GENERIC_LISTING_SELECTORS.includes(linkSelector.toLowerCase()) || linkSelector === 'a[href]') {
+      flags.push(`link_selector genérico demais ("${linkSelector}")`);
+      score -= 5;
+    }
+  }
+
   if (blocklist.length > 4) {
     score += 5;
   }
@@ -114,6 +133,7 @@ export function scoreConfig(config: ScrapingConfig | Record<string, unknown>): C
     score += 5;
   }
 
+  score = Math.max(0, score);
   const confidence = Math.min(100, Math.round((score / maxScore) * 100));
 
   return {

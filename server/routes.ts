@@ -473,6 +473,9 @@ export async function registerRoutes(
           created_at: job.startedAt,
           completed_at: job.completedAt,
           result: job.result,
+          result_classification: job.resultClassification,
+          confidence_score: job.confidenceScore,
+          urls_found: job.totalUrls,
           progress: {
             percent: job.progress,
             message: job.progressMessage,
