@@ -193,7 +193,8 @@ export async function registerRoutes(
 
   app.post("/api/scraping/onboard", async (req, res) => {
     try {
-      const { siteId, siteUrl, maxPages, model, engine } = req.body;
+      const { siteId, siteUrl, maxPages, model, engine: rawEngine } = req.body;
+      const engine = rawEngine || "internal";
       if (!siteUrl) {
         return res.status(400).json({ error: "URL do site é obrigatória" });
       }
@@ -277,7 +278,8 @@ export async function registerRoutes(
 
   app.post("/api/scraping/scrape", async (req, res) => {
     try {
-      const { siteUrl, config, maxPages, concurrentRequests, engine, siteId } = req.body;
+      const { siteUrl, config, maxPages, concurrentRequests, engine: rawScrapeEngine, siteId } = req.body;
+      const engine = rawScrapeEngine || "internal";
       if (!siteUrl) {
         return res.status(400).json({ error: "URL do site é obrigatória" });
       }
