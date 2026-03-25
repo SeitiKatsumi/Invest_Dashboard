@@ -1684,16 +1684,15 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
         if (c in serverClassifications) serverClassifications[c]++;
       }
 
+      const mergedClassifications: Record<string, number> = { ...localReport.by_classification };
+      for (const key of ['success', 'empty', 'config_suspect', 'error']) {
+        mergedClassifications[key] = Math.max(mergedClassifications[key] || 0, serverClassifications[key] || 0);
+      }
+
       return {
         ...localReport,
         total_urls_found: totalUrls,
-        by_classification: {
-          success: Math.max(localReport.by_classification.success || 0, serverClassifications.success),
-          empty: serverClassifications.empty + (localReport.by_classification.config_invalid || 0) > 0 ? serverClassifications.empty : 0,
-          config_suspect: serverClassifications.config_suspect,
-          config_invalid: localReport.by_classification.config_invalid || 0,
-          error: Math.max(localReport.by_classification.error || 0, serverClassifications.error),
-        },
+        by_classification: mergedClassifications,
       };
     } catch {
       return localReport;
