@@ -407,13 +407,19 @@ export async function explore(options: ExplorerOptions): Promise<ExplorationResu
   const { baseUrl, maxPages = 30, usePlaywright = true } = options;
   const domain = extractDomain(baseUrl);
 
+  const isBrowserUnavailable = (msg: string) =>
+    msg.includes("Executable doesn't exist") ||
+    msg.toLowerCase().includes('playwright') ||
+    msg.includes('BrowserPool') ||
+    msg.includes('acquire timeout');
+
   if (usePlaywright) {
     try {
       return await exploreWithPlaywright(baseUrl, domain, maxPages);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      if (msg.includes("Executable doesn't exist") || msg.toLowerCase().includes('playwright')) {
-        console.warn('[Explorer] Playwright não disponível, usando fetch como fallback:', msg.slice(0, 100));
+      if (isBrowserUnavailable(msg)) {
+        console.warn('[Explorer] Playwright não disponível, usando fetch como fallback:', msg.slice(0, 120));
         const result = await exploreWithFetch(baseUrl, domain, maxPages);
         result.warnings = ['Navegador não disponível. Usando fetch como fallback.'];
         return result;
@@ -430,8 +436,8 @@ export async function explore(options: ExplorerOptions): Promise<ExplorationResu
       return await exploreWithPlaywright(baseUrl, domain, maxPages);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      if (msg.includes("Executable doesn't exist") || msg.toLowerCase().includes('playwright')) {
-        console.warn('[Explorer] Playwright não disponível:', msg.slice(0, 100));
+      if (isBrowserUnavailable(msg)) {
+        console.warn('[Explorer] Playwright não disponível:', msg.slice(0, 120));
         result.warnings = ['Navegador não disponível. Resultados podem ser limitados para sites com JavaScript.'];
         return result;
       }

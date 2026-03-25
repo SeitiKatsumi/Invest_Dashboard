@@ -528,8 +528,13 @@ export class DeterministicCrawler {
         return await this.crawlWithPlaywright(startUrl, maxPages, externalPage);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        if (msg.includes("Executable doesn't exist") || msg.toLowerCase().includes('playwright')) {
-          console.warn('[Crawler] Playwright não disponível, usando fetch como fallback:', msg.slice(0, 100));
+        if (
+          msg.includes("Executable doesn't exist") ||
+          msg.toLowerCase().includes('playwright') ||
+          msg.includes('BrowserPool') ||
+          msg.includes('acquire timeout')
+        ) {
+          console.warn('[Crawler] Playwright não disponível, usando fetch como fallback:', msg.slice(0, 120));
           const result = await this.crawlWithFetch(startUrl, maxPages);
           result.warnings = ['Navegador não disponível. Usando fetch como fallback.'];
           return result;

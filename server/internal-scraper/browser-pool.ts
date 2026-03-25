@@ -11,12 +11,14 @@ interface PooledBrowser {
 const MAX_BROWSERS = 3;
 const MAX_USES_PER_BROWSER = 20;
 const BROWSER_MAX_AGE_MS = 30 * 60 * 1000;
+const ACQUIRE_TIMEOUT_MS = 30_000;
 
 class BrowserPool {
   private pool: PooledBrowser[] = [];
-  private waitQueue: Array<(browser: Browser) => void> = [];
+  private waitQueue: Array<{ resolve: (browser: Browser) => void; reject: (err: Error) => void }> = [];
   private _totalAcquired = 0;
   private _totalReleased = 0;
+  private _creationFailed = false;
 
   get activeBrowsers(): number {
     return this.pool.filter(b => b.inUse).length;
@@ -42,10 +44,19 @@ class BrowserPool {
   }
 
   async acquire(): Promise<{ browser: Browser; context: BrowserContext; page: Page }> {
+    if (this._creationFailed) {
+      throw new Error('BrowserPool: playwright browser creation previously failed');
+    }
+
     let pooled: PooledBrowser | undefined = this.pool.find(b => !b.inUse && !this.isExpired(b));
 
     if (!pooled && this.pool.length < MAX_BROWSERS) {
       pooled = (await this.createBrowser()) ?? undefined;
+      if (!pooled) {
+        this._creationFailed = true;
+        this.rejectAllWaiters('BrowserPool: playwright browser creation failed');
+        throw new Error('BrowserPool: playwright browser creation failed');
+      }
     }
 
     if (!pooled) {
@@ -53,12 +64,26 @@ class BrowserPool {
       if (stale) {
         await this.destroyBrowser(stale);
         pooled = (await this.createBrowser()) ?? undefined;
+        if (!pooled) {
+          this._creationFailed = true;
+          this.rejectAllWaiters('BrowserPool: playwright browser creation failed');
+          throw new Error('BrowserPool: playwright browser creation failed');
+        }
       }
     }
 
     if (!pooled) {
-      const browser = await new Promise<Browser>((resolve) => {
-        this.waitQueue.push(resolve);
+      const browser = await new Promise<Browser>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          const idx = this.waitQueue.findIndex(w => w.resolve === resolve);
+          if (idx >= 0) this.waitQueue.splice(idx, 1);
+          reject(new Error('BrowserPool: acquire timeout after 30s'));
+        }, ACQUIRE_TIMEOUT_MS);
+
+        this.waitQueue.push({
+          resolve: (b: Browser) => { clearTimeout(timer); resolve(b); },
+          reject: (err: Error) => { clearTimeout(timer); reject(err); },
+        });
       });
       const entry = this.pool.find(b => b.browser === browser)!;
       entry.inUse = true;
@@ -87,7 +112,10 @@ class BrowserPool {
         const newBrowser = await this.createBrowser();
         if (newBrowser) {
           const waiter = this.waitQueue.shift();
-          if (waiter) waiter(newBrowser.browser);
+          if (waiter) waiter.resolve(newBrowser.browser);
+        } else {
+          this._creationFailed = true;
+          this.rejectAllWaiters('BrowserPool: playwright browser creation failed on recycle');
         }
       }
       return;
@@ -98,13 +126,13 @@ class BrowserPool {
     if (this.waitQueue.length > 0) {
       const waiter = this.waitQueue.shift();
       if (waiter) {
-        waiter(pooled.browser);
+        waiter.resolve(pooled.browser);
       }
     }
   }
 
   async drainAll(): Promise<void> {
-    this.waitQueue = [];
+    this.rejectAllWaiters('BrowserPool: pool drained');
 
     for (const entry of [...this.pool]) {
       try {
@@ -112,12 +140,25 @@ class BrowserPool {
       } catch {}
     }
     this.pool = [];
+    this._creationFailed = false;
   }
 
   async drainIdle(): Promise<void> {
     const idle = this.pool.filter(b => !b.inUse);
     for (const entry of idle) {
       await this.destroyBrowser(entry);
+    }
+  }
+
+  resetCreationFlag(): void {
+    this._creationFailed = false;
+  }
+
+  private rejectAllWaiters(message: string): void {
+    const waiters = [...this.waitQueue];
+    this.waitQueue = [];
+    for (const w of waiters) {
+      w.reject(new Error(message));
     }
   }
 
