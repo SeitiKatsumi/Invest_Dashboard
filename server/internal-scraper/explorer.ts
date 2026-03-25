@@ -138,8 +138,14 @@ function detectPaginationPatterns($: cheerio.CheerioAPI, url: string): string[] 
   return Array.from(patterns);
 }
 
-function extractLinkInfo($: cheerio.CheerioAPI, currentUrl: string, domain: string, allLinks: Set<string>): LinkInfo {
+interface LinkExtractionResult {
+  info: LinkInfo;
+  newLinks: string[];
+}
+
+function extractLinkInfo($: cheerio.CheerioAPI, currentUrl: string, domain: string, allLinks: Set<string>): LinkExtractionResult {
   const linksData: SampleLink[] = [];
+  const newLinks: string[] = [];
 
   $('a[href]').each((_, el) => {
     const href = $(el).attr('href') || '';
@@ -164,13 +170,19 @@ function extractLinkInfo($: cheerio.CheerioAPI, currentUrl: string, domain: stri
       hasImage: $(el).find('img').length > 0,
     });
 
-    allLinks.add(fullUrl);
+    if (!allLinks.has(fullUrl)) {
+      allLinks.add(fullUrl);
+      newLinks.push(fullUrl);
+    }
   });
 
   return {
-    totalLinks: linksData.length,
-    sampleLinks: linksData.slice(0, 30),
-    uniquePatterns: extractUrlPatterns(linksData),
+    info: {
+      totalLinks: linksData.length,
+      sampleLinks: linksData.slice(0, 30),
+      uniquePatterns: extractUrlPatterns(linksData),
+    },
+    newLinks,
   };
 }
 
@@ -232,17 +244,18 @@ async function exploreWithFetch(
     visitedUrls.add(currentUrl);
     const $ = cheerio.load(html);
 
+    const { info: linkInfo, newLinks } = extractLinkInfo($, currentUrl, domain, allLinks);
     const pageData: PageData = {
       url: currentUrl,
       type: urlType,
       structure: extractPageStructure($),
-      links: extractLinkInfo($, currentUrl, domain, allLinks),
+      links: linkInfo,
       pagination: detectPaginationPatterns($, currentUrl),
     };
     results.push(pageData);
     paginationSamples.push(...pageData.pagination);
 
-    for (const link of Array.from(allLinks)) {
+    for (const link of newLinks) {
       if (visitedUrls.has(link) || urlsToVisit.includes(link)) continue;
       const linkType = classifyUrl(link);
       if (linkType === 'category') {
@@ -346,17 +359,18 @@ async function exploreWithPlaywright(
         const html = await page.content();
         const $ = cheerio.load(html);
 
+        const { info: linkInfo, newLinks } = extractLinkInfo($, currentUrl, domain, allLinks);
         const pageData: PageData = {
           url: currentUrl,
           type: urlType,
           structure: extractPageStructure($),
-          links: extractLinkInfo($, currentUrl, domain, allLinks),
+          links: linkInfo,
           pagination: detectPaginationPatterns($, currentUrl),
         };
         results.push(pageData);
         paginationSamples.push(...pageData.pagination);
 
-        for (const link of Array.from(allLinks)) {
+        for (const link of newLinks) {
           if (visitedUrls.has(link) || urlsToVisit.includes(link)) continue;
           const linkType = classifyUrl(link);
           if (linkType === 'category') {

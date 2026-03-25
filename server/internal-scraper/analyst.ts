@@ -278,6 +278,7 @@ export async function analyzeAndGenerateConfig(
       ],
       temperature: 0.3,
       max_tokens: 2000,
+      response_format: { type: 'json_object' },
     });
 
     let responseText = response.choices[0].message.content?.trim() || '';
