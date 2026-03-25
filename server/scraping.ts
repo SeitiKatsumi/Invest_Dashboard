@@ -1,3 +1,11 @@
+import {
+  explore,
+  analyzeAndGenerateConfig,
+  DeterministicCrawler,
+  jobManager,
+} from './internal-scraper/index.js';
+import type { ScrapingConfig } from './internal-scraper/types.js';
+
 const SCRAPING_API_URL = process.env.SCRAPING_API_URL?.trim() || "https://api-scrap-invest.server04.11mind.com.br";
 const DIRECTUS_URL = process.env.DIRECTUS_URL?.trim();
 const DIRECTUS_TOKEN = process.env.DIRECTUS_TOKEN?.trim();
@@ -354,7 +362,7 @@ export async function getSitesWithConfig() {
   }
 
   const baseFields = "id,nome_site,url_site,url_listagem,liga_desliga,status,scraping_config,last_scraping_at,last_scraping_urls_found";
-  const extendedFields = `${baseFields},scraping_error,scraping_error_analysis`;
+  const extendedFields = `${baseFields},scraping_error,scraping_error_analysis,scraping_engine`;
 
   const url = new URL(`${DIRECTUS_URL}/items/input_library_url`);
   url.searchParams.set("limit", "-1");
@@ -385,4 +393,171 @@ export async function getSitesWithConfig() {
 
   const result = await response.json();
   return result.data || [];
+}
+
+export async function updateSiteEngine(siteId: number, engine: "external" | "internal") {
+  if (!DIRECTUS_URL || !DIRECTUS_TOKEN) {
+    throw new Error("DIRECTUS_URL and DIRECTUS_TOKEN must be set");
+  }
+
+  const response = await fetch(`${DIRECTUS_URL}/items/input_library_url/${siteId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ scraping_engine: engine }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.warn(`Could not update scraping_engine in Directus (field may not exist): ${response.status} - ${error}`);
+    return null;
+  }
+
+  return response.json();
+}
+
+export async function getSiteErrorContext(siteId: number): Promise<{
+  scraping_error?: string;
+  scraping_error_analysis?: string;
+  previous_config?: Record<string, unknown>;
+} | null> {
+  if (!DIRECTUS_URL || !DIRECTUS_TOKEN) return null;
+
+  try {
+    const url = new URL(`${DIRECTUS_URL}/items/input_library_url/${siteId}`);
+    url.searchParams.set("fields", "scraping_error,scraping_error_analysis,scraping_config");
+
+    const response = await fetch(url.toString(), {
+      headers: {
+        Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) return null;
+    const result = await response.json();
+    const data = result.data;
+    if (!data) return null;
+
+    const context: Record<string, unknown> = {};
+    if (data.scraping_error) context.scraping_error = data.scraping_error;
+    if (data.scraping_error_analysis) context.scraping_error_analysis = data.scraping_error_analysis;
+    if (data.scraping_config) {
+      try {
+        context.previous_config = typeof data.scraping_config === "string"
+          ? JSON.parse(data.scraping_config)
+          : data.scraping_config;
+      } catch {}
+    }
+    return Object.keys(context).length > 0 ? context as {
+      scraping_error?: string;
+      scraping_error_analysis?: string;
+      previous_config?: Record<string, unknown>;
+    } : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function startInternalOnboarding(
+  siteUrl: string,
+  openaiApiKey: string,
+  siteId?: number,
+  maxPages?: number,
+  model?: string,
+): Promise<{ config?: ScrapingConfig; error?: string; exploration_summary?: Record<string, unknown> }> {
+  const { extractDomain } = await import('./internal-scraper/utils.js');
+  const domain = extractDomain(siteUrl);
+
+  let previousErrors: {
+    scraping_error?: string;
+    scraping_error_analysis?: string;
+    previous_config?: Record<string, unknown>;
+  } | undefined;
+  if (siteId) {
+    const ctx = await getSiteErrorContext(siteId);
+    if (ctx) previousErrors = ctx;
+  }
+
+  const explorationResult = await explore({
+    baseUrl: siteUrl,
+    maxPages: maxPages || 30,
+    usePlaywright: true,
+  });
+
+  const analysisResult = await analyzeAndGenerateConfig(
+    explorationResult,
+    domain,
+    openaiApiKey,
+    {
+      model: model || "gpt-4o-mini",
+      targetDescription: "links de imóveis ou propriedades",
+      previousErrors,
+    },
+  );
+
+  if (!analysisResult.success || !analysisResult.config) {
+    return {
+      error: analysisResult.error || "Análise não retornou configuração",
+      exploration_summary: analysisResult.exploration_summary as Record<string, unknown> | undefined,
+    };
+  }
+
+  return {
+    config: analysisResult.config,
+    exploration_summary: analysisResult.exploration_summary as Record<string, unknown> | undefined,
+  };
+}
+
+export async function startInternalScraping(
+  siteUrl: string,
+  config: Record<string, unknown>,
+  siteId?: number,
+  maxPages?: number,
+  concurrentRequests?: number,
+): Promise<{ job_id: string }> {
+  const job = jobManager.createJob('scrape', siteUrl, siteId, N8N_WEBHOOK_URL);
+
+  (async () => {
+    try {
+      jobManager.updateProgress(job.id, 5, 'Inicializando crawler...');
+
+      const crawler = new DeterministicCrawler(config as ScrapingConfig, {
+        concurrentRequests: concurrentRequests || 10,
+      });
+
+      jobManager.updateProgress(job.id, 10, 'Navegando páginas...');
+
+      const result = await crawler.crawl(siteUrl, maxPages || 100, true);
+
+      jobManager.completeJob(job.id, result);
+
+      if (siteId) {
+        try {
+          await updateSiteScrapingStats(siteId, new Date().toISOString(), result.total_urls);
+        } catch (e) {
+          console.error(`[InternalScraping] Failed to update stats for site ${siteId}:`, e);
+        }
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      jobManager.failJob(job.id, msg);
+    }
+  })();
+
+  return { job_id: job.id };
+}
+
+export function getInternalJobs(limit?: number) {
+  return jobManager.listJobs(limit || 50);
+}
+
+export function getInternalJob(jobId: string) {
+  return jobManager.getJob(jobId);
+}
+
+export function deleteInternalJob(jobId: string) {
+  return jobManager.deleteJob(jobId);
 }

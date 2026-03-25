@@ -20,6 +20,12 @@ import {
   updateSiteName,
   getAuctionCountsBySite,
   bulkUpdateSiteStatus,
+  updateSiteEngine,
+  startInternalOnboarding,
+  startInternalScraping,
+  getInternalJobs,
+  getInternalJob,
+  deleteInternalJob,
 } from "./scraping";
 import {
   connectWhatsApp,
@@ -187,7 +193,7 @@ export async function registerRoutes(
 
   app.post("/api/scraping/onboard", async (req, res) => {
     try {
-      const { siteId, siteUrl, maxPages, model } = req.body;
+      const { siteId, siteUrl, maxPages, model, engine } = req.body;
       if (!siteUrl) {
         return res.status(400).json({ error: "URL do site é obrigatória" });
       }
@@ -195,28 +201,58 @@ export async function registerRoutes(
         return res.status(500).json({ error: "OPENAI_API_KEY não configurada" });
       }
 
-      const result = await startOnboarding(siteUrl, process.env.OPENAI_API_KEY, maxPages, model);
+      const useInternal = engine === "internal";
 
-      if (siteId && result.config) {
-        try {
-          await saveSiteScrapingConfig(siteId, result.config);
-          await clearSiteScrapingError(siteId);
-        } catch (saveError) {
-          console.error("Error saving config to Directus:", saveError);
+      if (useInternal) {
+        const result = await startInternalOnboarding(
+          siteUrl, process.env.OPENAI_API_KEY, siteId, maxPages, model
+        );
+
+        if (siteId && result.config) {
+          try {
+            await saveSiteScrapingConfig(siteId, result.config as unknown as Record<string, unknown>);
+            await clearSiteScrapingError(siteId);
+            await updateSiteEngine(siteId, "internal");
+          } catch (saveError) {
+            console.error("Error saving config to Directus:", saveError);
+          }
         }
-      }
 
-      if (siteId && !result.config) {
-        try {
-          const errorMsg = result.error || result.message || "Onboarding não retornou configuração";
-          const analysis = result.analysis || result.agent_analysis || result.details || null;
-          await saveSiteScrapingError(siteId, errorMsg, typeof analysis === "string" ? analysis : analysis ? JSON.stringify(analysis) : null);
-        } catch (saveError) {
-          console.error("Error saving scraping error to Directus:", saveError);
+        if (siteId && !result.config) {
+          try {
+            const errorMsg = result.error || "Onboarding interno não retornou configuração";
+            await saveSiteScrapingError(siteId, errorMsg, null);
+          } catch (saveError) {
+            console.error("Error saving scraping error to Directus:", saveError);
+          }
         }
-      }
 
-      res.json(result);
+        res.json(result);
+      } else {
+        const result = await startOnboarding(siteUrl, process.env.OPENAI_API_KEY, maxPages, model);
+
+        if (siteId && result.config) {
+          try {
+            await saveSiteScrapingConfig(siteId, result.config);
+            await clearSiteScrapingError(siteId);
+            await updateSiteEngine(siteId, "external");
+          } catch (saveError) {
+            console.error("Error saving config to Directus:", saveError);
+          }
+        }
+
+        if (siteId && !result.config) {
+          try {
+            const errorMsg = result.error || result.message || "Onboarding não retornou configuração";
+            const analysis = result.analysis || result.agent_analysis || result.details || null;
+            await saveSiteScrapingError(siteId, errorMsg, typeof analysis === "string" ? analysis : analysis ? JSON.stringify(analysis) : null);
+          } catch (saveError) {
+            console.error("Error saving scraping error to Directus:", saveError);
+          }
+        }
+
+        res.json(result);
+      }
     } catch (error) {
       console.error("Error during onboarding:", error);
       const errorMsg = error instanceof Error ? error.message : "Erro desconhecido";
@@ -238,7 +274,7 @@ export async function registerRoutes(
 
   app.post("/api/scraping/scrape", async (req, res) => {
     try {
-      const { siteUrl, config, maxPages, concurrentRequests } = req.body;
+      const { siteUrl, config, maxPages, concurrentRequests, engine, siteId } = req.body;
       if (!siteUrl) {
         return res.status(400).json({ error: "URL do site é obrigatória" });
       }
@@ -258,8 +294,17 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Configuração de scraping deve ser um objeto JSON válido" });
       }
 
-      const result = await startScraping(siteUrl, parsedConfig, maxPages, concurrentRequests);
-      res.json(result);
+      const useInternal = engine === "internal";
+
+      if (useInternal) {
+        const result = await startInternalScraping(
+          siteUrl, parsedConfig, siteId, maxPages, concurrentRequests
+        );
+        res.json(result);
+      } else {
+        const result = await startScraping(siteUrl, parsedConfig, maxPages, concurrentRequests);
+        res.json(result);
+      }
     } catch (error) {
       console.error("Error starting scraping:", error);
       res.status(500).json({
@@ -272,15 +317,52 @@ export async function registerRoutes(
   app.get("/api/scraping/jobs", async (req, res) => {
     try {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
-      const jobsResult = await getJobs(limit);
-      const jobsList = jobsResult?.jobs || [];
 
       let sites: any[] = [];
       try {
         sites = await getSitesWithConfig();
       } catch {}
 
-      const enrichedJobs = jobsList.map((job: any) => {
+      let externalJobs: any[] = [];
+      try {
+        const jobsResult = await getJobs(limit);
+        externalJobs = (jobsResult?.jobs || []).map((job: any) => ({
+          ...job,
+          engine: "external",
+        }));
+      } catch (e) {
+        console.warn("Could not fetch external jobs:", e);
+      }
+
+      const internalJobs = getInternalJobs(limit).map((job) => ({
+        job_id: job.id,
+        status: job.status === "processing" ? "running" : job.status,
+        url: job.siteUrl,
+        site_url: job.siteUrl,
+        site_id: job.siteId,
+        progress: job.progress,
+        urls_found: job.totalUrls,
+        pages_processed: job.pagesProcessed,
+        error: job.error,
+        started_at: job.startedAt,
+        completed_at: job.completedAt,
+        engine: "internal",
+        result: job.result && "urls_found" in job.result ? {
+          total_urls: job.result.total_urls,
+          urls_found: job.result.urls_found,
+          pages_processed: job.result.pages_processed,
+        } : undefined,
+      }));
+
+      const allJobs = [...internalJobs, ...externalJobs];
+
+      allJobs.sort((a, b) => {
+        const da = new Date(a.started_at || a.created_at || 0).getTime();
+        const db = new Date(b.started_at || b.created_at || 0).getTime();
+        return db - da;
+      });
+
+      const enrichedJobs = allJobs.slice(0, limit).map((job: any) => {
         let jobUrl = job.url || job.site_url || "";
         if (!jobUrl && job.result?.urls_found?.[0]) {
           try { jobUrl = new URL(job.result.urls_found[0]).origin; } catch {}
@@ -300,7 +382,7 @@ export async function registerRoutes(
               } catch { return false; }
             });
             if (matchedSite) {
-              if (job.status === "completed" && job.completed_at && matchedSite.id) {
+              if (job.status === "completed" && job.completed_at && matchedSite.id && job.engine !== "internal") {
                 const totalUrls = job.result?.total_urls || job.result?.urls_found?.length || 0;
                 const existingDate = matchedSite.last_scraping_at;
                 const jobDate = new Date(job.completed_at);
@@ -317,7 +399,7 @@ export async function registerRoutes(
         return { ...job, site_url: jobUrl || undefined };
       });
 
-      res.json({ ...jobsResult, jobs: enrichedJobs });
+      res.json({ jobs: enrichedJobs });
     } catch (error) {
       console.error("Error fetching jobs:", error);
       res.status(500).json({
@@ -329,8 +411,15 @@ export async function registerRoutes(
 
   app.get("/api/scraping/jobs/:jobId", async (req, res) => {
     try {
-      const job = await getJob(req.params.jobId);
-      res.json(job);
+      const jobId = req.params.jobId;
+      if (jobId.startsWith("int_")) {
+        const job = getInternalJob(jobId);
+        if (!job) return res.status(404).json({ error: "Job não encontrado" });
+        res.json(job);
+      } else {
+        const job = await getJob(jobId);
+        res.json(job);
+      }
     } catch (error) {
       console.error("Error fetching job:", error);
       res.status(500).json({
@@ -342,8 +431,14 @@ export async function registerRoutes(
 
   app.delete("/api/scraping/jobs/:jobId", async (req, res) => {
     try {
-      const result = await deleteJob(req.params.jobId);
-      res.json(result);
+      const jobId = req.params.jobId;
+      if (jobId.startsWith("int_")) {
+        const deleted = deleteInternalJob(jobId);
+        res.json({ success: deleted });
+      } else {
+        const result = await deleteJob(jobId);
+        res.json(result);
+      }
     } catch (error) {
       console.error("Error deleting job:", error);
       res.status(500).json({
@@ -453,10 +548,30 @@ export async function registerRoutes(
         return res.json({ urls: [], total: 0 });
       }
 
-      const jobsResult = await getJobs(100);
-      const jobsList = jobsResult?.jobs || [];
+      let externalJobs: any[] = [];
+      try {
+        const jobsResult = await getJobs(100);
+        externalJobs = jobsResult?.jobs || [];
+      } catch {}
 
-      const completedJobs = jobsList
+      const internalCompletedJobs = getInternalJobs(100)
+        .filter((j) => j.status === "completed")
+        .filter((j) => {
+          if (j.siteId === siteId) return true;
+          try {
+            return new URL(j.siteUrl).hostname.replace(/^www\./, "") === siteDomain;
+          } catch { return false; }
+        })
+        .map((j) => ({
+          job_id: j.id,
+          status: j.status,
+          completed_at: j.completedAt,
+          result: j.result && "urls_found" in j.result ? { urls_found: j.result.urls_found, total_urls: j.result.total_urls } : undefined,
+          url: j.siteUrl,
+          engine: "internal",
+        }));
+
+      const externalCompletedJobs = externalJobs
         .filter((j: any) => j.status === "completed")
         .filter((j: any) => {
           const jobUrl = j.url || j.site_url || j.result?.urls_found?.[0] || j.config_used?.url || j.result?.config_used?.url || "";
@@ -464,18 +579,20 @@ export async function registerRoutes(
           try {
             return new URL(jobUrl).hostname.replace(/^www\./, "") === siteDomain;
           } catch { return false; }
-        })
+        });
+
+      const allCompleted = [...internalCompletedJobs, ...externalCompletedJobs]
         .sort((a: any, b: any) => {
           const da = new Date(a.completed_at || 0).getTime();
           const db = new Date(b.completed_at || 0).getTime();
           return db - da;
         });
 
-      if (completedJobs.length === 0) {
+      if (allCompleted.length === 0) {
         return res.json({ urls: [], total: 0 });
       }
 
-      const lastJob = completedJobs[0];
+      const lastJob = allCompleted[0];
       const urls: string[] = lastJob.result?.urls_found || [];
       res.json({ urls, total: urls.length, job_id: lastJob.job_id || lastJob.id });
     } catch (error) {
@@ -502,6 +619,24 @@ export async function registerRoutes(
       console.error("Error updating bulk site status:", error);
       res.status(500).json({
         error: "Failed to update bulk site status",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  app.patch("/api/scraping/sites/:siteId/engine", async (req, res) => {
+    try {
+      const siteId = parseInt(req.params.siteId);
+      const { engine } = req.body;
+      if (!siteId || !engine || !["external", "internal"].includes(engine)) {
+        return res.status(400).json({ error: "siteId e engine (external/internal) são obrigatórios" });
+      }
+      await updateSiteEngine(siteId, engine);
+      res.json({ success: true, engine });
+    } catch (error) {
+      console.error("Error updating site engine:", error);
+      res.status(500).json({
+        error: "Falha ao atualizar motor de scraping",
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }

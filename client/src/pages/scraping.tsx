@@ -59,6 +59,8 @@ import {
   Pencil,
   Save,
   X,
+  Cpu,
+  Cloud,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -250,6 +252,50 @@ function EditableNameCell({ site }: { site: Site }) {
         <Pencil className="h-3 w-3 text-muted-foreground" />
       </Button>
     </div>
+  );
+}
+
+function EngineToggle({ site }: { site: Site }) {
+  const { toast } = useToast();
+
+  const mutation = useMutation({
+    mutationFn: async (newEngine: "external" | "internal") => {
+      const response = await apiRequest("PATCH", `/api/scraping/sites/${site.id}/engine`, {
+        engine: newEngine,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/scraping/sites"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao alterar motor", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const engine = site.scraping_engine || "internal";
+  const isInternal = engine === "internal";
+
+  return (
+    <button
+      onClick={() => mutation.mutate(isInternal ? "external" : "internal")}
+      disabled={mutation.isPending}
+      className="cursor-pointer"
+      data-testid={`button-toggle-engine-${site.id}`}
+      title={isInternal ? "Motor Interno (clique para trocar)" : "API Externa (clique para trocar)"}
+    >
+      <Badge
+        variant="outline"
+        className={
+          isInternal
+            ? "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800"
+            : "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800"
+        }
+      >
+        {isInternal ? <Cpu className="h-3 w-3 mr-1" /> : <Cloud className="h-3 w-3 mr-1" />}
+        {isInternal ? "Interno" : "Externo"}
+      </Badge>
+    </button>
   );
 }
 
@@ -578,6 +624,7 @@ function SitesTable({
                   <th className="text-left p-3 font-medium">Site</th>
                   <th className="text-left p-3 font-medium hidden md:table-cell">URL Listagem</th>
                   <th className="text-center p-3 font-medium">Status</th>
+                  <th className="text-center p-3 font-medium">Motor</th>
                   <th className="text-center p-3 font-medium hidden lg:table-cell">Leilões</th>
                   <th className="text-center p-3 font-medium">Config</th>
                   <th className="text-center p-3 font-medium hidden lg:table-cell">Último Scraping</th>
@@ -621,6 +668,9 @@ function SitesTable({
                             {site.liga_desliga === "ligado" ? "Ativo" : "Inativo"}
                           </Badge>
                         </button>
+                      </td>
+                      <td className="p-3 text-center">
+                        <EngineToggle site={site} />
                       </td>
                       <td className="p-3 text-center hidden lg:table-cell">
                         {auctionCounts && auctionCounts[site.id] ? (
@@ -707,7 +757,7 @@ function SitesTable({
                 })}
                 {paged.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="p-8 text-center text-muted-foreground">
+                    <td colSpan={10} className="p-8 text-center text-muted-foreground">
                       Nenhum site encontrado
                     </td>
                   </tr>
@@ -849,6 +899,15 @@ function JobsPanel() {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
+                      {(job.engine as string) === "internal" ? (
+                        <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800">
+                          <Cpu className="h-3 w-3 mr-1" />Interno
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800">
+                          <Cloud className="h-3 w-3 mr-1" />Externo
+                        </Badge>
+                      )}
                       {getStatusBadge(status)}
                       <Button
                         variant="ghost"
@@ -915,6 +974,8 @@ function OnboardingDialog({
     { value: "o4-mini", label: "o4 Mini", desc: "Raciocínio mais recente" },
   ];
 
+  const engine = site?.scraping_engine || "internal";
+
   const mutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("POST", "/api/scraping/onboard", {
@@ -922,6 +983,7 @@ function OnboardingDialog({
         siteUrl: site?.url_listagem || site?.url_site,
         maxPages: parseInt(maxPages) || 30,
         model,
+        engine,
       });
       return response.json();
     },
@@ -966,6 +1028,15 @@ function OnboardingDialog({
             <Label className="text-sm font-medium">Site</Label>
             <p className="text-sm font-semibold mt-1">{site?.nome_site || `Site #${site?.id}`}</p>
             <p className="text-xs text-muted-foreground">{site?.url_listagem || site?.url_site}</p>
+            <div className="mt-1">
+              <Badge variant="outline" className={engine === "internal"
+                ? "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800"
+                : "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800"
+              }>
+                {engine === "internal" ? <Cpu className="h-3 w-3 mr-1" /> : <Cloud className="h-3 w-3 mr-1" />}
+                Motor {engine === "internal" ? "Interno" : "Externo"}
+              </Badge>
+            </div>
           </div>
 
           <div>
@@ -1078,6 +1149,8 @@ function ScrapingDialog({
   const [concurrentRequests, setConcurrentRequests] = useState("10");
   const { toast } = useToast();
 
+  const engine = site?.scraping_engine || "internal";
+
   const config = site?.scraping_config ? (() => {
     if (typeof site.scraping_config === "object") return site.scraping_config;
     try {
@@ -1094,6 +1167,8 @@ function ScrapingDialog({
         config,
         maxPages: parseInt(maxPages) || 100,
         concurrentRequests: parseInt(concurrentRequests) || 10,
+        engine,
+        siteId: site?.id,
       });
       return response.json();
     },
@@ -1132,6 +1207,15 @@ function ScrapingDialog({
             <Label className="text-sm font-medium">Site</Label>
             <p className="text-sm font-semibold mt-1">{site?.nome_site || `Site #${site?.id}`}</p>
             <p className="text-xs text-muted-foreground">{site?.url_listagem || site?.url_site}</p>
+            <div className="mt-1">
+              <Badge variant="outline" className={engine === "internal"
+                ? "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800"
+                : "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800"
+              }>
+                {engine === "internal" ? <Cpu className="h-3 w-3 mr-1" /> : <Cloud className="h-3 w-3 mr-1" />}
+                Motor {engine === "internal" ? "Interno" : "Externo"}
+              </Badge>
+            </div>
           </div>
 
           {!config && (
@@ -1365,6 +1449,7 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
           siteUrl: item.site.url_listagem || item.site.url_site,
           maxPages: 30,
           model: "gpt-4o-mini",
+          engine: item.site.scraping_engine || "internal",
         }),
       });
       if (!response.ok) {
@@ -1390,6 +1475,8 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
           config,
           maxPages: 100,
           concurrentRequests: 10,
+          engine: item.site.scraping_engine || "internal",
+          siteId: item.site.id,
         }),
       });
       if (!response.ok) {

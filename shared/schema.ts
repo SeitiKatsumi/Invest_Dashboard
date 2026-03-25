@@ -14,6 +14,7 @@ export interface Site {
   scraping_error_analysis: string | null;
   last_scraping_at: string | null;
   last_scraping_urls_found: number | null;
+  scraping_engine: "external" | "internal" | null;
 }
 
 export interface ScrapingJob {

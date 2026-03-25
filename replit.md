@@ -1,216 +1,47 @@
 # Painel de Monitoramento - Portal de Leilões
 
 ## Overview
-
-This is a monitoring dashboard application for a Brazilian auction portal (Portal de Leilões). The application displays real-time statistics and monitoring data for auction sites, scraped listings, scraping logs, and URL processing status. It connects to an external Directus CMS instance to fetch and display data about auction site scraping operations.
-
-The dashboard provides visibility into:
-- Monitored auction sites and their on/off status
-- Extracted auction listings (leilões) with image and publication status
-- Scraping operation logs with success/error tracking
-- URL processing queue status
+This project is a monitoring dashboard for a Brazilian auction portal, "Portal de Leilões." It provides real-time statistics and monitoring data for auction sites, extracted listings, scraping logs, and URL processing statuses. The dashboard integrates with an external Directus CMS to manage and display data related to auction scraping operations. The system aims to provide comprehensive visibility into the health and performance of the auction data collection pipeline, enabling efficient management and monitoring of auction listings and scraping activities. It includes modules for AI-driven scraping, manual auction registration with AI image extraction, and WhatsApp broadcast capabilities for auction listings.
 
 ## User Preferences
-
 Preferred communication style: Simple, everyday language.
 
 ## System Architecture
 
 ### Frontend Architecture
 - **Framework**: React 18 with TypeScript
-- **Routing**: Wouter (lightweight React router)
-- **State Management**: TanStack React Query for server state
-- **UI Components**: shadcn/ui component library built on Radix UI primitives
-- **Styling**: Tailwind CSS with CSS custom properties for theming
-- **Charts**: Recharts for data visualization (pie charts, bar charts)
-- **Build Tool**: Vite with hot module replacement
-
-The frontend follows a component-based architecture with:
-- Page components in `client/src/pages/`
-- Reusable UI components in `client/src/components/ui/`
-- Dashboard-specific components in `client/src/components/dashboard/`
-- Custom hooks in `client/src/hooks/`
-- Utility functions and providers in `client/src/lib/`
+- **Routing**: Wouter
+- **State Management**: TanStack React Query
+- **UI Components**: shadcn/ui built on Radix UI
+- **Styling**: Tailwind CSS
+- **Charts**: Recharts
+- **Build Tool**: Vite
 
 ### Backend Architecture
 - **Runtime**: Node.js with Express 5
-- **Language**: TypeScript compiled with tsx
-- **API Pattern**: REST endpoints under `/api/` prefix
-- **Development**: Vite middleware integration for HMR
-
-The backend acts primarily as a proxy/aggregation layer that:
-- Fetches data from external Directus CMS
-- Aggregates statistics for dashboard display
-- Serves the static frontend in production
+- **Language**: TypeScript
+- **API Pattern**: REST endpoints under `/api/`
+- **Functionality**: Acts as a proxy/aggregation layer for Directus CMS data and serves the static frontend. Includes an internal scraping engine and WhatsApp integration.
 
 ### Data Layer
-- **Primary Data Source**: External Directus CMS (headless CMS)
-- **Database Schema**: Drizzle ORM configured for PostgreSQL (schema in `shared/schema.ts`)
-- **Session Storage**: connect-pg-simple for PostgreSQL sessions (configured but may not be actively used)
+- **Primary Data Source**: External Directus CMS
+- **Database (for local persistence/sessions)**: PostgreSQL with Drizzle ORM
+- **Shared Types**: TypeScript interfaces defined in `shared/schema.ts` for consistent data structures across frontend and backend.
 
-The application primarily reads data from Directus collections:
-- `input_library_url` - Sites to monitor
-- `leiloes_imovel` - Auction listings (note: state field is `estado_uf`, not `uf`)
-- `logs_scraping` - Scraping operation logs
-- `url_consulta` - URL processing queue
-
-### Shared Types
-TypeScript interfaces are defined in `shared/schema.ts` and shared between frontend and backend:
-- `Site` - Auction site configuration
-- `Leilao` - Individual auction listing
-- `LogScraping` - Scraping log entry
-- `UrlConsulta` - URL processing status
-- `DashboardStats` - Aggregated dashboard statistics
-- `LeilaoInsert` - Zod schema type for creating new auctions (used for form validation)
-- `leilaoInsertSchema` - Zod validation schema shared between frontend and backend
+### Key Features
+- **Dashboard**: Displays monitored sites, auction listings, scraping logs, and URL processing queue status.
+- **AI Scraping Integration**: Features an internal, TypeScript-based scraping engine with Explorer, Analyst, Crawler, and Job Manager modules. It supports AI-driven configuration generation and parallel crawling. An external AI scraping API is also integrated for comparison and dual-engine support.
+- **WhatsApp Broadcast Module**: Allows sending auction listings to WhatsApp community groups with QR code authentication, group management, and dispatch history. Supports community announcement groups.
+- **Manual Registration**: Provides a form for manual auction registration with comprehensive fields, CEP auto-fill via ViaCEP API, and AI Image Extraction using OpenAI GPT-4o Vision for automated data population from screenshots.
+- **Detailed Logs Page**: Offers a dedicated page for detailed scraping logs with filtering and search capabilities.
 
 ## External Dependencies
 
-### Directus CMS Integration
-- **Purpose**: Primary data source for all dashboard data
-- **Authentication**: Bearer token via `DIRECTUS_TOKEN` environment variable
-- **Base URL**: Configured via `DIRECTUS_URL` environment variable
-- **Collections Accessed**: input_library_url, leiloes_imovel, log_scrapings, whatsapp_grupos, whatsapp_disparos
-
-### Database
-- **Type**: PostgreSQL
-- **ORM**: Drizzle ORM
-- **Connection**: Via `DATABASE_URL` environment variable
-- **Migrations**: Stored in `./migrations/` directory
-- **Note**: The database may be used for session storage and future local data persistence
-
-### Required Environment Variables
-- `DIRECTUS_URL` - Base URL of the Directus CMS instance (e.g., https://sistema.investleiloesbrasil.com.br)
-- `DIRECTUS_TOKEN` - API authentication token for Directus
-- `DATABASE_URL` - PostgreSQL connection string
-- `SESSION_SECRET` - Secret for session management
-
-## Recent Changes (March 2026)
-
-### Internal Scraping Engine (TypeScript Port)
-- New `server/internal-scraper/` directory with complete TypeScript modules porting the external Python scraping API
-- **Architecture**: 4-module pipeline mirroring the external API:
-  1. **Explorer** (`explorer.ts`): Navigates up to 30 pages using `fetch` + `cheerio`, with automatic Playwright fallback for JS-heavy sites. URL classification (category/detail/pagination), BFS navigation with category priority
-  2. **Analyst** (`analyst.ts`): Sends exploration data to OpenAI GPT-4o-mini, generates JSON config with regex patterns (allowlist, blocklist, pagination, selectors). Includes regex validation and config-against-URLs coverage testing. Supports error feedback loop (previous errors fed into prompt)
-  3. **Crawler** (`crawler.ts`): Deterministic parallel crawling using AI-generated config. Semaphore-based concurrency control, BFS priority queue (pagination → categories → listing → detail), heuristic fallback when patterns insufficient. Supports both fetch and Playwright
-  4. **Job Manager** (`job-manager.ts`): In-memory job tracking with status (pending/processing/completed/failed), progress reporting, webhook callbacks, automatic cleanup
-- **Shared utilities** (`utils.ts`): URL normalization, domain extraction, regex compilation with error handling, user-agent rotation, semaphore implementation
-- **Type definitions** (`types.ts`): Full TypeScript interfaces for all modules
-- **Dependencies added**: `cheerio`, `playwright`
-- **Build config**: `cheerio` added to esbuild allowlist in `script/build.ts`; `playwright` kept external (native binaries)
-- **Status**: Modules are complete and type-checked. Not yet wired to Express routes (integration task pending)
-- **Coexistence**: External API integration in `server/scraping.ts` remains 100% functional and unchanged
-
-## Changes (February 2026)
-
-### AI Scraping Integration
-- New `/scraping` page with full integration to external AI scraping API
-- **Architecture**: Backend proxy routes in `server/scraping.ts` → External API at `SCRAPING_API_URL`
-- **Onboarding flow**: AI agent analyzes site structure (HTML patterns, URL patterns, pagination), generates scraping config
-  - Config saved as JSON in `scraping_config` field on Directus `input_library_url` collection
-  - Persists across deploys (not dependent on API's temporary config IDs)
-- **Scraping flow**: Uses saved config to extract property URLs from auction sites
-  - Async job execution with job_id tracking
-  - N8n webhook callback at `https://n8n-invest.server04.11mind.com.br/webhook/retornascrapapi`
-  - Real-time progress polling (5s interval) showing % complete and URLs found
-- **Jobs panel**: Auto-refreshing list of active/recent scraping jobs with status badges
-- **Sites table**: Full list of leiloeiros from Directus with search, filter by config status, pagination
-  - Inline editable `url_listagem` field — click pencil icon to update the listing page URL directly in Directus
-  - Scraping uses `url_listagem` (listing page) as primary URL, falls back to `url_site` (main site)
-- Backend endpoints:
-  - GET `/api/scraping/status` - API health check
-  - GET `/api/scraping/sites` - Sites with scraping_config field
-  - POST `/api/scraping/onboard` - Start site analysis (uses OPENAI_API_KEY)
-  - POST `/api/scraping/scrape` - Launch scraping job with saved config
-  - GET `/api/scraping/jobs` - List recent jobs
-  - GET `/api/scraping/jobs/:jobId` - Job details/progress
-  - DELETE `/api/scraping/jobs/:jobId` - Remove job
-  - POST `/api/scraping/save-config` - Save config to Directus
-  - PATCH `/api/scraping/sites/:siteId/url-listagem` - Update listing URL in Directus
-- **Environment variable**: `SCRAPING_API_URL` = `https://api-scrap-invest.server04.11mind.com.br`
-- **Schema**: Added `scraping_config` field to `Site` interface, new `ScrapingJob` interface
-
-### WhatsApp Broadcast Module
-- New `/whatsapp` page for sending auction listings to WhatsApp community groups
-- **Architecture**: Backend service in `server/whatsapp.ts` using @whiskeysockets/baileys (WhatsApp Web protocol)
-- **Connection**: QR code based authentication, auto-reconnect, persistent auth in `./whatsapp_auth/`
-- **Group management**: CRUD operations for WhatsApp groups stored in Directus `whatsapp_grupos` collection
-  - Groups organized by region (SP, RJ, Sul, Nacional, etc.)
-  - Active/inactive toggle per group
-- **Community support**: Detects WhatsApp communities via Baileys `isCommunity`/`linkedParent`/`isCommunityAnnounce` metadata
-  - Identifies the **Grupo de Avisos** (announcement group) separately using `isCommunityAnnounce: true`
-  - Announcement group shown prominently in import dialog with Megaphone icon and "Avisos" badge
-  - Sending to announcement group broadcasts to all community members
-  - Communities with 0 linked groups treated as regular groups
-- **Disparo flow**: Two search modes — browse via embedded listing widget or manual ID entry
-  - **Listing widget**: Iframe from `https://investleiloes.replit.app/embed/listing` embedded in dispatch panel
-    - Captures `LEILOES_PROPERTY_CLICK` postMessage events to auto-select property
-    - Auto-resizes via `LEILOES_RESIZE` postMessage events
-    - Widget hides after selection; "Trocar imóvel" button to re-show
-  - **ID search**: Manual Directus ID input (fallback mode)
-  - Message template includes: name, type, values, dates, location, description, edital link
-  - 2-second delay between group sends to avoid spam detection
-  - Images fetched server-side (never exposes Directus tokens)
-- **History**: Dispatch history stored in Directus `whatsapp_disparos` collection with sent/error status
-- **Navigation**: Green "WhatsApp" button in dashboard header
-- Backend endpoints:
-  - GET `/api/whatsapp/status` - Connection status
-  - POST `/api/whatsapp/connect` - Start connection (returns QR code)
-  - POST `/api/whatsapp/disconnect` - Logout and clear auth
-  - GET `/api/whatsapp/qr` - Get current QR code
-  - GET/POST/PATCH/DELETE `/api/whatsapp/grupos` - Group CRUD
-  - GET `/api/whatsapp/leilao/:id` - Fetch auction from Directus
-  - POST `/api/whatsapp/disparar` - Send auction to selected groups
-  - GET `/api/whatsapp/disparos` - Dispatch history
-- **Schema**: New `WhatsAppGrupo` and `WhatsAppDisparo` interfaces in shared/schema.ts
-
-### Manual Registration
-- Created manual auction registration form at `/cadastro`:
-  - Comprehensive form with all auction fields (site, property info, values, dates, address, links)
-  - Site dropdown (required field) fetched from Directus
-  - CEP auto-fill using ViaCEP API for address completion
-  - Shared Zod schema (`leilaoInsertSchema`) used for both frontend and backend validation
-  - Backend validation before writing to Directus
-  - SEO tags for the page
-  - Navigation: "Cadastrar Leilão" button in dashboard header
-  - **URL-based site detection**: paste auction URL → auto-detects and fills site dropdown
-  - **AI Image Extraction**: upload/paste screenshot of auction page → GPT-4o Vision extracts 24+ fields automatically
-    - Supports drag-and-drop, file selection, and Ctrl+V paste
-    - Extracts: nome, descrição, tipo imóvel/leilão, valores, praças, endereço, links, etc.
-    - Zod validation on extracted data for safety
-- Backend endpoints added:
-  - GET `/api/sites` - fetches all sites for dropdown
-  - GET `/api/sites/find-by-url` - finds site by auction URL domain
-  - POST `/api/leiloes` - creates new auction with Zod validation
-  - POST `/api/extract-from-image` - uses OpenAI GPT-4o Vision to extract auction data from images
-
-### OpenAI Integration
-- **File**: `server/openai.ts`
-- **Model**: GPT-4o with vision capabilities
-- **API Key**: `OPENAI_API_KEY` environment variable (user's own key)
-- **Purpose**: Extract structured auction data from screenshots of auction pages
-
-## Changes (January 2026)
-- Fixed Directus integration with proper URL validation and error handling
-- Updated field mapping: changed `uf` to `estado_uf` to match actual Directus schema
-- Dashboard now successfully displays real data from Directus including:
-  - 664 monitored sites (658 active, 6 inactive)
-  - Auction listings with type, state, and image statistics
-  - Scraping logs with success/error rates
-  - URL processing queue status
-- Added temporal chart (area chart) showing auctions created in last 14 days (`leiloesTemporal` aggregation)
-- Updated URL Consulta panel to show category breakdown using `classifica` field (imóvel individual, paginação, categoria, outros)
-- Removed "Erros por Site" chart from logs panel (now 2-column layout)
-- Created new `/logs` page with detailed scraping logs table:
-  - Full table of all logs with site information
-  - Filter by status (successes, successes_partial, erro, url_inválida)
-  - Search by site name or error reason
-  - Navigation link in dashboard header
-
-### Key NPM Dependencies
-- `@tanstack/react-query` - Server state management
-- `recharts` - Data visualization charts
-- `date-fns` - Date formatting (with Portuguese locale)
-- `drizzle-orm` / `drizzle-zod` - Database ORM and validation
-- `express` - HTTP server framework
-- Full shadcn/ui component suite via Radix UI primitives
+- **Directus CMS**: Primary data source, accessed via `DIRECTUS_URL` and `DIRECTUS_TOKEN`.
+- **PostgreSQL**: Used for session storage and potential future local data persistence, configured via `DATABASE_URL`.
+- **OpenAI API**: Utilized for AI-driven scraping configuration (GPT-4o mini via external API), AI Image Extraction (GPT-4o Vision), and error analysis, requiring `OPENAI_API_KEY`.
+- **ViaCEP API**: Used for auto-filling address details during manual auction registration.
+- **@whiskeysockets/baileys**: For WhatsApp Web protocol integration in the WhatsApp broadcast module.
+- **`cheerio`**: For server-side HTML parsing in the internal scraping engine.
+- **`playwright`**: For headless browser automation in the internal scraping engine.
+- **`SCRAPING_API_URL`**: External AI scraping API (`https://api-scrap-invest.server04.11mind.com.br`).
