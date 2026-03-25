@@ -415,8 +415,7 @@ export async function updateSiteEngine(siteId: number, engine: "external" | "int
 
   if (!response.ok) {
     const error = await response.text();
-    console.warn(`Could not update scraping_engine in Directus (field may not exist): ${response.status} - ${error}`);
-    return null;
+    throw new Error(`Failed to update scraping_engine in Directus: ${response.status} - ${error}`);
   }
 
   return response.json();

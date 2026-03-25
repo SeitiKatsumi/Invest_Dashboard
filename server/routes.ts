@@ -210,7 +210,10 @@ export async function registerRoutes(
 
         if (siteId && result.config) {
           try {
-            await saveSiteScrapingConfig(siteId, result.config as unknown as Record<string, unknown>);
+            const configObj = typeof result.config === "object" && result.config !== null
+              ? result.config as Record<string, unknown>
+              : {};
+            await saveSiteScrapingConfig(siteId, configObj);
             await clearSiteScrapingError(siteId);
             await updateSiteEngine(siteId, "internal");
           } catch (saveError) {
@@ -415,7 +418,16 @@ export async function registerRoutes(
       if (jobId.startsWith("int_")) {
         const job = getInternalJob(jobId);
         if (!job) return res.status(404).json({ error: "Job não encontrado" });
-        res.json(job);
+        res.json({
+          job_id: job.id,
+          status: job.status,
+          url: job.siteUrl,
+          created_at: job.startedAt,
+          completed_at: job.completedAt,
+          result: job.result,
+          processing: job.processing,
+          engine: "internal",
+        });
       } else {
         const job = await getJob(jobId);
         res.json(job);
