@@ -1835,13 +1835,13 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
         clearInterval(resourceIntervalRef.current);
         resourceIntervalRef.current = null;
       }
-      const drainAfterSettled = async () => {
-        await delay(5000);
-        if (pausedRef.current) {
+      const drainWhilePaused = async () => {
+        while (pausedRef.current) {
           await fetch("/api/scraping/drain-pool", { method: "POST" }).catch(() => {});
+          await delay(5000);
         }
       };
-      drainAfterSettled();
+      drainWhilePaused();
     }
   };
 

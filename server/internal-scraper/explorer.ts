@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import type { Page } from 'playwright';
 import type {
   ExplorerOptions, ExplorationResult, PageData,
   PageStructure, LinkInfo, SampleLink, ContainerInfo, CardPattern,
@@ -7,6 +8,7 @@ import {
   normalizeUrl, extractDomain, isSameDomain, isValidPageUrl,
   randomUserAgent, sleep, STEALTH_INIT_SCRIPT, STEALTH_BROWSER_ARGS,
 } from './utils.js';
+import { browserPool } from './browser-pool.js';
 
 const CATEGORY_PATTERNS = [
   /\/categoria\//i, /\/categorias\//i, /\/eventos\//i,
@@ -292,8 +294,6 @@ async function exploreWithPlaywright(
   domain: string,
   maxPages: number,
 ): Promise<ExplorationResult> {
-  const { chromium } = await import('playwright');
-
   const visitedUrls = new Set<string>();
   const allLinks = new Set<string>();
   const detailUrls = new Set<string>();
@@ -305,15 +305,8 @@ async function exploreWithPlaywright(
   let detailSamples = 0;
   const maxDetailSamples = 10;
 
-  const browser = await chromium.launch({ headless: true, args: STEALTH_BROWSER_ARGS });
-  const context = await browser.newContext({
-    userAgent: randomUserAgent(),
-    locale: 'pt-BR',
-    timezoneId: 'America/Sao_Paulo',
-    viewport: { width: 1920, height: 1080 },
-  });
-  await context.addInitScript(STEALTH_INIT_SCRIPT);
-  const page = await context.newPage();
+  const poolHandle = await browserPool.acquire();
+  const page: Page = poolHandle.page;
 
   try {
     while (urlsToVisit.length > 0 && visitedUrls.size < maxPages) {
@@ -390,7 +383,8 @@ async function exploreWithPlaywright(
       }
     }
   } finally {
-    await browser.close();
+    try { await poolHandle.context.close(); } catch {}
+    await browserPool.release(poolHandle.browser);
   }
 
   return {

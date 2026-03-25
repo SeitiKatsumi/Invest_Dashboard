@@ -561,13 +561,7 @@ export async function startInternalScraping(
   const configConfidence = scoreConfig(config);
 
   (async () => {
-    let poolBrowser: any = null;
     try {
-      jobManager.updateProgress(job.id, 2, 'Aguardando navegador do pool...');
-
-      const poolEntry = await browserPool.acquire();
-      poolBrowser = poolEntry.browser;
-
       jobManager.updateProgress(job.id, 5, 'Inicializando crawler...');
 
       const crawlerConfig: ScrapingConfig = {
@@ -586,7 +580,7 @@ export async function startInternalScraping(
         },
       });
 
-      const result = await crawler.crawl(siteUrl, maxPages || 100, true, poolEntry.page);
+      const result = await crawler.crawl(siteUrl, maxPages || 100, true);
 
       let classification: 'success' | 'empty' | 'config_suspect' = 'success';
       if (result.total_urls === 0) {
@@ -607,10 +601,6 @@ export async function startInternalScraping(
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       jobManager.failJob(job.id, msg);
-    } finally {
-      if (poolBrowser) {
-        await browserPool.release(poolBrowser);
-      }
     }
   })();
 

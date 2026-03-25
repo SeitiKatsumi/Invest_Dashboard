@@ -1,7 +1,8 @@
+import type { Browser, BrowserContext, Page } from 'playwright';
 import { STEALTH_BROWSER_ARGS, STEALTH_INIT_SCRIPT, randomUserAgent } from './utils.js';
 
 interface PooledBrowser {
-  browser: any;
+  browser: Browser;
   inUse: boolean;
   createdAt: number;
   useCount: number;
@@ -13,7 +14,7 @@ const BROWSER_MAX_AGE_MS = 30 * 60 * 1000;
 
 class BrowserPool {
   private pool: PooledBrowser[] = [];
-  private waitQueue: Array<(browser: any) => void> = [];
+  private waitQueue: Array<(browser: Browser) => void> = [];
   private _totalAcquired = 0;
   private _totalReleased = 0;
 
@@ -40,7 +41,7 @@ class BrowserPool {
     };
   }
 
-  async acquire(): Promise<{ browser: any; context: any; page: any }> {
+  async acquire(): Promise<{ browser: Browser; context: BrowserContext; page: Page }> {
     let pooled: PooledBrowser | undefined = this.pool.find(b => !b.inUse && !this.isExpired(b));
 
     if (!pooled && this.pool.length < MAX_BROWSERS) {
@@ -56,7 +57,7 @@ class BrowserPool {
     }
 
     if (!pooled) {
-      const browser = await new Promise<any>((resolve) => {
+      const browser = await new Promise<Browser>((resolve) => {
         this.waitQueue.push(resolve);
       });
       const entry = this.pool.find(b => b.browser === browser)!;
@@ -74,7 +75,7 @@ class BrowserPool {
     return { browser: pooled.browser, context, page };
   }
 
-  async release(browser: any): Promise<void> {
+  async release(browser: Browser): Promise<void> {
     const pooled = this.pool.find(b => b.browser === browser);
     if (!pooled) return;
 
@@ -103,9 +104,6 @@ class BrowserPool {
   }
 
   async drainAll(): Promise<void> {
-    for (const waiter of this.waitQueue) {
-      waiter(null);
-    }
     this.waitQueue = [];
 
     for (const entry of [...this.pool]) {
@@ -150,7 +148,7 @@ class BrowserPool {
     }
   }
 
-  private async createContext(browser: any): Promise<{ context: any; page: any }> {
+  private async createContext(browser: Browser): Promise<{ context: BrowserContext; page: Page }> {
     const context = await browser.newContext({
       userAgent: randomUserAgent(),
       locale: 'pt-BR',

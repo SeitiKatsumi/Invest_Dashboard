@@ -221,7 +221,7 @@ export async function registerRoutes(
 
           try {
             const { DeterministicCrawler } = await import('./internal-scraper/index.js');
-            const testCrawler = new DeterministicCrawler(result.config as any, { concurrentRequests: 3 });
+            const testCrawler = new DeterministicCrawler(result.config as Record<string, unknown>, { concurrentRequests: 3 });
             const testResult = await testCrawler.crawl(siteUrl, 5, true);
             miniScrapeResult = { urls_found: testResult.total_urls, valid: testResult.total_urls > 0 };
 

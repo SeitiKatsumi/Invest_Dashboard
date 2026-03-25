@@ -1,10 +1,12 @@
 import * as cheerio from 'cheerio';
+import type { Browser, Page, BrowserContext } from 'playwright';
 import type { CrawlResult, CrawlerOptions, ScrapingConfig } from './types.js';
 import {
   normalizeUrl, isSameDomain, getBuiltinBlocklist,
   compileRegex, compileRegexList, randomUserAgent,
   Semaphore, sleep, STEALTH_INIT_SCRIPT, STEALTH_BROWSER_ARGS,
 } from './utils.js';
+import { browserPool } from './browser-pool.js';
 
 const DEFAULT_OPTIONS: Required<CrawlerOptions> = {
   concurrentRequests: 10,
@@ -390,25 +392,15 @@ export class DeterministicCrawler {
     return this.buildResult();
   }
 
-  async crawlWithPlaywright(startUrl: string, maxPages: number, externalPage?: any): Promise<CrawlResult> {
-    let page: any;
-    let ownsBrowser = false;
-    let browser: any;
+  async crawlWithPlaywright(startUrl: string, maxPages: number, externalPage?: Page): Promise<CrawlResult> {
+    let page: Page;
+    let poolHandle: { browser: Browser; context: BrowserContext; page: Page } | undefined;
 
     if (externalPage) {
       page = externalPage;
     } else {
-      const { chromium } = await import('playwright');
-      browser = await chromium.launch({ headless: true, args: STEALTH_BROWSER_ARGS });
-      const context = await browser.newContext({
-        userAgent: randomUserAgent(),
-        locale: 'pt-BR',
-        timezoneId: 'America/Sao_Paulo',
-        viewport: { width: 1920, height: 1080 },
-      });
-      await context.addInitScript(STEALTH_INIT_SCRIPT);
-      page = await context.newPage();
-      ownsBrowser = true;
+      poolHandle = await browserPool.acquire();
+      page = poolHandle.page;
     }
 
     const urlsToVisit: string[] = [startUrl];
@@ -474,8 +466,9 @@ export class DeterministicCrawler {
         }
       }
     } finally {
-      if (ownsBrowser && browser) {
-        await browser.close();
+      if (poolHandle) {
+        try { await poolHandle.context.close(); } catch {}
+        await browserPool.release(poolHandle.browser);
       } else if (externalPage) {
         try { await externalPage.context().close(); } catch {}
       }
@@ -529,7 +522,7 @@ export class DeterministicCrawler {
     };
   }
 
-  async crawl(startUrl: string, maxPages = 100, usePlaywright = true, externalPage?: any): Promise<CrawlResult> {
+  async crawl(startUrl: string, maxPages = 100, usePlaywright = true, externalPage?: Page): Promise<CrawlResult> {
     if (usePlaywright) {
       try {
         return await this.crawlWithPlaywright(startUrl, maxPages, externalPage);
