@@ -54,6 +54,7 @@ class BrowserPool {
       pooled = (await this.createBrowser()) ?? undefined;
       if (!pooled) {
         this._creationFailed = true;
+        console.warn('[BrowserPool] Marcando pool como indisponível — criação de browser falhou. Fallback para fetch será usado.');
         this.rejectAllWaiters('BrowserPool: playwright browser creation failed');
         throw new Error('BrowserPool: playwright browser creation failed');
       }
@@ -74,16 +75,18 @@ class BrowserPool {
 
     if (!pooled) {
       const browser = await new Promise<Browser>((resolve, reject) => {
-        const timer = setTimeout(() => {
-          const idx = this.waitQueue.findIndex(w => w.resolve === resolve);
+        let timer: ReturnType<typeof setTimeout>;
+        const waiter = {
+          resolve: (b: Browser) => { clearTimeout(timer); resolve(b); },
+          reject: (err: Error) => { clearTimeout(timer); reject(err); },
+        };
+        timer = setTimeout(() => {
+          const idx = this.waitQueue.indexOf(waiter);
           if (idx >= 0) this.waitQueue.splice(idx, 1);
           reject(new Error('BrowserPool: acquire timeout after 30s'));
         }, ACQUIRE_TIMEOUT_MS);
 
-        this.waitQueue.push({
-          resolve: (b: Browser) => { clearTimeout(timer); resolve(b); },
-          reject: (err: Error) => { clearTimeout(timer); reject(err); },
-        });
+        this.waitQueue.push(waiter);
       });
       const entry = this.pool.find(b => b.browser === browser)!;
       entry.inUse = true;
