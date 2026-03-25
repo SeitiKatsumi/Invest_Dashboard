@@ -392,7 +392,11 @@ export async function getSitesWithConfig() {
   }
 
   const result = await response.json();
-  return result.data || [];
+  const sites = result.data || [];
+  return sites.map((site: Record<string, unknown>) => ({
+    ...site,
+    scraping_engine: site.scraping_engine || "internal",
+  }));
 }
 
 export async function updateSiteEngine(siteId: number, engine: "external" | "internal") {
@@ -426,31 +430,64 @@ export async function getSiteErrorContext(siteId: number): Promise<{
   if (!DIRECTUS_URL || !DIRECTUS_TOKEN) return null;
 
   try {
-    const url = new URL(`${DIRECTUS_URL}/items/input_library_url/${siteId}`);
-    url.searchParams.set("fields", "scraping_error,scraping_error_analysis,scraping_config");
+    const siteUrl = new URL(`${DIRECTUS_URL}/items/input_library_url/${siteId}`);
+    siteUrl.searchParams.set("fields", "scraping_error,scraping_error_analysis,scraping_config");
 
-    const response = await fetch(url.toString(), {
+    const siteResponse = await fetch(siteUrl.toString(), {
       headers: {
         Authorization: `Bearer ${DIRECTUS_TOKEN}`,
         "Content-Type": "application/json",
       },
     });
 
-    if (!response.ok) return null;
-    const result = await response.json();
-    const data = result.data;
-    if (!data) return null;
-
     const context: Record<string, unknown> = {};
-    if (data.scraping_error) context.scraping_error = data.scraping_error;
-    if (data.scraping_error_analysis) context.scraping_error_analysis = data.scraping_error_analysis;
-    if (data.scraping_config) {
-      try {
-        context.previous_config = typeof data.scraping_config === "string"
-          ? JSON.parse(data.scraping_config)
-          : data.scraping_config;
-      } catch {}
+
+    if (siteResponse.ok) {
+      const result = await siteResponse.json();
+      const data = result.data;
+      if (data) {
+        if (data.scraping_error) context.scraping_error = data.scraping_error;
+        if (data.scraping_error_analysis) context.scraping_error_analysis = data.scraping_error_analysis;
+        if (data.scraping_config) {
+          try {
+            context.previous_config = typeof data.scraping_config === "string"
+              ? JSON.parse(data.scraping_config)
+              : data.scraping_config;
+          } catch {}
+        }
+      }
     }
+
+    try {
+      const logsUrl = new URL(`${DIRECTUS_URL}/items/logs_scraping`);
+      logsUrl.searchParams.set("filter[site][_eq]", String(siteId));
+      logsUrl.searchParams.set("filter[status_scraping][_in]", "erro,url_inválida");
+      logsUrl.searchParams.set("sort", "-date_created");
+      logsUrl.searchParams.set("limit", "5");
+      logsUrl.searchParams.set("fields", "motivo_do_erro,status_scraping,date_created");
+
+      const logsResponse = await fetch(logsUrl.toString(), {
+        headers: {
+          Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (logsResponse.ok) {
+        const logsResult = await logsResponse.json();
+        const logs = logsResult.data || [];
+        const errorReasons = logs
+          .map((l: { motivo_do_erro?: string }) => l.motivo_do_erro)
+          .filter(Boolean);
+        if (errorReasons.length > 0) {
+          context.scraping_error = [
+            context.scraping_error,
+            ...errorReasons,
+          ].filter(Boolean).join("\n---\n");
+        }
+      }
+    } catch {}
+
     return Object.keys(context).length > 0 ? context as {
       scraping_error?: string;
       scraping_error_analysis?: string;
