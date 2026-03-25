@@ -418,14 +418,19 @@ export async function registerRoutes(
       if (jobId.startsWith("int_")) {
         const job = getInternalJob(jobId);
         if (!job) return res.status(404).json({ error: "Job não encontrado" });
+        const normalizedStatus = job.status === "processing" ? "running" : job.status;
         res.json({
           job_id: job.id,
-          status: job.status,
+          status: normalizedStatus,
           url: job.siteUrl,
           created_at: job.startedAt,
           completed_at: job.completedAt,
           result: job.result,
-          processing: job.processing,
+          progress: job.processing ? {
+            current: job.processing.processedUrls,
+            total: job.processing.totalUrls,
+            message: `Processando ${job.processing.processedUrls}/${job.processing.totalUrls} URLs`,
+          } : undefined,
           engine: "internal",
         });
       } else {
