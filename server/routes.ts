@@ -426,11 +426,12 @@ export async function registerRoutes(
           created_at: job.startedAt,
           completed_at: job.completedAt,
           result: job.result,
-          progress: job.processing ? {
-            current: job.processing.processedUrls,
-            total: job.processing.totalUrls,
-            message: `Processando ${job.processing.processedUrls}/${job.processing.totalUrls} URLs`,
-          } : undefined,
+          progress: {
+            percent: job.progress,
+            message: job.progressMessage,
+            pagesProcessed: job.pagesProcessed,
+            totalUrls: job.totalUrls,
+          },
           engine: "internal",
         });
       } else {

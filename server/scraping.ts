@@ -560,11 +560,21 @@ export async function startInternalScraping(
     try {
       jobManager.updateProgress(job.id, 5, 'Inicializando crawler...');
 
-      const crawler = new DeterministicCrawler(config as ScrapingConfig, {
-        concurrentRequests: concurrentRequests || 10,
-      });
+      const crawlerConfig: ScrapingConfig = {
+        domain: "",
+        listing_url: "",
+        listing_selector: "",
+        link_selector: "",
+        pagination_type: "none",
+        ...(config as Record<string, unknown>),
+      } as ScrapingConfig;
 
-      jobManager.updateProgress(job.id, 10, 'Navegando páginas...');
+      const crawler = new DeterministicCrawler(crawlerConfig, {
+        concurrentRequests: concurrentRequests || 10,
+        onProgress: (progress: number, message: string) => {
+          jobManager.updateProgress(job.id, progress, message);
+        },
+      });
 
       const result = await crawler.crawl(siteUrl, maxPages || 100, true);
 
