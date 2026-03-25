@@ -63,7 +63,7 @@ class InternalJobManager {
   }
 
   listJobs(limit = 50): InternalJob[] {
-    const all = [...this.jobs.values()];
+    const all = Array.from(this.jobs.values());
     all.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
     return all.slice(0, limit);
   }
@@ -143,7 +143,7 @@ class InternalJobManager {
   private cleanup(): void {
     const now = Date.now();
 
-    for (const [id, job] of this.jobs) {
+    for (const [id, job] of Array.from(this.jobs)) {
       const age = now - new Date(job.startedAt).getTime();
       if ((job.status === 'pending' || job.status === 'processing') && age > JOB_TIMEOUT_MS) {
         job.status = 'failed';
@@ -159,7 +159,7 @@ class InternalJobManager {
 
     const toDelete: string[] = [];
 
-    for (const [id, job] of this.jobs) {
+    for (const [id, job] of Array.from(this.jobs)) {
       const age = now - new Date(job.startedAt).getTime();
       if (age > JOB_EXPIRY_MS && (job.status === 'completed' || job.status === 'failed')) {
         toDelete.push(id);
@@ -171,7 +171,7 @@ class InternalJobManager {
     }
 
     if (this.jobs.size >= MAX_JOBS) {
-      const sorted = [...this.jobs.entries()]
+      const sorted = Array.from(this.jobs.entries())
         .filter(([_, j]) => j.status === 'completed' || j.status === 'failed')
         .sort((a, b) => new Date(a[1].startedAt).getTime() - new Date(b[1].startedAt).getTime());
 

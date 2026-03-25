@@ -74,7 +74,7 @@ function extractUrlPatterns(links: { url: string }[]): string[] {
       patternMap.get(pattern)!.push(link.url);
     } catch { /* skip */ }
   }
-  const sorted = [...patternMap.entries()].sort((a, b) => b[1].length - a[1].length);
+  const sorted = Array.from(patternMap.entries()).sort((a, b) => b[1].length - a[1].length);
   return sorted.slice(0, 10).map(([p]) => p);
 }
 
@@ -106,7 +106,7 @@ function extractPageStructure($: cheerio.CheerioAPI): PageStructure {
         classCounts.set(sorted, (classCounts.get(sorted) || 0) + 1);
       }
     });
-    for (const [classes, count] of classCounts) {
+    for (const [classes, count] of Array.from(classCounts)) {
       if (count >= 3) {
         cardPatterns.push({
           tag,
@@ -135,7 +135,7 @@ function detectPaginationPatterns($: cheerio.CheerioAPI, url: string): string[] 
       });
     } catch { /* skip */ }
   }
-  return [...patterns];
+  return Array.from(patterns);
 }
 
 function extractLinkInfo($: cheerio.CheerioAPI, currentUrl: string, domain: string, allLinks: Set<string>): LinkInfo {
@@ -242,7 +242,7 @@ async function exploreWithFetch(
     results.push(pageData);
     paginationSamples.push(...pageData.pagination);
 
-    for (const link of allLinks) {
+    for (const link of Array.from(allLinks)) {
       if (visitedUrls.has(link) || urlsToVisit.includes(link)) continue;
       const linkType = classifyUrl(link);
       if (linkType === 'category') {
@@ -261,10 +261,10 @@ async function exploreWithFetch(
   return {
     pagesExplored: results.length,
     data: results,
-    allLinksFound: [...allLinks].slice(0, 300),
-    detailUrlsFound: [...detailUrls].slice(0, 100),
-    categoryUrlsFound: [...categoryUrls].slice(0, 50),
-    paginationSamples: [...new Set(paginationSamples)],
+    allLinksFound: Array.from(allLinks).slice(0, 300),
+    detailUrlsFound: Array.from(detailUrls).slice(0, 100),
+    categoryUrlsFound: Array.from(categoryUrls).slice(0, 50),
+    paginationSamples: Array.from(new Set(paginationSamples)),
     stats: {
       totalLinks: allLinks.size,
       detailCount: detailUrls.size,
@@ -356,7 +356,7 @@ async function exploreWithPlaywright(
         results.push(pageData);
         paginationSamples.push(...pageData.pagination);
 
-        for (const link of allLinks) {
+        for (const link of Array.from(allLinks)) {
           if (visitedUrls.has(link) || urlsToVisit.includes(link)) continue;
           const linkType = classifyUrl(link);
           if (linkType === 'category') {
@@ -382,10 +382,10 @@ async function exploreWithPlaywright(
   return {
     pagesExplored: results.length,
     data: results,
-    allLinksFound: [...allLinks].slice(0, 300),
-    detailUrlsFound: [...detailUrls].slice(0, 100),
-    categoryUrlsFound: [...categoryUrls].slice(0, 50),
-    paginationSamples: [...new Set(paginationSamples)],
+    allLinksFound: Array.from(allLinks).slice(0, 300),
+    detailUrlsFound: Array.from(detailUrls).slice(0, 100),
+    categoryUrlsFound: Array.from(categoryUrls).slice(0, 50),
+    paginationSamples: Array.from(new Set(paginationSamples)),
     stats: {
       totalLinks: allLinks.size,
       detailCount: detailUrls.size,

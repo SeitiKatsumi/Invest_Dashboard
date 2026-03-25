@@ -244,7 +244,7 @@ export class DeterministicCrawler {
       }
     }
 
-    return [...new Set(links)];
+    return Array.from(new Set(links));
   }
 
   private prioritizeUrl(url: string): number {
@@ -474,10 +474,10 @@ export class DeterministicCrawler {
   private applyHeuristicCollection(): void {
     const heuristicUrls = new Set<string>();
 
-    for (const url of this.allLinksSeen) {
+    for (const url of Array.from(this.allLinksSeen)) {
       if (this.looksLikeDetailPage(url)) heuristicUrls.add(url);
     }
-    for (const url of this.visitedUrls) {
+    for (const url of Array.from(this.visitedUrls)) {
       if (this.looksLikeDetailPage(url) && !this.matchesBlocklist(url)) {
         heuristicUrls.add(url);
       }
@@ -501,7 +501,7 @@ export class DeterministicCrawler {
 
     return {
       success: true,
-      urls_found: [...this.collectedUrls],
+      urls_found: Array.from(this.collectedUrls),
       total_urls: this.collectedUrls.size,
       pages_processed: this.visitedUrls.size,
       categories_found: this.categoryUrls.size,
