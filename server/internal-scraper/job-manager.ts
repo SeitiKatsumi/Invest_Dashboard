@@ -9,7 +9,9 @@ const JOB_TIMEOUT_MS = 30 * 60 * 1000;
 const BLOCKED_CALLBACK_HOSTS = [
   /^localhost$/i, /^127\.\d+\.\d+\.\d+$/, /^10\.\d+\.\d+\.\d+$/,
   /^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$/, /^192\.168\.\d+\.\d+$/,
-  /^0\.0\.0\.0$/, /^\[::1?\]$/,
+  /^0\.0\.0\.0$/, /^\[::1?\]$/, /^\[?fe80:/i,
+  /^169\.254\.\d+\.\d+$/, /^\[?fd[0-9a-f]{2}:/i,
+  /^metadata\.google\.internal$/i, /^metadata\.internal$/i,
 ];
 
 function isCallbackUrlSafe(url: string): boolean {
