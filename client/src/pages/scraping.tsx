@@ -1535,6 +1535,34 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
     }
   };
 
+  const pollJobUntilDone = async (jobId: string, siteId: number, maxPollMs = 300000): Promise<{ status: string; classification?: string; confidence?: number; urls?: number }> => {
+    const start = Date.now();
+    const POLL_INTERVAL = 3000;
+    while (Date.now() - start < maxPollMs) {
+      if (abortRef.current) return { status: 'cancelled' };
+      await waitWhilePaused();
+      try {
+        const res = await fetch(`/api/scraping/jobs/${jobId}`);
+        if (!res.ok) break;
+        const job = await res.json();
+        const jStatus = job.status;
+        if (jStatus === 'completed' || jStatus === 'failed') {
+          return {
+            status: jStatus,
+            classification: job.result_classification || job.resultClassification,
+            confidence: job.confidence_score || job.confidenceScore,
+            urls: job.urls_found || job.totalUrls || 0,
+          };
+        }
+        if (job.progress !== undefined) {
+          updateItem(siteId, { status: "scraping" });
+        }
+      } catch {}
+      await delay(POLL_INTERVAL);
+    }
+    return { status: 'timeout' };
+  };
+
   const processScraping = async (item: QueueItem, config: Record<string, unknown>) => {
     updateItem(item.site.id, { status: "scraping" });
     try {
@@ -1555,7 +1583,31 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
         throw new Error(err);
       }
       const result = await response.json();
-      updateItem(item.site.id, { status: "completed", jobId: result.job_id });
+      const jobId = result.job_id;
+      updateItem(item.site.id, { jobId });
+
+      const finalState = await pollJobUntilDone(jobId, item.site.id);
+
+      if (finalState.status === 'completed') {
+        updateItem(item.site.id, {
+          status: "completed",
+          classification: finalState.classification || 'success',
+          confidence: finalState.confidence,
+        });
+      } else if (finalState.status === 'failed') {
+        updateItem(item.site.id, {
+          status: "error",
+          error: `Scraping falhou (job ${jobId})`,
+          classification: finalState.classification || 'error',
+          confidence: finalState.confidence,
+        });
+      } else if (finalState.status === 'timeout') {
+        updateItem(item.site.id, {
+          status: "error",
+          error: `Timeout aguardando job ${jobId}`,
+          classification: 'error',
+        });
+      }
     } catch (e: any) {
       updateItem(item.site.id, { status: "error", error: `Scraping: ${e.message?.slice(0, 100)}` });
     }
@@ -1568,14 +1620,11 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
     };
 
     for (const item of completed) {
-      if (item.status === "error") {
-        if (item.classification === "config_invalid") {
-          classificationCounts.config_invalid++;
-        } else {
-          classificationCounts.error++;
-        }
+      const cls = item.classification || (item.status === "error" ? "error" : "success");
+      if (cls in classificationCounts) {
+        classificationCounts[cls]++;
       } else {
-        classificationCounts.success++;
+        classificationCounts.error++;
       }
     }
 
@@ -1786,7 +1835,13 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
         clearInterval(resourceIntervalRef.current);
         resourceIntervalRef.current = null;
       }
-      fetch("/api/scraping/drain-pool", { method: "POST" }).catch(() => {});
+      const drainAfterSettled = async () => {
+        await delay(5000);
+        if (pausedRef.current) {
+          await fetch("/api/scraping/drain-pool", { method: "POST" }).catch(() => {});
+        }
+      };
+      drainAfterSettled();
     }
   };
 
