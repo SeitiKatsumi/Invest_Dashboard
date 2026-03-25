@@ -97,10 +97,6 @@ class BrowserPool {
     if (this.waitQueue.length > 0) {
       const waiter = this.waitQueue.shift();
       if (waiter) {
-        pooled.inUse = true;
-        pooled.useCount++;
-        this._totalAcquired++;
-        this._totalReleased--;
         waiter(pooled.browser);
       }
     }

@@ -1561,15 +1561,91 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
     }
   };
 
-  const fetchReport = async () => {
+  const buildLocalReport = (): BatchReport => {
+    const completed = queue.filter(q => q.status === "completed" || q.status === "error");
+    const classificationCounts: Record<string, number> = {
+      success: 0, empty: 0, config_suspect: 0, config_invalid: 0, error: 0,
+    };
+
+    for (const item of completed) {
+      if (item.status === "error") {
+        if (item.classification === "config_invalid") {
+          classificationCounts.config_invalid++;
+        } else {
+          classificationCounts.error++;
+        }
+      } else {
+        classificationCounts.success++;
+      }
+    }
+
+    const errorItems = completed.filter(q => q.status === "error" && q.error);
+    const errorCounts: Record<string, number> = {};
+    for (const item of errorItems) {
+      const key = (item.error || '').slice(0, 80);
+      errorCounts[key] = (errorCounts[key] || 0) + 1;
+    }
+
+    const confidenceValues = completed.filter(q => q.confidence !== undefined).map(q => q.confidence!);
+    const avgConfidence = confidenceValues.length > 0
+      ? Math.round(confidenceValues.reduce((a, b) => a + b, 0) / confidenceValues.length)
+      : null;
+
+    return {
+      total_jobs: completed.length,
+      by_classification: classificationCounts,
+      avg_confidence: avgConfidence,
+      total_urls_found: 0,
+      top_errors: Object.entries(errorCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([error, count]) => ({ error, count })),
+      sites_needing_attention: completed
+        .filter(q => q.status === "error")
+        .map(q => ({
+          site_id: q.site.id,
+          site_url: q.site.url_listagem || q.site.url_site || '',
+          classification: q.classification || 'error',
+          error: q.error,
+          confidence: q.confidence,
+        })),
+    };
+  };
+
+  const enrichReportFromServer = async (localReport: BatchReport): Promise<BatchReport> => {
+    const jobIds = queue.filter(q => q.jobId).map(q => q.jobId!);
+    if (jobIds.length === 0) return localReport;
+
     try {
       const res = await fetch("/api/scraping/batch-report");
-      if (res.ok) {
-        const data = await res.json();
-        setReport(data);
-        setShowReport(true);
+      if (!res.ok) return localReport;
+      const serverReport = await res.json();
+
+      const batchJobs = (serverReport.jobs || []).filter((j: any) => jobIds.includes(j.id));
+      const totalUrls = batchJobs.reduce((sum: number, j: any) => sum + (j.urls_found || 0), 0);
+
+      const serverClassifications: Record<string, number> = {
+        success: 0, empty: 0, config_suspect: 0, config_invalid: 0, error: 0,
+      };
+      for (const j of batchJobs) {
+        const c = j.classification || (j.status === 'failed' ? 'error' : 'success');
+        if (c in serverClassifications) serverClassifications[c]++;
       }
-    } catch {}
+
+      return {
+        ...localReport,
+        total_urls_found: totalUrls,
+        by_classification: {
+          success: Math.max(localReport.by_classification.success || 0, serverClassifications.success),
+          empty: serverClassifications.empty + (localReport.by_classification.config_invalid || 0) > 0 ? serverClassifications.empty : 0,
+          config_suspect: serverClassifications.config_suspect,
+          config_invalid: localReport.by_classification.config_invalid || 0,
+          error: Math.max(localReport.by_classification.error || 0, serverClassifications.error),
+        },
+      };
+    } catch {
+      return localReport;
+    }
   };
 
   const exportReport = () => {
@@ -1685,7 +1761,10 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
     setIsRunning(false);
     setIsPaused(false);
 
-    await fetchReport();
+    const localReport = buildLocalReport();
+    const enrichedReport = await enrichReportFromServer(localReport);
+    setReport(enrichedReport);
+    setShowReport(true);
   };
 
   const startProcessing = (sitesToProcess: Site[]) => {

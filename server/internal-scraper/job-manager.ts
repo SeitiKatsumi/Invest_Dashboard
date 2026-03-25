@@ -124,6 +124,7 @@ class InternalJobManager {
     job.progress = 0;
     job.progressMessage = `Erro: ${error}`;
     job.error = error;
+    job.resultClassification = 'error';
     job.completedAt = new Date().toISOString();
 
     this.sendCallback(job);

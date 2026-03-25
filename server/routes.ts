@@ -225,12 +225,9 @@ export async function registerRoutes(
             const testResult = await testCrawler.crawl(siteUrl, 5, true);
             miniScrapeResult = { urls_found: testResult.total_urls, valid: testResult.total_urls > 0 };
 
-            if (testResult.total_urls === 0 && configConfidence.confidence < 40) {
+            if (testResult.total_urls === 0) {
               diagnostics.config_validation = 'config_invalid';
-              diagnostics.config_validation_message = `Mini-scrape de teste encontrou 0 URLs. Confiança da config: ${configConfidence.confidence}%. Config provavelmente inválida.`;
-            } else if (testResult.total_urls === 0) {
-              diagnostics.config_validation = 'config_suspect';
-              diagnostics.config_validation_message = `Mini-scrape de teste encontrou 0 URLs, mas confiança da config é ${configConfidence.confidence}%. Site pode estar temporariamente sem listagens.`;
+              diagnostics.config_validation_message = `Mini-scrape de teste encontrou 0 URLs. Confiança da config: ${configConfidence.confidence}%. Config invalidada — nenhum resultado encontrado.`;
             } else {
               diagnostics.config_validation = 'validated';
               diagnostics.config_validation_message = `Mini-scrape encontrou ${testResult.total_urls} URLs. Config validada.`;
