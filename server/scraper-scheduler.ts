@@ -78,7 +78,7 @@ function assignSitesToGroups(sites: any[], daysPerWeek: number, activeDays: numb
 
   const activeSites = sites
     .filter((s: any) => s.liga_desliga === 'ligado')
-    .sort((a: any, b: any) => (a.id || 0) - (b.id || 0));
+    .sort((a: any, b: any) => (a.nome_site || '').localeCompare(b.nome_site || '', 'pt-BR', { sensitivity: 'base' }));
 
   for (let i = 0; i < activeSites.length; i++) {
     const groupIdx = i % groups.length;
