@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { getDashboardStats, getDetailedLogs, getSites, createLeilao, findSiteByUrl } from "./directus";
 import { leilaoInsertSchema } from "@shared/schema";
 import { extractAuctionDataFromImage } from "./openai";
+import { getOpenAIApiKey, setOpenAIApiKey, isOpenAIKeyConfigured, getMaskedKey, getUsageSummary } from "./openai-usage";
 import {
   getScrapingApiStatus,
   startOnboarding,
@@ -120,7 +121,31 @@ export async function registerRoutes(
     }
   });
 
-  // Extract auction data from image using GPT-4 Vision
+  app.get("/api/settings/openai", async (_req, res) => {
+    res.json({
+      configured: isOpenAIKeyConfigured(),
+      masked_key: getMaskedKey(),
+    });
+  });
+
+  app.post("/api/settings/openai", async (req, res) => {
+    try {
+      const { api_key } = req.body;
+      if (!api_key || typeof api_key !== 'string' || !api_key.startsWith('sk-')) {
+        return res.status(400).json({ error: "Chave inválida. A chave da OpenAI deve começar com 'sk-'" });
+      }
+
+      setOpenAIApiKey(api_key);
+      res.json({ success: true, masked_key: getMaskedKey() });
+    } catch (error) {
+      res.status(500).json({ error: "Falha ao salvar chave" });
+    }
+  });
+
+  app.get("/api/settings/openai/usage", async (_req, res) => {
+    res.json(getUsageSummary());
+  });
+
   app.post("/api/extract-from-image", async (req, res) => {
     try {
       const { image } = req.body;
@@ -129,7 +154,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Imagem é obrigatória" });
       }
 
-      if (!process.env.OPENAI_API_KEY) {
+      if (!isOpenAIKeyConfigured()) {
         return res.status(500).json({ error: "OPENAI_API_KEY não configurada" });
       }
 
@@ -202,7 +227,7 @@ export async function registerRoutes(
       if (!siteUrl) {
         return res.status(400).json({ error: "URL do site é obrigatória" });
       }
-      if (!process.env.OPENAI_API_KEY) {
+      if (!isOpenAIKeyConfigured()) {
         return res.status(500).json({ error: "OPENAI_API_KEY não configurada" });
       }
 
@@ -210,7 +235,7 @@ export async function registerRoutes(
 
       if (useInternal) {
         const result = await startInternalOnboarding(
-          siteUrl, process.env.OPENAI_API_KEY, siteId, maxPages, model
+          siteUrl, getOpenAIApiKey(), siteId, maxPages, model
         );
 
         let configConfidence: ReturnType<typeof scoreConfig> | undefined;
@@ -277,7 +302,7 @@ export async function registerRoutes(
 
         res.json({ ...result, ...diagnostics });
       } else {
-        const result = await startOnboarding(siteUrl, process.env.OPENAI_API_KEY, maxPages, model);
+        const result = await startOnboarding(siteUrl, getOpenAIApiKey(), maxPages, model);
 
         if (siteId && result.config) {
           try {

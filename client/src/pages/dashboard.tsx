@@ -23,7 +23,8 @@ import {
   FileText,
   Plus,
   Bot,
-  MessageSquare
+  MessageSquare,
+  Settings
 } from "lucide-react";
 
 function LoadingSkeleton() {
@@ -160,6 +161,11 @@ export default function Dashboard() {
               <Button variant="outline" className="gap-2" data-testid="button-logs-page">
                 <FileText className="h-4 w-4" />
                 <span className="hidden sm:inline">Logs Detalhados</span>
+              </Button>
+            </Link>
+            <Link href="/settings">
+              <Button variant="outline" size="icon" data-testid="button-settings-page">
+                <Settings className="h-4 w-4" />
               </Button>
             </Link>
             <Button

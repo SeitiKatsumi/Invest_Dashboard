@@ -1,9 +1,10 @@
 import OpenAI from "openai";
 import { z } from "zod";
+import { getOpenAIApiKey, trackUsage } from "./openai-usage";
 
-// the newest OpenAI model is "gpt-4o" which supports vision
-// Using gpt-4o for image analysis as it's the current vision-capable model
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+function getClient(): OpenAI {
+  return new OpenAI({ apiKey: getOpenAIApiKey() });
+}
 
 const extractedAuctionDataSchema = z.object({
   nome_do_anuncio: z.string().optional().default(""),
@@ -28,44 +29,36 @@ const extractedAuctionDataSchema = z.object({
   logradouro: z.string().optional().default(""),
   bairro: z.string().optional().default(""),
   numero: z.string().optional().default(""),
-  link_edital: z.string().optional().default(""),
-  link_matricula: z.string().optional().default(""),
 });
 
 export type ExtractedAuctionData = z.infer<typeof extractedAuctionDataSchema>;
 
-export async function extractAuctionDataFromImage(base64Image: string): Promise<ExtractedAuctionData> {
-  const prompt = `Você é um especialista em extrair dados de páginas de leilão de imóveis no Brasil.
+const prompt = `Você é um especialista em extração de dados de leilões de imóveis no Brasil.
+Analise a imagem fornecida e extraia todas as informações relevantes sobre o leilão.
 
-Analise esta imagem de uma página de leilão e extraia TODOS os dados que conseguir identificar.
-
-Retorne um JSON com os seguintes campos (deixe vazio "" se não encontrar):
-{
-  "nome_do_anuncio": "título ou nome do anúncio do imóvel",
-  "descricao": "descrição do imóvel se houver",
-  "tipo_do_imovel": "Casa, Apartamento, Terreno, Comercial, Rural ou Outros",
-  "tipo_de_leilao": "Judicial, Extrajudicial, Leilão Online, etc",
-  "nome_leiloeiro": "nome do leiloeiro se aparecer",
-  "area_imovel": "área em m² (apenas números e m²)",
-  "valor_avalaiacao_imovel": "valor de avaliação (formato: R$ 000.000,00)",
-  "valor_leilao": "valor mínimo ou lance inicial",
-  "valor_praca1": "valor da 1ª praça",
-  "valor_praca2": "valor da 2ª praça",
-  "valor_praca3": "valor da 3ª praça se houver",
-  "praca_1": "data/hora da 1ª praça (formato ISO: YYYY-MM-DDTHH:mm)",
-  "praca_2": "data/hora da 2ª praça (formato ISO: YYYY-MM-DDTHH:mm)",
-  "praca_3": "data/hora da 3ª praça se houver",
-  "desconto": "percentual de desconto se mencionado",
-  "numero_do_processo": "número do processo judicial se aparecer",
-  "cep": "CEP do imóvel",
-  "cidade": "cidade do imóvel",
-  "estado_uf": "sigla do estado (ex: SP, RJ, MG)",
-  "logradouro": "rua/avenida do endereço",
-  "bairro": "bairro do imóvel",
-  "numero": "número do endereço",
-  "link_edital": "URL do edital se visível na página",
-  "link_matricula": "URL da matrícula se visível na página"
-}
+Retorne um JSON com os seguintes campos (use string vazia "" se não encontrar a informação):
+- nome_do_anuncio: título ou nome do anúncio do leilão
+- descricao: descrição detalhada do imóvel
+- tipo_do_imovel: tipo do imóvel (casa, apartamento, terreno, etc.)
+- tipo_de_leilao: tipo do leilão (judicial, extrajudicial, etc.)
+- nome_leiloeiro: nome do leiloeiro responsável
+- area_imovel: área do imóvel em m²
+- valor_avalaiacao_imovel: valor de avaliação do imóvel
+- valor_leilao: valor do leilão / lance mínimo
+- valor_praca1: valor da 1ª praça
+- valor_praca2: valor da 2ª praça
+- valor_praca3: valor da 3ª praça (se houver)
+- praca_1: data e hora da 1ª praça (formato: YYYY-MM-DDTHH:mm)
+- praca_2: data e hora da 2ª praça (formato: YYYY-MM-DDTHH:mm)
+- praca_3: data e hora da 3ª praça (formato: YYYY-MM-DDTHH:mm, se houver)
+- desconto: desconto em relação ao valor de avaliação
+- numero_do_processo: número do processo judicial
+- cep: CEP do imóvel
+- cidade: cidade do imóvel
+- estado_uf: estado (UF) do imóvel
+- logradouro: endereço/logradouro do imóvel
+- bairro: bairro do imóvel
+- numero: número do endereço
 
 IMPORTANTE: 
 - Extraia o máximo de informações possível
@@ -74,9 +67,12 @@ IMPORTANTE:
 - Se um campo não for encontrado, deixe como string vazia ""
 - Retorne APENAS o JSON, sem explicações adicionais`;
 
+export async function extractAuctionDataFromImage(base64Image: string): Promise<ExtractedAuctionData> {
+  const model = "gpt-4o";
+
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+    const response = await getClient().chat.completions.create({
+      model,
       messages: [
         {
           role: "user",
@@ -97,6 +93,15 @@ IMPORTANTE:
       max_tokens: 2048,
       response_format: { type: "json_object" },
     });
+
+    if (response.usage) {
+      trackUsage(
+        model,
+        'image_extraction',
+        response.usage.prompt_tokens,
+        response.usage.completion_tokens,
+      );
+    }
 
     const content = response.choices[0].message.content;
     if (!content) {

@@ -34,6 +34,7 @@ Preferred communication style: Simple, everyday language.
 - **WhatsApp Broadcast Module**: Allows sending auction listings to WhatsApp community groups with QR code authentication, group management, and dispatch history. Supports community announcement groups.
 - **Manual Registration**: Provides a form for manual auction registration with comprehensive fields, CEP auto-fill via ViaCEP API, and AI Image Extraction using OpenAI GPT-4o Vision for automated data population from screenshots.
 - **Detailed Logs Page**: Offers a dedicated page for detailed scraping logs with filtering and search capabilities.
+- **Settings Page**: Allows runtime configuration of the OpenAI API key and displays token usage tracking with cost estimates per model and operation (scraping onboarding, image extraction). Usage data includes 24h/7d summaries, breakdowns by model/operation, and recent call history with token counts.
 
 ## External Dependencies
 

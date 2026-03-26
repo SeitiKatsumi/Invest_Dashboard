@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import type { ExplorationResult, AnalysisResult, ScrapingConfig, ConfigValidation } from './types.js';
 import { validateRegexPatterns, generateId } from './utils.js';
+import { trackUsage } from '../openai-usage.js';
 
 function generateConfigId(domain: string): string {
   const timestamp = Date.now().toString(36);
@@ -280,6 +281,16 @@ export async function analyzeAndGenerateConfig(
       max_tokens: 2000,
       response_format: { type: 'json_object' },
     });
+
+    if (response.usage) {
+      trackUsage(
+        model,
+        'scraping_onboarding',
+        response.usage.prompt_tokens,
+        response.usage.completion_tokens,
+        domain,
+      );
+    }
 
     let responseText = response.choices[0].message.content?.trim() || '';
 
