@@ -7,6 +7,7 @@ import {
 import type { ScrapingConfig } from './internal-scraper/types.js';
 import { browserPool } from './internal-scraper/browser-pool.js';
 import { scoreConfig } from './internal-scraper/config-scorer.js';
+import { getOpenAIApiKey, isOpenAIKeyConfigured } from './openai-usage.js';
 
 const SCRAPING_API_URL = process.env.SCRAPING_API_URL?.trim() || "https://api-scrap-invest.server04.11mind.com.br";
 const DIRECTUS_URL = process.env.DIRECTUS_URL?.trim();
@@ -521,7 +522,7 @@ export async function startInternalOnboarding(
 
   const explorationResult = await explore({
     baseUrl: siteUrl,
-    maxPages: maxPages || 30,
+    maxPages: maxPages || 60,
     usePlaywright: true,
   });
 
@@ -555,6 +556,7 @@ export async function startInternalScraping(
   siteId?: number,
   maxPages?: number,
   concurrentRequests?: number,
+  _autoRetried?: boolean,
 ): Promise<{ job_id: string }> {
   const job = jobManager.createJob('scrape', siteUrl, siteId, N8N_WEBHOOK_URL);
 
@@ -587,6 +589,118 @@ export async function startInternalScraping(
         classification = 'empty';
       } else if (configConfidence.confidence < 30) {
         classification = 'config_suspect';
+      }
+
+      const shouldAutoRetry = !_autoRetried
+        && siteId
+        && (classification === 'empty' || classification === 'config_suspect')
+        && isOpenAIKeyConfigured();
+
+      if (shouldAutoRetry) {
+        console.log(`[InternalScraping] Auto re-onboarding para site ${siteId} (${classification}, ${result.total_urls} URLs, confiança ${configConfidence.confidence}%)`);
+        jobManager.updateProgress(job.id, 50, `Resultado insuficiente (${classification}). Re-executando onboarding automático...`);
+
+        try {
+          const errorMsg = classification === 'empty'
+            ? `Scraping retornou 0 URLs com config atual (confiança: ${configConfidence.confidence}%)`
+            : `Config suspeita (confiança: ${configConfidence.confidence}%). Apenas ${result.total_urls} URLs encontradas.`;
+          await saveSiteScrapingError(siteId!, errorMsg, `Auto re-onboarding ativado. Classificação: ${classification}`);
+
+          const reOnboardResult = await startInternalOnboarding(
+            siteUrl,
+            getOpenAIApiKey(),
+            siteId,
+            undefined,
+            undefined,
+          );
+
+          if (reOnboardResult.config) {
+            const newConfidence = scoreConfig(reOnboardResult.config as Record<string, unknown>);
+            console.log(`[InternalScraping] Re-onboarding gerou nova config (confiança: ${newConfidence.confidence}%). Re-executando crawl...`);
+            jobManager.updateProgress(job.id, 70, `Nova config gerada (confiança: ${newConfidence.confidence}%). Re-executando crawl...`);
+
+            try {
+              await saveSiteScrapingConfig(siteId!, reOnboardResult.config as Record<string, unknown>);
+              await updateSiteEngine(siteId!, "internal");
+              console.log(`[InternalScraping] Nova config persistida para site ${siteId}`);
+            } catch (saveErr) {
+              console.error(`[InternalScraping] Erro ao salvar nova config:`, saveErr);
+            }
+
+            const newCrawlerConfig: ScrapingConfig = {
+              domain: "",
+              listing_url: "",
+              listing_selector: "",
+              link_selector: "",
+              pagination_type: "none",
+              ...(reOnboardResult.config as Record<string, unknown>),
+            } as ScrapingConfig;
+
+            const retryCrawler = new DeterministicCrawler(newCrawlerConfig, {
+              concurrentRequests: concurrentRequests || 5,
+              onProgress: (progress: number, message: string) => {
+                const adjustedProgress = 70 + Math.round(progress * 0.3);
+                jobManager.updateProgress(job.id, adjustedProgress, message);
+              },
+            });
+
+            const retryResult = await retryCrawler.crawl(siteUrl, maxPages || 100, true);
+
+            let retryClassification: 'success' | 'empty' | 'config_suspect' = 'success';
+            if (retryResult.total_urls === 0) {
+              retryClassification = 'empty';
+            } else if (newConfidence.confidence < 30) {
+              retryClassification = 'config_suspect';
+            }
+
+            const finalResult = retryResult.total_urls > result.total_urls ? retryResult : result;
+            const finalClassification = retryResult.total_urls > result.total_urls ? retryClassification : classification;
+            const finalConfidence = retryResult.total_urls > result.total_urls ? newConfidence.confidence : configConfidence.confidence;
+
+            console.log(`[InternalScraping] Auto-retry resultado: ${result.total_urls} → ${retryResult.total_urls} URLs (usando ${retryResult.total_urls > result.total_urls ? 'nova' : 'original'})`);
+
+            jobManager.completeJob(job.id, finalResult, finalClassification, finalConfidence);
+
+            const completedJob = jobManager.getJob(job.id);
+            if (completedJob) {
+              persistJobToDirectus({
+                id: completedJob.id,
+                type: completedJob.type,
+                siteUrl: completedJob.siteUrl,
+                siteId: completedJob.siteId,
+                status: completedJob.status,
+                resultClassification: completedJob.resultClassification,
+                confidenceScore: completedJob.confidenceScore,
+                totalUrls: completedJob.totalUrls,
+                urlsFound: completedJob.urlsFound,
+                pagesProcessed: completedJob.pagesProcessed,
+                error: completedJob.error,
+                result: finalResult as unknown as Record<string, unknown>,
+                startedAt: completedJob.startedAt,
+                completedAt: completedJob.completedAt,
+                engine: 'internal',
+                progressMessage: `Auto-retry: ${result.total_urls} → ${retryResult.total_urls} URLs`,
+              });
+            }
+
+            if (finalResult.total_urls > 0) {
+              await clearSiteScrapingError(siteId!);
+            }
+
+            if (siteId) {
+              try {
+                await updateSiteScrapingStats(siteId, new Date().toISOString(), finalResult.total_urls);
+              } catch (e) {
+                console.error(`[InternalScraping] Failed to update stats for site ${siteId}:`, e);
+              }
+            }
+            return;
+          } else {
+            console.log(`[InternalScraping] Re-onboarding falhou para site ${siteId}: ${reOnboardResult.error}`);
+          }
+        } catch (retryErr) {
+          console.error(`[InternalScraping] Erro no auto re-onboarding para site ${siteId}:`, retryErr);
+        }
       }
 
       jobManager.completeJob(job.id, result, classification, configConfidence.confidence);

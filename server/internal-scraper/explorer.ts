@@ -224,7 +224,7 @@ async function exploreWithFetch(
 
   const urlsToVisit: string[] = [baseUrl];
   let detailSamples = 0;
-  const maxDetailSamples = 10;
+  const maxDetailSamples = 20;
 
   while (urlsToVisit.length > 0 && visitedUrls.size < maxPages) {
     const currentUrl = urlsToVisit.shift()!;
@@ -260,9 +260,11 @@ async function exploreWithFetch(
     for (const link of newLinks) {
       if (visitedUrls.has(link) || urlsToVisit.includes(link)) continue;
       const linkType = classifyUrl(link);
-      if (linkType === 'category') {
-        categoryUrls.add(link);
+      if (linkType === 'pagination') {
         urlsToVisit.unshift(link);
+      } else if (linkType === 'category') {
+        categoryUrls.add(link);
+        urlsToVisit.splice(Math.min(urlsToVisit.length, 2), 0, link);
       } else if (linkType === 'detail') {
         detailUrls.add(link);
         if (detailSamples < maxDetailSamples) urlsToVisit.push(link);
@@ -276,9 +278,9 @@ async function exploreWithFetch(
   return {
     pagesExplored: results.length,
     data: results,
-    allLinksFound: Array.from(allLinks).slice(0, 300),
-    detailUrlsFound: Array.from(detailUrls).slice(0, 100),
-    categoryUrlsFound: Array.from(categoryUrls).slice(0, 50),
+    allLinksFound: Array.from(allLinks).slice(0, 500),
+    detailUrlsFound: Array.from(detailUrls).slice(0, 200),
+    categoryUrlsFound: Array.from(categoryUrls).slice(0, 80),
     paginationSamples: Array.from(new Set(paginationSamples)),
     stats: {
       totalLinks: allLinks.size,
@@ -303,7 +305,7 @@ async function exploreWithPlaywright(
 
   const urlsToVisit: string[] = [baseUrl];
   let detailSamples = 0;
-  const maxDetailSamples = 10;
+  const maxDetailSamples = 20;
 
   const poolHandle = await browserPool.acquire();
   const page: Page = poolHandle.page;
@@ -366,9 +368,11 @@ async function exploreWithPlaywright(
         for (const link of newLinks) {
           if (visitedUrls.has(link) || urlsToVisit.includes(link)) continue;
           const linkType = classifyUrl(link);
-          if (linkType === 'category') {
-            categoryUrls.add(link);
+          if (linkType === 'pagination') {
             urlsToVisit.unshift(link);
+          } else if (linkType === 'category') {
+            categoryUrls.add(link);
+            urlsToVisit.splice(Math.min(urlsToVisit.length, 2), 0, link);
           } else if (linkType === 'detail') {
             detailUrls.add(link);
             if (detailSamples < maxDetailSamples) urlsToVisit.push(link);
@@ -390,9 +394,9 @@ async function exploreWithPlaywright(
   return {
     pagesExplored: results.length,
     data: results,
-    allLinksFound: Array.from(allLinks).slice(0, 300),
-    detailUrlsFound: Array.from(detailUrls).slice(0, 100),
-    categoryUrlsFound: Array.from(categoryUrls).slice(0, 50),
+    allLinksFound: Array.from(allLinks).slice(0, 500),
+    detailUrlsFound: Array.from(detailUrls).slice(0, 200),
+    categoryUrlsFound: Array.from(categoryUrls).slice(0, 80),
     paginationSamples: Array.from(new Set(paginationSamples)),
     stats: {
       totalLinks: allLinks.size,
@@ -404,7 +408,7 @@ async function exploreWithPlaywright(
 }
 
 export async function explore(options: ExplorerOptions): Promise<ExplorationResult> {
-  const { baseUrl, maxPages = 30, usePlaywright = true } = options;
+  const { baseUrl, maxPages = 60, usePlaywright = true } = options;
   const domain = extractDomain(baseUrl);
 
   const isBrowserUnavailable = (msg: string) =>
@@ -430,7 +434,7 @@ export async function explore(options: ExplorerOptions): Promise<ExplorationResu
 
   const result = await exploreWithFetch(baseUrl, domain, maxPages);
 
-  if (result.pagesExplored < 3 || result.allLinksFound.length < 10) {
+  if (result.pagesExplored < 5 || result.allLinksFound.length < 15) {
     console.log('[Explorer] Resultados insuficientes com fetch, tentando Playwright...');
     try {
       return await exploreWithPlaywright(baseUrl, domain, maxPages);

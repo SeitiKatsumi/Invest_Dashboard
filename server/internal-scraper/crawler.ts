@@ -522,18 +522,56 @@ export class DeterministicCrawler {
     };
   }
 
+  private detectSpaOrBlocked(html: string): 'spa' | 'blocked' | 'ok' {
+    const cfIndicators = [
+      'Just a moment', 'Checking your browser', 'cf-browser-verification',
+      'challenge-platform', 'Attention Required', 'Access denied',
+      'Enable JavaScript and cookies', 'You are being redirected',
+    ];
+    if (cfIndicators.some(ind => html.includes(ind))) return 'blocked';
+
+    const $ = cheerio.load(html);
+    const linkCount = $('a[href]').length;
+    const scriptCount = $('script[src]').length;
+    const bodyText = $('body').text().trim();
+    const hasReactRoot = $('#root, #app, #__next, [id*="react"], [data-reactroot]').length > 0;
+    const hasMinimalContent = bodyText.length < 500 && linkCount < 5;
+
+    if (hasReactRoot && hasMinimalContent) return 'spa';
+    if (linkCount < 3 && scriptCount > 3) return 'spa';
+
+    return 'ok';
+  }
+
   async crawl(startUrl: string, maxPages = 100, usePlaywright = true, externalPage?: Page): Promise<CrawlResult> {
+    const isBrowserUnavailable = (msg: string) =>
+      msg.includes("Executable doesn't exist") ||
+      msg.toLowerCase().includes('playwright') ||
+      msg.includes('BrowserPool') ||
+      msg.includes('acquire timeout');
+
     if (usePlaywright) {
       try {
-        return await this.crawlWithPlaywright(startUrl, maxPages, externalPage);
+        const pwResult = await this.crawlWithPlaywright(startUrl, maxPages, externalPage);
+
+        if (pwResult.total_urls === 0 && pwResult.pages_processed > 3) {
+          console.log(`[Crawler] Playwright retornou 0 URLs após ${pwResult.pages_processed} páginas. Tentando fetch como fallback...`);
+          try {
+            this.resetState();
+            const fetchFallback = await this.crawlWithFetch(startUrl, maxPages);
+            if (fetchFallback.total_urls > pwResult.total_urls) {
+              fetchFallback.warnings = [`Fallback Playwright → fetch. URLs: ${pwResult.total_urls} → ${fetchFallback.total_urls}`];
+              return fetchFallback;
+            }
+          } catch (fetchErr) {
+            console.warn('[Crawler] Fetch fallback falhou:', fetchErr);
+          }
+        }
+
+        return pwResult;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        if (
-          msg.includes("Executable doesn't exist") ||
-          msg.toLowerCase().includes('playwright') ||
-          msg.includes('BrowserPool') ||
-          msg.includes('acquire timeout')
-        ) {
+        if (isBrowserUnavailable(msg)) {
           console.warn('[Crawler] Playwright não disponível, usando fetch como fallback:', msg.slice(0, 120));
           const result = await this.crawlWithFetch(startUrl, maxPages);
           result.warnings = ['Navegador não disponível. Usando fetch como fallback.'];
@@ -543,6 +581,56 @@ export class DeterministicCrawler {
       }
     }
 
-    return await this.crawlWithFetch(startUrl, maxPages);
+    const fetchResult = await this.crawlWithFetch(startUrl, maxPages);
+
+    const shouldEscalate = fetchResult.total_urls === 0
+      || (fetchResult.total_urls < 3 && fetchResult.pages_processed > 5);
+
+    if (shouldEscalate) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      try {
+        const probeResp = await fetch(startUrl, {
+          headers: { 'User-Agent': randomUserAgent() },
+          signal: controller.signal,
+        });
+        const probeHtml = await probeResp.text();
+        clearTimeout(timeout);
+
+        const detection = this.detectSpaOrBlocked(probeHtml);
+        if (detection !== 'ok') {
+          console.log(`[Crawler] Fetch retornou ${fetchResult.total_urls} URLs. Detectado: ${detection}. Escalando para Playwright...`);
+          try {
+            this.resetState();
+            const pwResult = await this.crawlWithPlaywright(startUrl, maxPages);
+            pwResult.warnings = [`Fallback automático: fetch → Playwright (motivo: ${detection}). URLs: ${fetchResult.total_urls} → ${pwResult.total_urls}`];
+            return pwResult.total_urls > fetchResult.total_urls ? pwResult : fetchResult;
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            if (isBrowserUnavailable(msg)) {
+              console.warn('[Crawler] Playwright indisponível para fallback:', msg.slice(0, 120));
+              fetchResult.warnings = [`Tentativa de fallback para Playwright falhou (${detection}). Resultados podem ser limitados.`];
+              return fetchResult;
+            }
+            fetchResult.warnings = [`Erro no fallback Playwright: ${msg.slice(0, 100)}`];
+            return fetchResult;
+          }
+        }
+      } catch {
+        clearTimeout(timeout);
+      }
+    }
+
+    return fetchResult;
+  }
+
+  private resetState(): void {
+    this.visitedUrls.clear();
+    this.collectedUrls.clear();
+    this.allLinksSeen.clear();
+    this.categoryUrls.clear();
+    this.listingCount = 0;
+    this.detailCount = 0;
+    this.errors = [];
   }
 }
