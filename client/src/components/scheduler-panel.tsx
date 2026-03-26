@@ -80,15 +80,7 @@ interface ScheduleStatus {
 }
 
 const DAY_NAMES_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-const DAY_COLORS: Record<number, string> = {
-  0: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800',
-  1: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
-  2: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800',
-  3: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800',
-  4: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800',
-  5: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800',
-  6: 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-pink-800',
-};
+const DAY_STYLE = 'bg-muted/60 text-foreground border-border';
 
 function formatDateTime(iso: string | null) {
   if (!iso) return '—';
@@ -307,7 +299,7 @@ export default function SchedulerPanel() {
                 <div
                   key={group.dayIndex}
                   className={`flex-1 min-w-[100px] p-3 rounded-lg border text-center cursor-pointer transition-all hover:scale-105 ${
-                    DAY_COLORS[group.dayIndex] || 'bg-muted'
+                    DAY_STYLE
                   } ${isToday ? 'ring-2 ring-primary ring-offset-2 dark:ring-offset-background' : ''}`}
                   onClick={() => setExpanded(true)}
                   data-testid={`day-group-${group.dayIndex}`}
@@ -410,7 +402,7 @@ export default function SchedulerPanel() {
                     <div className="flex items-center gap-2">
                       <Badge
                         variant="outline"
-                        className={`${DAY_COLORS[group.dayIndex]} text-xs`}
+                        className={`${DAY_STYLE} text-xs`}
                       >
                         {DAY_NAMES_SHORT[group.dayIndex]}
                       </Badge>
