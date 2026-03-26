@@ -19,6 +19,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
+import SchedulerPanel from "@/components/scheduler-panel";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -2308,6 +2309,8 @@ export default function ScrapingPage() {
         </header>
 
         <BatchProcessingPanel sites={allSites || []} />
+
+        <SchedulerPanel />
 
         <SitesTable
           onStartOnboarding={setOnboardSite}

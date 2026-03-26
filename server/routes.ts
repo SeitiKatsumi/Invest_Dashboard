@@ -5,6 +5,16 @@ import { leilaoInsertSchema } from "@shared/schema";
 import { extractAuctionDataFromImage } from "./openai";
 import { getOpenAIApiKey, setOpenAIApiKey, isOpenAIKeyConfigured, getMaskedKey, getUsageSummary } from "./openai-usage";
 import {
+  initScheduler,
+  getScheduleStatus,
+  getScheduleConfig,
+  updateScheduleConfig,
+  triggerManualRun,
+  cancelCurrentRun,
+  getLastRunResult,
+  getDayNames,
+} from "./scraper-scheduler";
+import {
   getScrapingApiStatus,
   startOnboarding,
   startScraping,
@@ -1108,6 +1118,53 @@ export async function registerRoutes(
       res.status(500).json({ error: "Falha ao buscar histórico" });
     }
   });
+
+  app.get("/api/scheduler/status", async (_req, res) => {
+    try {
+      const status = await getScheduleStatus();
+      res.json(status);
+    } catch (error) {
+      res.status(500).json({ error: "Falha ao obter status do agendamento" });
+    }
+  });
+
+  app.get("/api/scheduler/config", (_req, res) => {
+    res.json(getScheduleConfig());
+  });
+
+  app.put("/api/scheduler/config", (req, res) => {
+    try {
+      const updated = updateScheduleConfig(req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : "Falha ao atualizar configuração" });
+    }
+  });
+
+  app.post("/api/scheduler/run", async (req, res) => {
+    try {
+      const dayIndex = req.body.dayIndex;
+      const result = await triggerManualRun(dayIndex);
+      res.json(result);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : "Falha ao iniciar execução" });
+    }
+  });
+
+  app.post("/api/scheduler/cancel", (_req, res) => {
+    const cancelled = cancelCurrentRun();
+    res.json({ cancelled });
+  });
+
+  app.get("/api/scheduler/last-run", (_req, res) => {
+    res.json(getLastRunResult());
+  });
+
+  app.get("/api/scheduler/days", (_req, res) => {
+    res.json(getDayNames());
+  });
+
+  initScheduler();
 
   return httpServer;
 }
