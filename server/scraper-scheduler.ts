@@ -6,6 +6,9 @@ import {
 } from './scraping.js';
 import { getOpenAIApiKey, isOpenAIKeyConfigured } from './openai-usage.js';
 import { scoreConfig } from './internal-scraper/config-scorer.js';
+import { db } from './db.js';
+import { schedulerConfigTable } from '@shared/schema';
+import { desc } from 'drizzle-orm';
 
 const DAY_NAMES = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'] as const;
 const DAY_NAMES_SHORT = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'] as const;
@@ -391,7 +394,39 @@ export function updateScheduleConfig(updates: Partial<ScheduleConfig>): Schedule
   }
 
   refreshGroups().catch(() => {});
+  saveConfigToDb().catch(() => {});
   return { ...config };
+}
+
+async function saveConfigToDb() {
+  try {
+    const rows = await db.select().from(schedulerConfigTable).limit(1);
+    if (rows.length > 0) {
+      await db.update(schedulerConfigTable).set({
+        config_json: JSON.stringify(config),
+        updated_at: new Date(),
+      });
+    } else {
+      await db.insert(schedulerConfigTable).values({
+        config_json: JSON.stringify(config),
+      });
+    }
+  } catch (err) {
+    console.error('[Scheduler] Erro ao salvar config no banco:', err);
+  }
+}
+
+async function loadConfigFromDb() {
+  try {
+    const rows = await db.select().from(schedulerConfigTable).orderBy(desc(schedulerConfigTable.updated_at)).limit(1);
+    if (rows.length > 0) {
+      const saved = JSON.parse(rows[0].config_json);
+      config = { ...DEFAULT_CONFIG, ...saved };
+      console.log(`[Scheduler] Config carregada do banco (enabled: ${config.enabled}, cron: ${config.cronExpression})`);
+    }
+  } catch (err) {
+    console.error('[Scheduler] Erro ao carregar config do banco:', err);
+  }
 }
 
 export async function getScheduleStatus(): Promise<ScheduleStatus> {
@@ -471,8 +506,9 @@ export function getDayNames() {
   return { full: [...DAY_NAMES], short: [...DAY_NAMES_SHORT] };
 }
 
-export function initScheduler() {
+export async function initScheduler() {
   console.log('[Scheduler] Inicializando...');
+  await loadConfigFromDb();
   if (config.enabled) {
     startCron();
   }

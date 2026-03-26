@@ -153,7 +153,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/settings/openai/usage", async (_req, res) => {
-    res.json(getUsageSummary());
+    res.json(await getUsageSummary());
   });
 
   app.post("/api/extract-from-image", async (req, res) => {
@@ -1164,7 +1164,7 @@ export async function registerRoutes(
     res.json(getDayNames());
   });
 
-  initScheduler();
+  await initScheduler();
 
   return httpServer;
 }
