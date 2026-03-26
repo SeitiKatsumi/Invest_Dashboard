@@ -1,6 +1,5 @@
-import { db } from './db.js';
-import { openaiUsageTable } from '@shared/schema';
-import { desc, gte, sql } from 'drizzle-orm';
+const DIRECTUS_URL = process.env.DIRECTUS_URL || '';
+const DIRECTUS_TOKEN = process.env.DIRECTUS_TOKEN || '';
 
 interface UsageEntry {
   timestamp: string;
@@ -54,31 +53,61 @@ export function trackUsage(
   completionTokens: number,
   siteUrl?: string,
 ): void {
+  if (!DIRECTUS_URL || !DIRECTUS_TOKEN) return;
+
   const cost = estimateCost(model, promptTokens, completionTokens);
 
-  db.insert(openaiUsageTable).values({
-    model,
-    operation,
-    prompt_tokens: promptTokens,
-    completion_tokens: completionTokens,
-    total_tokens: promptTokens + completionTokens,
-    estimated_cost_usd: cost,
-    site_url: siteUrl || null,
+  fetch(`${DIRECTUS_URL}/items/openai_usage`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      operation,
+      prompt_tokens: promptTokens,
+      completion_tokens: completionTokens,
+      total_tokens: promptTokens + completionTokens,
+      estimated_cost_usd: cost,
+      site_url: siteUrl || null,
+    }),
   }).catch(err => {
-    console.error('[OpenAI Usage] Erro ao salvar no banco:', err.message);
+    console.error('[OpenAI Usage] Erro ao salvar no Directus:', err.message);
   });
 }
 
 export async function getUsageSummary() {
-  const now = new Date();
-  const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-  const last7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  if (!DIRECTUS_URL || !DIRECTUS_TOKEN) {
+    return emptyResult();
+  }
 
   try {
-    const allEntries = await db.select().from(openaiUsageTable).orderBy(desc(openaiUsageTable.timestamp));
+    const url = new URL(`${DIRECTUS_URL}/items/openai_usage`);
+    url.searchParams.set('limit', '-1');
+    url.searchParams.set('sort', '-date_created');
 
-    const recentEntries = allEntries.filter(e => e.timestamp >= last24h);
-    const weekEntries = allEntries.filter(e => e.timestamp >= last7d);
+    const response = await fetch(url.toString(), {
+      headers: {
+        Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      console.error('[OpenAI Usage] Erro ao ler do Directus:', response.status);
+      return emptyResult();
+    }
+
+    const result = await response.json();
+    const allEntries: any[] = result.data || [];
+
+    const now = new Date();
+    const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const last7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    const recentEntries = allEntries.filter(e => new Date(e.date_created) >= last24h);
+    const weekEntries = allEntries.filter(e => new Date(e.date_created) >= last7d);
 
     const byModel: Record<string, { calls: number; tokens: number; cost: number }> = {};
     const byOperation: Record<string, { calls: number; tokens: number; cost: number }> = {};
@@ -97,22 +126,22 @@ export async function getUsageSummary() {
 
     return {
       total_calls: allEntries.length,
-      total_tokens: allEntries.reduce((s, e) => s + e.total_tokens, 0),
-      total_cost_usd: allEntries.reduce((s, e) => s + e.estimated_cost_usd, 0),
+      total_tokens: allEntries.reduce((s: number, e: any) => s + (e.total_tokens || 0), 0),
+      total_cost_usd: allEntries.reduce((s: number, e: any) => s + (e.estimated_cost_usd || 0), 0),
       last_24h: {
         calls: recentEntries.length,
-        tokens: recentEntries.reduce((s, e) => s + e.total_tokens, 0),
-        cost: recentEntries.reduce((s, e) => s + e.estimated_cost_usd, 0),
+        tokens: recentEntries.reduce((s: number, e: any) => s + (e.total_tokens || 0), 0),
+        cost: recentEntries.reduce((s: number, e: any) => s + (e.estimated_cost_usd || 0), 0),
       },
       last_7d: {
         calls: weekEntries.length,
-        tokens: weekEntries.reduce((s, e) => s + e.total_tokens, 0),
-        cost: weekEntries.reduce((s, e) => s + e.estimated_cost_usd, 0),
+        tokens: weekEntries.reduce((s: number, e: any) => s + (e.total_tokens || 0), 0),
+        cost: weekEntries.reduce((s: number, e: any) => s + (e.estimated_cost_usd || 0), 0),
       },
       by_model: byModel,
       by_operation: byOperation,
-      recent_entries: allEntries.slice(0, 50).map(e => ({
-        timestamp: e.timestamp.toISOString(),
+      recent_entries: allEntries.slice(0, 50).map((e: any) => ({
+        timestamp: e.date_created,
         model: e.model,
         operation: e.operation,
         prompt_tokens: e.prompt_tokens,
@@ -124,17 +153,21 @@ export async function getUsageSummary() {
       pricing_table: MODEL_PRICING,
     };
   } catch (err) {
-    console.error('[OpenAI Usage] Erro ao ler do banco:', err);
-    return {
-      total_calls: 0,
-      total_tokens: 0,
-      total_cost_usd: 0,
-      last_24h: { calls: 0, tokens: 0, cost: 0 },
-      last_7d: { calls: 0, tokens: 0, cost: 0 },
-      by_model: {},
-      by_operation: {},
-      recent_entries: [],
-      pricing_table: MODEL_PRICING,
-    };
+    console.error('[OpenAI Usage] Erro ao ler do Directus:', err);
+    return emptyResult();
   }
+}
+
+function emptyResult() {
+  return {
+    total_calls: 0,
+    total_tokens: 0,
+    total_cost_usd: 0,
+    last_24h: { calls: 0, tokens: 0, cost: 0 },
+    last_7d: { calls: 0, tokens: 0, cost: 0 },
+    by_model: {},
+    by_operation: {},
+    recent_entries: [],
+    pricing_table: MODEL_PRICING,
+  };
 }

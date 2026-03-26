@@ -24,8 +24,8 @@ Preferred communication style: Simple, everyday language.
 - **Functionality**: Acts as a proxy/aggregation layer for Directus CMS data and serves the static frontend. Includes an internal scraping engine and WhatsApp integration.
 
 ### Data Layer
-- **Primary Data Source**: External Directus CMS
-- **Database (for local persistence/sessions)**: PostgreSQL with Drizzle ORM
+- **Primary Data Source**: External Directus CMS (all data storage)
+- **No local database**: All persistence is handled through Directus collections (`openai_usage`, `scheduler_config`, etc.)
 - **Shared Types**: TypeScript interfaces defined in `shared/schema.ts` for consistent data structures across frontend and backend.
 
 ### Key Features
@@ -39,8 +39,7 @@ Preferred communication style: Simple, everyday language.
 
 ## External Dependencies
 
-- **Directus CMS**: Primary data source, accessed via `DIRECTUS_URL` and `DIRECTUS_TOKEN`.
-- **PostgreSQL**: Used for session storage and potential future local data persistence, configured via `DATABASE_URL`.
+- **Directus CMS**: Primary and sole data source, accessed via `DIRECTUS_URL` and `DIRECTUS_TOKEN`. Collections include `openai_usage` (API token tracking) and `scheduler_config` (singleton, scraping schedule configuration).
 - **OpenAI API**: Utilized for AI-driven scraping configuration (GPT-4o mini via external API), AI Image Extraction (GPT-4o Vision), and error analysis, requiring `OPENAI_API_KEY`.
 - **ViaCEP API**: Used for auto-filling address details during manual auction registration.
 - **@whiskeysockets/baileys**: For WhatsApp Web protocol integration in the WhatsApp broadcast module.

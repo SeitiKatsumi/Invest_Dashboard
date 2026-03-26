@@ -6,9 +6,8 @@ import {
 } from './scraping.js';
 import { getOpenAIApiKey, isOpenAIKeyConfigured } from './openai-usage.js';
 import { scoreConfig } from './internal-scraper/config-scorer.js';
-import { db } from './db.js';
-import { schedulerConfigTable } from '@shared/schema';
-import { desc } from 'drizzle-orm';
+const DIRECTUS_URL = process.env.DIRECTUS_URL || '';
+const DIRECTUS_TOKEN = process.env.DIRECTUS_TOKEN || '';
 
 const DAY_NAMES = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'] as const;
 const DAY_NAMES_SHORT = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'] as const;
@@ -394,38 +393,50 @@ export function updateScheduleConfig(updates: Partial<ScheduleConfig>): Schedule
   }
 
   refreshGroups().catch(() => {});
-  saveConfigToDb().catch(() => {});
+  saveConfigToDirectus().catch(() => {});
   return { ...config };
 }
 
-async function saveConfigToDb() {
+async function saveConfigToDirectus() {
+  if (!DIRECTUS_URL || !DIRECTUS_TOKEN) return;
+
   try {
-    const rows = await db.select().from(schedulerConfigTable).limit(1);
-    if (rows.length > 0) {
-      await db.update(schedulerConfigTable).set({
-        config_json: JSON.stringify(config),
-        updated_at: new Date(),
-      });
-    } else {
-      await db.insert(schedulerConfigTable).values({
-        config_json: JSON.stringify(config),
-      });
+    const resp = await fetch(`${DIRECTUS_URL}/items/scheduler_config`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ config_json: config }),
+    });
+    if (!resp.ok) {
+      const body = await resp.text();
+      console.error(`[Scheduler] Erro ao salvar config no Directus: ${resp.status} ${body}`);
     }
   } catch (err) {
-    console.error('[Scheduler] Erro ao salvar config no banco:', err);
+    console.error('[Scheduler] Erro ao salvar config no Directus:', err);
   }
 }
 
-async function loadConfigFromDb() {
+async function loadConfigFromDirectus() {
+  if (!DIRECTUS_URL || !DIRECTUS_TOKEN) return;
+
   try {
-    const rows = await db.select().from(schedulerConfigTable).orderBy(desc(schedulerConfigTable.updated_at)).limit(1);
-    if (rows.length > 0) {
-      const saved = JSON.parse(rows[0].config_json);
+    const resp = await fetch(`${DIRECTUS_URL}/items/scheduler_config`, {
+      headers: { Authorization: `Bearer ${DIRECTUS_TOKEN}` },
+    });
+
+    if (!resp.ok) return;
+
+    const data = await resp.json();
+    const row = data.data;
+    if (row?.config_json) {
+      const saved = typeof row.config_json === 'string' ? JSON.parse(row.config_json) : row.config_json;
       config = { ...DEFAULT_CONFIG, ...saved };
-      console.log(`[Scheduler] Config carregada do banco (enabled: ${config.enabled}, cron: ${config.cronExpression})`);
+      console.log(`[Scheduler] Config carregada do Directus (enabled: ${config.enabled}, cron: ${config.cronExpression})`);
     }
   } catch (err) {
-    console.error('[Scheduler] Erro ao carregar config do banco:', err);
+    console.error('[Scheduler] Erro ao carregar config do Directus:', err);
   }
 }
 
@@ -508,7 +519,7 @@ export function getDayNames() {
 
 export async function initScheduler() {
   console.log('[Scheduler] Inicializando...');
-  await loadConfigFromDb();
+  await loadConfigFromDirectus();
   if (config.enabled) {
     startCron();
   }

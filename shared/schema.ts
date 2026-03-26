@@ -1,28 +1,15 @@
 import { z } from "zod";
-import { pgTable, serial, text, integer, real, timestamp } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
 
-export const openaiUsageTable = pgTable("openai_usage", {
-  id: serial("id").primaryKey(),
-  timestamp: timestamp("timestamp").defaultNow().notNull(),
-  model: text("model").notNull(),
-  operation: text("operation").notNull(),
-  prompt_tokens: integer("prompt_tokens").notNull(),
-  completion_tokens: integer("completion_tokens").notNull(),
-  total_tokens: integer("total_tokens").notNull(),
-  estimated_cost_usd: real("estimated_cost_usd").notNull(),
-  site_url: text("site_url"),
-});
+export interface User {
+  id: string;
+  username: string;
+  password: string;
+}
 
-export const schedulerConfigTable = pgTable("scheduler_config", {
-  id: serial("id").primaryKey(),
-  config_json: text("config_json").notNull(),
-  updated_at: timestamp("updated_at").defaultNow().notNull(),
-});
-
-export const insertOpenaiUsageSchema = createInsertSchema(openaiUsageTable).omit({ id: true });
-export type InsertOpenaiUsage = z.infer<typeof insertOpenaiUsageSchema>;
-export type OpenaiUsage = typeof openaiUsageTable.$inferSelect;
+export interface InsertUser {
+  username: string;
+  password: string;
+}
 
 export interface Site {
   id: number;
@@ -75,7 +62,10 @@ export interface Leilao {
   praca_3: string | null;
   link_edital: string | null;
   link_matricula: string | null;
+  valor_leilao: string | null;
   desconto: string | null;
+  numero_do_processo: string | null;
+  cep: string | null;
   estado_uf: string | null;
   cidade: string | null;
   endereco: string | null;
