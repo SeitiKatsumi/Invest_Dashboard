@@ -690,7 +690,7 @@ function SitesTable({
                         )}
                       </td>
                       <td className="p-3 text-center">
-                        {hasConfig ? (
+                        {hasConfig && !site.scraping_error ? (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -702,12 +702,20 @@ function SitesTable({
                         ) : site.scraping_error ? (
                           <Button
                             variant="ghost"
-                            size="icon"
+                            size="sm"
+                            className="h-auto py-1 px-2 max-w-[220px]"
                             onClick={() => onViewError(site)}
                             data-testid={`button-view-error-${site.id}`}
-                            title="Ver erro do onboarding"
+                            title={site.scraping_error}
                           >
-                            <AlertTriangle className="h-4 w-4 text-red-500" />
+                            <div className="flex items-center gap-1.5">
+                              <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0" />
+                              <span className="text-xs text-red-600 dark:text-red-400 text-left truncate">
+                                {site.scraping_error.length > 40
+                                  ? site.scraping_error.slice(0, 40) + "…"
+                                  : site.scraping_error}
+                              </span>
+                            </div>
                           </Button>
                         ) : (
                           <XCircle className="h-4 w-4 text-muted-foreground mx-auto" />
@@ -1354,36 +1362,83 @@ function ConfigDialog({
   );
 }
 
+function classifyError(error: string): { type: string; label: string; color: string; suggestion: string } {
+  const lower = error.toLowerCase();
+  if (lower.includes('timeout') || lower.includes('timed out') || lower.includes('expirou'))
+    return { type: 'timeout', label: 'Timeout', color: 'text-orange-600 bg-orange-50 border-orange-200 dark:bg-orange-950 dark:border-orange-800', suggestion: 'O site demorou muito para responder. Pode estar fora do ar ou com proteção anti-bot. Tente novamente mais tarde ou verifique manualmente.' };
+  if (lower.includes('cloudflare') || lower.includes('403') || lower.includes('blocked') || lower.includes('captcha') || lower.includes('access denied'))
+    return { type: 'blocked', label: 'Bloqueado', color: 'text-red-600 bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800', suggestion: 'O site possui proteção anti-bot (Cloudflare, captcha, etc.). Pode ser necessário usar o motor externo ou configuração manual.' };
+  if (lower.includes('enotfound') || lower.includes('dns') || lower.includes('getaddrinfo') || lower.includes('não encontrado'))
+    return { type: 'dns', label: 'DNS/Domínio', color: 'text-purple-600 bg-purple-50 border-purple-200 dark:bg-purple-950 dark:border-purple-800', suggestion: 'O domínio não foi encontrado. Verifique se a URL está correta ou se o site ainda existe.' };
+  if (lower.includes('econnrefused') || lower.includes('connection refused') || lower.includes('econnreset') || lower.includes('socket'))
+    return { type: 'connection', label: 'Conexão', color: 'text-yellow-600 bg-yellow-50 border-yellow-200 dark:bg-yellow-950 dark:border-yellow-800', suggestion: 'O servidor recusou a conexão. O site pode estar temporariamente fora do ar. Tente novamente mais tarde.' };
+  if (lower.includes('ssl') || lower.includes('certificate') || lower.includes('cert'))
+    return { type: 'ssl', label: 'SSL/Certificado', color: 'text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-950 dark:border-amber-800', suggestion: 'Problema com o certificado SSL do site. Pode indicar site inseguro ou certificado expirado.' };
+  if (lower.includes('config invalidada') || lower.includes('mini-scrape') || lower.includes('0 urls'))
+    return { type: 'config', label: 'Config Inválida', color: 'text-blue-600 bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800', suggestion: 'A configuração gerada pela IA não conseguiu extrair URLs. Tente rodar o onboarding novamente com um modelo diferente, ou verifique se a URL de listagem está correta.' };
+  if (lower.includes('json') || lower.includes('parse') || lower.includes('syntax'))
+    return { type: 'parse', label: 'Parsing', color: 'text-indigo-600 bg-indigo-50 border-indigo-200 dark:bg-indigo-950 dark:border-indigo-800', suggestion: 'A IA retornou uma resposta que não pôde ser processada. Tente rodar o onboarding novamente.' };
+  if (lower.includes('não retornou configuração') || lower.includes('onboarding'))
+    return { type: 'onboarding', label: 'Onboarding', color: 'text-cyan-600 bg-cyan-50 border-cyan-200 dark:bg-cyan-950 dark:border-cyan-800', suggestion: 'O onboarding não conseguiu gerar uma configuração. Verifique se a URL do site está acessível e tente novamente.' };
+  return { type: 'unknown', label: 'Outro', color: 'text-gray-600 bg-gray-50 border-gray-200 dark:bg-gray-950 dark:border-gray-800', suggestion: 'Erro não categorizado. Analise a mensagem de erro para mais detalhes ou tente rodar o onboarding novamente.' };
+}
+
 function ErrorDialog({
   site,
   open,
   onOpenChange,
+  onRetryOnboarding,
 }: {
   site: Site | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onRetryOnboarding?: (site: Site) => void;
 }) {
+  const errorText = site?.scraping_error || "";
+  const diagnosis = classifyError(errorText);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-red-500">
             <AlertTriangle className="h-5 w-5" />
-            Erro no Onboarding
+            Diagnóstico de Erro
           </DialogTitle>
           <DialogDescription>
             {site?.nome_site || `Site #${site?.id}`} — {site?.url_listagem || site?.url_site}
           </DialogDescription>
         </DialogHeader>
         <div className="overflow-auto flex-1 min-h-0 space-y-4">
-          <div>
-            <Label className="text-sm font-medium text-red-500">Mensagem de Erro</Label>
-            <div className="mt-1 p-3 bg-red-500/10 border border-red-500/20 rounded-md">
-              <p className="text-sm whitespace-pre-wrap" data-testid="text-error-message">
-                {site?.scraping_error || "Erro desconhecido"}
+          <div className={`flex items-center gap-3 p-3 rounded-lg border ${diagnosis.color}`}>
+            <div>
+              <Badge variant="outline" className="mb-1" data-testid="badge-error-type">
+                {diagnosis.label}
+              </Badge>
+              <p className="text-sm font-medium" data-testid="text-error-type-label">
+                Tipo: {diagnosis.label}
               </p>
             </div>
           </div>
+
+          <div>
+            <Label className="text-sm font-medium text-red-500">Mensagem de Erro</Label>
+            <div className="mt-1 p-3 bg-red-500/10 border border-red-500/20 rounded-md">
+              <p className="text-sm whitespace-pre-wrap font-mono" data-testid="text-error-message">
+                {errorText || "Erro desconhecido"}
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <Label className="text-sm font-medium text-blue-600 dark:text-blue-400">Ação Sugerida</Label>
+            <div className="mt-1 p-3 bg-blue-500/10 border border-blue-500/20 rounded-md">
+              <p className="text-sm" data-testid="text-error-suggestion">
+                {diagnosis.suggestion}
+              </p>
+            </div>
+          </div>
+
           {site?.scraping_error_analysis && (
             <div>
               <Label className="text-sm font-medium">Análise do Agente IA</Label>
@@ -1394,8 +1449,36 @@ function ErrorDialog({
               </div>
             </div>
           )}
+
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="p-2 bg-muted rounded">
+              <span className="text-muted-foreground">Motor:</span>{" "}
+              <span className="font-medium">{site?.scraping_engine || "interno"}</span>
+            </div>
+            <div className="p-2 bg-muted rounded">
+              <span className="text-muted-foreground">Config:</span>{" "}
+              <span className="font-medium">{site?.scraping_config ? "Sim" : "Não"}</span>
+            </div>
+            <div className="p-2 bg-muted rounded">
+              <span className="text-muted-foreground">Último scraping:</span>{" "}
+              <span className="font-medium">{site?.last_scraping_at ? new Date(site.last_scraping_at).toLocaleString("pt-BR") : "Nunca"}</span>
+            </div>
+            <div className="p-2 bg-muted rounded">
+              <span className="text-muted-foreground">URLs encontradas:</span>{" "}
+              <span className="font-medium">{site?.last_scraping_urls_found ?? 0}</span>
+            </div>
+          </div>
         </div>
-        <DialogFooter>
+        <DialogFooter className="gap-2">
+          {onRetryOnboarding && site && (
+            <Button
+              onClick={() => { onRetryOnboarding(site); onOpenChange(false); }}
+              data-testid="button-retry-onboarding"
+            >
+              <RotateCcw className="h-4 w-4 mr-1" />
+              Tentar Novamente
+            </Button>
+          )}
           <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="button-close-error">
             Fechar
           </Button>
@@ -2255,6 +2338,7 @@ export default function ScrapingPage() {
         site={errorSite}
         open={!!errorSite}
         onOpenChange={(open) => { if (!open) setErrorSite(null); }}
+        onRetryOnboarding={(site) => { setErrorSite(null); setOnboardSite(site); }}
       />
     </div>
   );
