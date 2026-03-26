@@ -29,6 +29,7 @@ import {
   getBrowserPoolStats,
   drainBrowserPool,
   scoreConfig,
+  persistBatchReportToDirectus,
 } from "./scraping";
 import {
   connectWhatsApp,
@@ -830,6 +831,21 @@ export async function registerRoutes(
       res.json(report);
     } catch (error) {
       res.status(500).json({ error: "Failed to generate batch report" });
+    }
+  });
+
+  app.post("/api/scraping/batch-report", async (req, res) => {
+    try {
+      const report = req.body;
+      if (!report || !report.batch_id) {
+        return res.status(400).json({ error: "batch_id é obrigatório" });
+      }
+
+      await persistBatchReportToDirectus(report);
+      res.json({ success: true, message: "Relatório salvo no Directus" });
+    } catch (error) {
+      console.error("Error saving batch report:", error);
+      res.status(500).json({ error: "Falha ao salvar relatório" });
     }
   });
 

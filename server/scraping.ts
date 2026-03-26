@@ -591,6 +591,27 @@ export async function startInternalScraping(
 
       jobManager.completeJob(job.id, result, classification, configConfidence.confidence);
 
+      const completedJob = jobManager.getJob(job.id);
+      if (completedJob) {
+        persistJobToDirectus({
+          id: completedJob.id,
+          type: completedJob.type,
+          siteUrl: completedJob.siteUrl,
+          siteId: completedJob.siteId,
+          status: completedJob.status,
+          resultClassification: completedJob.resultClassification,
+          confidenceScore: completedJob.confidenceScore,
+          totalUrls: completedJob.totalUrls,
+          urlsFound: completedJob.urlsFound,
+          pagesProcessed: completedJob.pagesProcessed,
+          error: completedJob.error,
+          result: result as unknown as Record<string, unknown>,
+          startedAt: completedJob.startedAt,
+          completedAt: completedJob.completedAt,
+          engine: 'internal',
+        });
+      }
+
       if (siteId) {
         try {
           await updateSiteScrapingStats(siteId, new Date().toISOString(), result.total_urls);
@@ -601,10 +622,139 @@ export async function startInternalScraping(
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       jobManager.failJob(job.id, msg);
+
+      const failedJob = jobManager.getJob(job.id);
+      if (failedJob) {
+        persistJobToDirectus({
+          id: failedJob.id,
+          type: failedJob.type,
+          siteUrl: failedJob.siteUrl,
+          siteId: failedJob.siteId,
+          status: failedJob.status,
+          resultClassification: 'error',
+          totalUrls: 0,
+          urlsFound: [],
+          pagesProcessed: 0,
+          error: msg,
+          startedAt: failedJob.startedAt,
+          completedAt: failedJob.completedAt,
+          engine: 'internal',
+        });
+      }
     }
   })();
 
   return { job_id: job.id };
+}
+
+async function persistJobToDirectus(job: {
+  id: string;
+  type: string;
+  siteUrl: string;
+  siteId?: number;
+  status: string;
+  resultClassification?: string;
+  confidenceScore?: number;
+  totalUrls: number;
+  urlsFound: string[];
+  pagesProcessed: number;
+  error?: string;
+  result?: Record<string, unknown>;
+  startedAt: string;
+  completedAt?: string;
+  engine: string;
+  progressMessage?: string;
+  batchId?: string;
+  siteName?: string;
+}): Promise<void> {
+  if (!DIRECTUS_URL || !DIRECTUS_TOKEN) return;
+
+  try {
+    const startTime = new Date(job.startedAt).getTime();
+    const endTime = job.completedAt ? new Date(job.completedAt).getTime() : Date.now();
+    const durationSeconds = Math.round((endTime - startTime) / 1000);
+
+    const configUsed = job.result && typeof job.result === 'object' && 'config_used' in job.result
+      ? job.result.config_used
+      : null;
+
+    const warnings = job.result && typeof job.result === 'object' && 'warnings' in job.result
+      ? job.result.warnings
+      : null;
+
+    const payload = {
+      job_id: job.id,
+      site: job.siteId || null,
+      site_url: job.siteUrl,
+      site_name: job.siteName || null,
+      engine: job.engine || 'internal',
+      job_type: job.type || 'scrape',
+      status: job.status,
+      result_classification: job.resultClassification || null,
+      confidence_score: job.confidenceScore || null,
+      urls_found: job.totalUrls || 0,
+      urls_list: job.urlsFound || [],
+      pages_processed: job.pagesProcessed || 0,
+      config_used: configUsed,
+      error_message: job.error || null,
+      warnings: warnings,
+      started_at: job.startedAt,
+      completed_at: job.completedAt || null,
+      duration_seconds: durationSeconds,
+      batch_id: job.batchId || null,
+    };
+
+    await fetch(`${DIRECTUS_URL}/items/scraping_jobs`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (e) {
+    console.error('[Directus] Falha ao persistir job:', e instanceof Error ? e.message : e);
+  }
+}
+
+export async function persistBatchReportToDirectus(report: {
+  batch_id: string;
+  total_sites: number;
+  total_completed: number;
+  total_urls_found: number;
+  by_classification: Record<string, number>;
+  avg_confidence: number;
+  top_errors: Array<{ error: string; count: number }>;
+  sites_needing_attention: Array<Record<string, unknown>>;
+  duration_seconds: number;
+  engine?: string;
+}): Promise<void> {
+  if (!DIRECTUS_URL || !DIRECTUS_TOKEN) return;
+
+  try {
+    const payload = {
+      batch_id: report.batch_id,
+      total_sites: report.total_sites || 0,
+      total_completed: report.total_completed || 0,
+      total_urls_found: report.total_urls_found || 0,
+      by_classification: report.by_classification || {},
+      avg_confidence: report.avg_confidence || null,
+      top_errors: report.top_errors || [],
+      sites_needing_attention: report.sites_needing_attention || [],
+      duration_seconds: report.duration_seconds || 0,
+    };
+
+    await fetch(`${DIRECTUS_URL}/items/scraping_batch_reports`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (e) {
+    console.error('[Directus] Falha ao persistir batch report:', e instanceof Error ? e.message : e);
+  }
 }
 
 export function getBrowserPoolStats() {

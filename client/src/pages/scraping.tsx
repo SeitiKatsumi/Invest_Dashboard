@@ -1417,6 +1417,9 @@ interface QueueItem {
 }
 
 interface BatchReport {
+  batch_id: string;
+  total_sites: number;
+  total_completed: number;
   total_jobs: number;
   by_classification: Record<string, number>;
   avg_confidence: number | null;
@@ -1429,6 +1432,7 @@ interface BatchReport {
     error?: string;
     confidence?: number;
   }>;
+  duration_seconds: number;
 }
 
 interface ResourceStats {
@@ -1640,7 +1644,12 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
       ? Math.round(confidenceValues.reduce((a, b) => a + b, 0) / confidenceValues.length)
       : null;
 
+    const durationSeconds = startTime ? Math.round((Date.now() - startTime) / 1000) : 0;
+
     return {
+      batch_id: `batch_${Date.now()}`,
+      total_sites: queue.length,
+      total_completed: completed.length,
       total_jobs: completed.length,
       by_classification: classificationCounts,
       avg_confidence: avgConfidence,
@@ -1661,6 +1670,7 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
           error: q.error,
           confidence: q.confidence,
         })),
+      duration_seconds: durationSeconds,
     };
   };
 
@@ -1816,6 +1826,14 @@ function BatchProcessingPanel({ sites }: { sites: Site[] }) {
     const enrichedReport = await enrichReportFromServer(localReport);
     setReport(enrichedReport);
     setShowReport(true);
+
+    try {
+      await fetch('/api/scraping/batch-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(enrichedReport),
+      });
+    } catch {};
   };
 
   const startProcessing = (sitesToProcess: Site[]) => {
