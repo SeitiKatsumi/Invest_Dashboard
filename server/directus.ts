@@ -370,7 +370,9 @@ export async function checkDuplicateLeilao(linkAnuncio: string): Promise<Leilao 
       },
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      throw new Error(`Falha ao verificar duplicatas no Directus (status ${response.status}). Criação bloqueada por segurança.`);
+    }
 
     const result = await response.json();
     const items = result.data || [];
