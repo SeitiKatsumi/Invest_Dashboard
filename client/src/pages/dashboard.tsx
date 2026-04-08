@@ -26,7 +26,8 @@ import {
   MessageSquare,
   Settings,
   Copy,
-  Brain
+  Brain,
+  CheckCircle2
 } from "lucide-react";
 
 function LoadingSkeleton() {
@@ -195,6 +196,41 @@ export default function Dashboard() {
           </div>
         </header>
 
+        {/* Leilões Ativos Destaque */}
+        <Card className="border-2 border-emerald-500/30 bg-gradient-to-r from-emerald-500/5 via-emerald-500/10 to-teal-500/5 dark:from-emerald-500/10 dark:via-emerald-500/15 dark:to-teal-500/10" data-testid="card-leiloes-ativos">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="h-7 w-7" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Leilões Ativos</p>
+                  <p className="text-4xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
+                    {data.leiloes.ativos.toLocaleString("pt-BR")}
+                  </p>
+                </div>
+              </div>
+              <div className="hidden sm:flex items-center gap-6 text-sm text-muted-foreground">
+                <div className="text-center">
+                  <p className="text-lg font-semibold text-foreground">{data.leiloes.total.toLocaleString("pt-BR")}</p>
+                  <p>total extraídos</p>
+                </div>
+                <div className="h-10 w-px bg-border" />
+                <div className="text-center">
+                  <p className="text-lg font-semibold text-foreground">{data.leiloes.total > 0 ? Math.round((data.leiloes.ativos / data.leiloes.total) * 100) : 0}%</p>
+                  <p>taxa de ativos</p>
+                </div>
+                <div className="h-10 w-px bg-border" />
+                <div className="text-center">
+                  <p className="text-lg font-semibold text-foreground">{(data.leiloes.total - data.leiloes.ativos).toLocaleString("pt-BR")}</p>
+                  <p>inativos</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
@@ -207,7 +243,7 @@ export default function Dashboard() {
           <StatCard
             title="Leilões Extraídos"
             value={data.leiloes.total.toLocaleString("pt-BR")}
-            description={`${data.leiloes.ativos.toLocaleString("pt-BR")} ativos • ${data.leiloes.comImagem.toLocaleString("pt-BR")} com imagem`}
+            description={`${data.leiloes.comImagem.toLocaleString("pt-BR")} com imagem`}
             icon={Building2}
             variant="success"
           />
