@@ -255,7 +255,7 @@ export default function ClassificadorPage() {
               <div className="text-3xl font-bold mt-1" data-testid="text-total-records">
                 {estimateQuery.data?.totalRecords?.toLocaleString("pt-BR") || "—"}
               </div>
-              <div className="text-xs text-muted-foreground mt-1">na base leiloes_imovel</div>
+              <div className="text-xs text-muted-foreground mt-1">registros ativos (published)</div>
             </CardContent>
           </Card>
           <Card>

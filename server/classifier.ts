@@ -62,6 +62,7 @@ export async function getEstimate(): Promise<{
 
   const url = new URL(`${DIRECTUS_URL}/items/leiloes_imovel`);
   url.searchParams.set("aggregate[count]", "id");
+  url.searchParams.set("filter[status][_eq]", "published");
   url.searchParams.set("filter[nome_do_anuncio][_nnull]", "true");
   url.searchParams.set("filter[nome_do_anuncio][_nempty]", "true");
 
@@ -96,6 +97,7 @@ async function fetchAllRecords(): Promise<ClassifierItem[]> {
   while (true) {
     const url = new URL(`${DIRECTUS_URL}/items/leiloes_imovel`);
     url.searchParams.set("fields", "id,nome_do_anuncio,tipo_do_imovel,site");
+    url.searchParams.set("filter[status][_eq]", "published");
     url.searchParams.set("filter[nome_do_anuncio][_nnull]", "true");
     url.searchParams.set("filter[nome_do_anuncio][_nempty]", "true");
     url.searchParams.set("sort", "id");
