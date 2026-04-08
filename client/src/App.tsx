@@ -10,6 +10,7 @@ import CadastroPage from "@/pages/cadastro";
 import ScrapingPage from "@/pages/scraping";
 import WhatsAppPage from "@/pages/whatsapp";
 import SettingsPage from "@/pages/settings";
+import DuplicatasPage from "@/pages/duplicatas";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -21,6 +22,7 @@ function Router() {
       <Route path="/scraping" component={ScrapingPage} />
       <Route path="/whatsapp" component={WhatsAppPage} />
       <Route path="/settings" component={SettingsPage} />
+      <Route path="/duplicatas" component={DuplicatasPage} />
       <Route component={NotFound} />
     </Switch>
   );

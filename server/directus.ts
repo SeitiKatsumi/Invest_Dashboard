@@ -334,6 +334,50 @@ export async function findSiteByUrl(url: string): Promise<Site | null> {
   }
 }
 
+export function normalizeUrl(url: string): string {
+  if (!url) return '';
+  let normalized = url.trim().toLowerCase();
+  normalized = normalized.replace(/#.*$/, '');
+  normalized = normalized.replace(/^https?:\/\//, '');
+  normalized = normalized.replace(/^www\./, '');
+  normalized = normalized.replace(/[?&](?:utm_\w+|fbclid|gclid|ref)=[^&]*/g, '');
+  normalized = normalized.replace(/\?$/, '');
+  normalized = normalized.replace(/\/+$/, '');
+  return normalized;
+}
+
+export async function checkDuplicateLeilao(linkAnuncio: string): Promise<Leilao | null> {
+  if (!linkAnuncio || !DIRECTUS_URL || !DIRECTUS_TOKEN) return null;
+
+  const normalized = normalizeUrl(linkAnuncio);
+  if (!normalized) return null;
+
+  const url = new URL(`${DIRECTUS_URL}/items/leiloes_imovel`);
+  url.searchParams.set('filter[link_anuncio][_contains]', normalized.replace(/^(www\.)?/, '').split('/').slice(0, 1).join('/'));
+  url.searchParams.set('fields', 'id,link_anuncio,nome_do_anuncio,site,date_created');
+  url.searchParams.set('limit', '50');
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) return null;
+
+  const result = await response.json();
+  const items = result.data || [];
+
+  for (const item of items) {
+    if (item.link_anuncio && normalizeUrl(item.link_anuncio) === normalized) {
+      return item;
+    }
+  }
+
+  return null;
+}
+
 export async function createLeilao(data: LeilaoInsert): Promise<Leilao> {
   if (!DIRECTUS_URL || !DIRECTUS_TOKEN) {
     throw new Error("DIRECTUS_URL and DIRECTUS_TOKEN must be set");
@@ -346,6 +390,13 @@ export async function createLeilao(data: LeilaoInsert): Promise<Leilao> {
     praca_2: data.praca_2 && data.praca_2.trim() !== "" ? data.praca_2 : null,
     praca_3: data.praca_3 && data.praca_3.trim() !== "" ? data.praca_3 : null,
   };
+
+  if (cleanData.link_anuncio) {
+    const existing = await checkDuplicateLeilao(cleanData.link_anuncio);
+    if (existing) {
+      throw new Error(`DUPLICATA: Já existe um leilão com este link (ID #${existing.id} - "${existing.nome_do_anuncio || 'Sem nome'}"). O registro não foi criado.`);
+    }
+  }
 
   const response = await fetch(`${DIRECTUS_URL}/items/leiloes_imovel`, {
     method: "POST",
@@ -363,6 +414,124 @@ export async function createLeilao(data: LeilaoInsert): Promise<Leilao> {
 
   const result = await response.json();
   return result.data;
+}
+
+export interface DuplicateGroup {
+  normalizedUrl: string;
+  items: { id: number; link_anuncio: string; nome_do_anuncio: string | null; site: number | null; date_created: string | null }[];
+  count: number;
+  excessCount: number;
+}
+
+export async function findDuplicates(): Promise<{ groups: DuplicateGroup[]; totalDuplicates: number; totalExcess: number }> {
+  if (!DIRECTUS_URL || !DIRECTUS_TOKEN) {
+    throw new Error("DIRECTUS_URL and DIRECTUS_TOKEN must be set");
+  }
+
+  const allItems: { id: number; link_anuncio: string; nome_do_anuncio: string | null; site: number | null; date_created: string | null }[] = [];
+  let page = 1;
+  const pageSize = 10000;
+
+  while (true) {
+    const url = new URL(`${DIRECTUS_URL}/items/leiloes_imovel`);
+    url.searchParams.set('fields', 'id,link_anuncio,nome_do_anuncio,site,date_created');
+    url.searchParams.set('filter[link_anuncio][_nnull]', 'true');
+    url.searchParams.set('filter[link_anuncio][_nempty]', 'true');
+    url.searchParams.set('sort', 'date_created');
+    url.searchParams.set('limit', String(pageSize));
+    url.searchParams.set('page', String(page));
+
+    const response = await fetch(url.toString(), {
+      headers: {
+        Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) break;
+
+    const result = await response.json();
+    const items = result.data || [];
+    if (items.length === 0) break;
+
+    allItems.push(...items);
+    if (items.length < pageSize) break;
+    page++;
+  }
+
+  const urlMap = new Map<string, typeof allItems>();
+
+  for (const item of allItems) {
+    if (!item.link_anuncio) continue;
+    const normalized = normalizeUrl(item.link_anuncio);
+    if (!normalized) continue;
+
+    if (!urlMap.has(normalized)) {
+      urlMap.set(normalized, []);
+    }
+    urlMap.get(normalized)!.push(item);
+  }
+
+  const groups: DuplicateGroup[] = [];
+  let totalExcess = 0;
+
+  for (const [normalizedUrl, items] of urlMap) {
+    if (items.length > 1) {
+      items.sort((a, b) => new Date(a.date_created || 0).getTime() - new Date(b.date_created || 0).getTime());
+      const excess = items.length - 1;
+      totalExcess += excess;
+      groups.push({
+        normalizedUrl,
+        items,
+        count: items.length,
+        excessCount: excess,
+      });
+    }
+  }
+
+  groups.sort((a, b) => b.count - a.count);
+
+  return {
+    groups,
+    totalDuplicates: groups.length,
+    totalExcess,
+  };
+}
+
+export async function deleteLeilaoItems(ids: number[]): Promise<{ deleted: number; errors: string[] }> {
+  if (!DIRECTUS_URL || !DIRECTUS_TOKEN) {
+    throw new Error("DIRECTUS_URL and DIRECTUS_TOKEN must be set");
+  }
+
+  let deleted = 0;
+  const errors: string[] = [];
+  const batchSize = 50;
+
+  for (let i = 0; i < ids.length; i += batchSize) {
+    const batch = ids.slice(i, i + batchSize);
+    const promises = batch.map(async (id) => {
+      try {
+        const response = await fetch(`${DIRECTUS_URL}/items/leiloes_imovel/${id}`, {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        if (!response.ok) {
+          errors.push(`ID ${id}: ${response.status}`);
+        } else {
+          deleted++;
+        }
+      } catch (err) {
+        errors.push(`ID ${id}: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      }
+    });
+
+    await Promise.all(promises);
+  }
+
+  return { deleted, errors };
 }
 
 export async function getDetailedLogs(): Promise<{ logs: LogScraping[]; total: number }> {

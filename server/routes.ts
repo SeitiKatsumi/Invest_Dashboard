@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { getDashboardStats, getDetailedLogs, getSites, createLeilao, findSiteByUrl } from "./directus";
+import { getDashboardStats, getDetailedLogs, getSites, createLeilao, findSiteByUrl, findDuplicates, deleteLeilaoItems } from "./directus";
 import { leilaoInsertSchema } from "@shared/schema";
 import { extractAuctionDataFromImage } from "./openai";
 import { getOpenAIApiKey, setOpenAIApiKey, isOpenAIKeyConfigured, getMaskedKey, getUsageSummary } from "./openai-usage";
@@ -195,9 +195,80 @@ export async function registerRoutes(
       res.status(201).json(leilao);
     } catch (error) {
       console.error("Error creating leilao:", error);
+      const message = error instanceof Error ? error.message : "Unknown error";
+      if (message.startsWith("DUPLICATA:")) {
+        return res.status(409).json({ error: message });
+      }
       res.status(500).json({
         error: "Failed to create leilao",
-        message: error instanceof Error ? error.message : "Unknown error",
+        message,
+      });
+    }
+  });
+
+  // ======= DUPLICATES API ROUTES =======
+
+  app.get("/api/leiloes/duplicates", async (_req, res) => {
+    try {
+      const result = await findDuplicates();
+      res.json(result);
+    } catch (error) {
+      console.error("Error finding duplicates:", error);
+      res.status(500).json({
+        error: "Falha ao buscar duplicatas",
+        message: error instanceof Error ? error.message : "Erro desconhecido",
+      });
+    }
+  });
+
+  app.delete("/api/leiloes/duplicates", async (req, res) => {
+    try {
+      const { ids } = req.body;
+      if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: "IDs são obrigatórios" });
+      }
+
+      const validIds = ids.filter((id: unknown) => typeof id === "number" && Number.isInteger(id) && id > 0);
+      if (validIds.length === 0) {
+        return res.status(400).json({ error: "Nenhum ID válido fornecido" });
+      }
+
+      const result = await deleteLeilaoItems(validIds);
+      res.json(result);
+    } catch (error) {
+      console.error("Error deleting duplicates:", error);
+      res.status(500).json({
+        error: "Falha ao excluir duplicatas",
+        message: error instanceof Error ? error.message : "Erro desconhecido",
+      });
+    }
+  });
+
+  app.delete("/api/leiloes/duplicates/auto", async (_req, res) => {
+    try {
+      const duplicates = await findDuplicates();
+      const idsToDelete: number[] = [];
+
+      for (const group of duplicates.groups) {
+        const sorted = [...group.items].sort(
+          (a, b) => new Date(a.date_created || 0).getTime() - new Date(b.date_created || 0).getTime()
+        );
+        for (let i = 1; i < sorted.length; i++) {
+          idsToDelete.push(sorted[i].id);
+        }
+      }
+
+      if (idsToDelete.length === 0) {
+        return res.json({ deleted: 0, errors: [], message: "Nenhuma duplicata encontrada" });
+      }
+
+      const result = await deleteLeilaoItems(idsToDelete);
+      res.json({ ...result, totalGroups: duplicates.totalDuplicates });
+    } catch (error) {
+      console.error("Error auto-deleting duplicates:", error);
+      res.status(500).json({
+        error: "Falha ao excluir duplicatas automaticamente",
+        message: error instanceof Error ? error.message : "Erro desconhecido",
       });
     }
   });

@@ -24,7 +24,8 @@ import {
   Plus,
   Bot,
   MessageSquare,
-  Settings
+  Settings,
+  Copy
 } from "lucide-react";
 
 function LoadingSkeleton() {
@@ -155,6 +156,12 @@ export default function Dashboard() {
               <Button variant="outline" className="gap-2" data-testid="button-cadastro-page">
                 <Plus className="h-4 w-4" />
                 <span className="hidden sm:inline">Cadastrar Leilão</span>
+              </Button>
+            </Link>
+            <Link href="/duplicatas">
+              <Button variant="outline" className="gap-2" data-testid="button-duplicatas-page">
+                <Copy className="h-4 w-4" />
+                <span className="hidden sm:inline">Duplicatas</span>
               </Button>
             </Link>
             <Link href="/logs">

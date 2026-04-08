@@ -69,6 +69,7 @@ export interface Leilao {
   estado_uf: string | null;
   cidade: string | null;
   endereco: string | null;
+  link_anuncio: string | null;
   arquivo_imagem: string | null;
   status_publicacao_wp: string | null;
   site: number | null;
