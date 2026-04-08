@@ -99,7 +99,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     directusFetch<Site[]>("input_library_url", { limit: -1 }),
     directusFetch<Leilao[]>("leiloes_imovel", { 
       limit: -1,
-      fields: "id,tipo_do_imovel,estado_uf,arquivo_imagem,status_publicacao_wp,site,date_created"
+      fields: "id,status,tipo_do_imovel,estado_uf,arquivo_imagem,status_publicacao_wp,site,date_created"
     }),
     directusFetch<LogScraping[]>("logs_scraping", { 
       limit: -1,
@@ -139,6 +139,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   let semImagem = 0;
   let publicados = 0;
   let naoPublicados = 0;
+  let ativos = 0;
 
   leiloes.forEach((leilao) => {
     // Por tipo
@@ -168,10 +169,16 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     } else {
       naoPublicados++;
     }
+
+    // Ativos (published no Directus)
+    if (leilao.status === "published") {
+      ativos++;
+    }
   });
 
   const leiloesStats = {
     total: leiloes.length,
+    ativos,
     comImagem,
     semImagem,
     porTipo,

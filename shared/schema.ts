@@ -107,6 +107,7 @@ export interface DashboardStats {
   };
   leiloes: {
     total: number;
+    ativos: number;
     comImagem: number;
     semImagem: number;
     porTipo: Record<string, number>;
@@ -197,6 +198,7 @@ export const dashboardStatsSchema = z.object({
   }),
   leiloes: z.object({
     total: z.number(),
+    ativos: z.number(),
     comImagem: z.number(),
     semImagem: z.number(),
     porTipo: z.record(z.string(), z.number()),

@@ -207,7 +207,7 @@ export default function Dashboard() {
           <StatCard
             title="Leilões Extraídos"
             value={data.leiloes.total.toLocaleString("pt-BR")}
-            description={`${data.leiloes.comImagem.toLocaleString("pt-BR")} com imagem`}
+            description={`${data.leiloes.ativos.toLocaleString("pt-BR")} ativos • ${data.leiloes.comImagem.toLocaleString("pt-BR")} com imagem`}
             icon={Building2}
             variant="success"
           />
