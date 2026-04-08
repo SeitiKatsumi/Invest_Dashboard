@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { getDashboardStats, getDetailedLogs, getSites, createLeilao, findSiteByUrl, findDuplicates, deleteLeilaoItems } from "./directus";
+import { getEstimate, startScan, getScanStatus, abortScan, cleanupItems, resetScan } from "./classifier";
 import { leilaoInsertSchema } from "@shared/schema";
 import { extractAuctionDataFromImage } from "./openai";
 import { getOpenAIApiKey, setOpenAIApiKey, isOpenAIKeyConfigured, getMaskedKey, getUsageSummary } from "./openai-usage";
@@ -268,6 +269,72 @@ export async function registerRoutes(
       console.error("Error auto-deleting duplicates:", error);
       res.status(500).json({
         error: "Falha ao excluir duplicatas automaticamente",
+        message: error instanceof Error ? error.message : "Erro desconhecido",
+      });
+    }
+  });
+
+  // ======= CLASSIFIER API ROUTES =======
+
+  app.get("/api/classificador/estimate", async (_req, res) => {
+    try {
+      const estimate = await getEstimate();
+      res.json(estimate);
+    } catch (error) {
+      console.error("Error getting estimate:", error);
+      res.status(500).json({
+        error: "Falha ao calcular estimativa",
+        message: error instanceof Error ? error.message : "Erro desconhecido",
+      });
+    }
+  });
+
+  app.post("/api/classificador/scan", async (_req, res) => {
+    try {
+      await startScan();
+      res.json({ message: "Escaneamento iniciado" });
+    } catch (error) {
+      console.error("Error starting scan:", error);
+      res.status(500).json({
+        error: "Falha ao iniciar escaneamento",
+        message: error instanceof Error ? error.message : "Erro desconhecido",
+      });
+    }
+  });
+
+  app.get("/api/classificador/status", async (_req, res) => {
+    const status = getScanStatus();
+    if (!status) {
+      return res.json({ status: "idle" });
+    }
+    res.json(status);
+  });
+
+  app.post("/api/classificador/abort", async (_req, res) => {
+    const aborted = abortScan();
+    res.json({ aborted });
+  });
+
+  app.post("/api/classificador/reset", async (_req, res) => {
+    const success = resetScan();
+    if (!success) {
+      return res.status(409).json({ error: "Não é possível resetar durante escaneamento em andamento" });
+    }
+    res.json({ reset: true });
+  });
+
+  app.delete("/api/classificador/cleanup", async (req, res) => {
+    try {
+      const { ids } = req.body;
+      if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: "IDs são obrigatórios" });
+      }
+      const result = await cleanupItems(ids);
+      res.json(result);
+    } catch (error) {
+      console.error("Error cleaning up items:", error);
+      res.status(500).json({
+        error: "Falha ao excluir itens",
         message: error instanceof Error ? error.message : "Erro desconhecido",
       });
     }

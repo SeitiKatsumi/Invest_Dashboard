@@ -25,7 +25,8 @@ import {
   Bot,
   MessageSquare,
   Settings,
-  Copy
+  Copy,
+  Brain
 } from "lucide-react";
 
 function LoadingSkeleton() {
@@ -162,6 +163,12 @@ export default function Dashboard() {
               <Button variant="outline" className="gap-2" data-testid="button-duplicatas-page">
                 <Copy className="h-4 w-4" />
                 <span className="hidden sm:inline">Duplicatas</span>
+              </Button>
+            </Link>
+            <Link href="/classificador">
+              <Button variant="outline" className="gap-2" data-testid="button-classificador-page">
+                <Brain className="h-4 w-4" />
+                <span className="hidden sm:inline">Classificador IA</span>
               </Button>
             </Link>
             <Link href="/logs">
