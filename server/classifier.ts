@@ -10,13 +10,24 @@ const BATCH_SIZE = 100;
 
 export const scanEmitter = new EventEmitter();
 scanEmitter.setMaxListeners(50);
-const SYSTEM_PROMPT = `Você é um classificador de leilões. Sua tarefa é determinar se cada item é um IMÓVEL ou NÃO-IMÓVEL.
+const SYSTEM_PROMPT = `Você é um classificador RIGOROSO de leilões de imóveis. Analise o título de cada item e determine se é genuinamente um BEM IMÓVEL (propriedade/terreno) ou NÃO-IMÓVEL.
 
-IMÓVEL inclui: casa, apartamento, terreno, lote, sala comercial, galpão, fazenda, sítio, chácara, prédio, cobertura, flat, kitnet, sobrado, edícula, barracão, box de estacionamento, vaga de garagem, área rural, gleba, fração ideal, direitos sobre imóvel, edificação, loja, escritório, ponto comercial, hotel, pousada, resort.
+CLASSIFIQUE COMO 0 (IMÓVEL) SOMENTE se o título indicar CLARAMENTE um bem imóvel, como:
+- Tipos explícitos: casa, apartamento, apto, terreno, lote, sala comercial, galpão, fazenda, sítio, chácara, prédio, cobertura, flat, kitnet, sobrado, edícula, barracão, loja, escritório, ponto comercial, hotel, pousada, resort, box garagem, vaga garagem, área rural, gleba, fração ideal, unidade, andar, bloco
+- Menções de matrícula de imóvel, registro de imóvel, CRI, fração de campo
+- Títulos com endereço + tipo de imóvel
 
-NÃO-IMÓVEL inclui: veículo, carro, moto, caminhão, ônibus, embarcação, aeronave, máquina, equipamento, móvel, eletrodoméstico, eletrônico, animal, mercadoria, estoque, material, peça, ferramenta, sucata, crédito, direito creditório, título, cota, ação, joia, obra de arte, objeto, commodity, óleo, combustível, cadeira, mesa, alimento.
+CLASSIFIQUE COMO 1 (NÃO-IMÓVEL) em TODOS os outros casos, incluindo:
+- Veículos: carro, moto, caminhão, ônibus, van, utilitário, automóvel, embarcação, aeronave, trator, retroescavadeira, empilhadeira, reboque, semirreboque, carreta
+- Bens móveis: máquina, equipamento, móvel, eletrodoméstico, eletrônico, computador, celular, telefone, ar condicionado, geladeira, fogão, TV, impressora, nobreak
+- Outros: animal, mercadoria, estoque, material, peça, ferramenta, sucata, crédito, direito creditório, título, cota, ação, joia, obra de arte, commodity, combustível, alimento, roupa, calçado, bebida
+- Títulos vagos que apenas mencionam uma cidade/estado SEM indicar tipo de imóvel (ex: "Outros, RIO DE JANEIRO - RJ")
+- Títulos genéricos como "Outros", "Diversos", "Bens móveis", "Lote de bens"
+- Qualquer item onde NÃO FICA CLARO que é um imóvel
 
-Responda APENAS com um JSON array onde cada elemento é 0 (imóvel) ou 1 (não-imóvel), na mesma ordem dos itens recebidos. Sem explicação, sem texto extra. Exemplo: [0,0,1,0,1]`;
+REGRA IMPORTANTE: Na dúvida, classifique como 1 (NÃO-IMÓVEL). É melhor marcar um imóvel como não-imóvel do que deixar passar um não-imóvel.
+
+Responda APENAS com um JSON array de 0s e 1s, na mesma ordem. Sem texto extra. Exemplo: [0,0,1,0,1]`;
 
 interface ClassifierItem {
   id: number;
@@ -146,7 +157,7 @@ async function classifyBatchWithUsage(titles: string[]): Promise<{ classificatio
         { role: "user", content: userMessage },
       ],
       temperature: 0,
-      max_tokens: titles.length * 3 + 20,
+      max_tokens: titles.length * 4 + 50,
     }),
   });
 
