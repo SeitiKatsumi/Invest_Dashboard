@@ -1,5 +1,6 @@
 import type { InternalJob, JobStatus, CrawlResult, AnalysisResult, ResultClassification } from './types.js';
 import { generateId } from './utils.js';
+import { normalizeUrl } from '../directus.js';
 
 const MAX_JOBS = 200;
 const JOB_EXPIRY_MS = 24 * 60 * 60 * 1000;
@@ -92,6 +93,17 @@ class InternalJobManager {
     job.result = result;
 
     if ('urls_found' in result) {
+      const seen = new Set<string>();
+      const dedupedUrls: string[] = [];
+      for (const u of result.urls_found) {
+        const norm = normalizeUrl(u);
+        if (!seen.has(norm)) {
+          seen.add(norm);
+          dedupedUrls.push(u);
+        }
+      }
+      result.urls_found = dedupedUrls;
+      result.total_urls = dedupedUrls.length;
       job.urlsFound = result.urls_found;
       job.totalUrls = result.total_urls;
       job.pagesProcessed = result.pages_processed;

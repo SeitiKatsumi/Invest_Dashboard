@@ -372,6 +372,7 @@ export default function DuplicatasPage() {
                                 <TableRow>
                                   <TableHead className="w-16">ID</TableHead>
                                   <TableHead>URL Original</TableHead>
+                                  <TableHead className="w-20">Site ID</TableHead>
                                   <TableHead className="w-40">Criado em</TableHead>
                                   <TableHead className="w-24 text-center">Status</TableHead>
                                 </TableRow>
@@ -403,6 +404,9 @@ export default function DuplicatasPage() {
                                           </span>
                                           <ExternalLink className="h-3 w-3 shrink-0" />
                                         </a>
+                                      </TableCell>
+                                      <TableCell className="text-xs text-muted-foreground font-mono">
+                                        {item.site ?? "—"}
                                       </TableCell>
                                       <TableCell className="text-xs text-muted-foreground">
                                         {item.date_created

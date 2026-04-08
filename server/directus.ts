@@ -352,27 +352,37 @@ export async function checkDuplicateLeilao(linkAnuncio: string): Promise<Leilao 
   const normalized = normalizeUrl(linkAnuncio);
   if (!normalized) return null;
 
-  const url = new URL(`${DIRECTUS_URL}/items/leiloes_imovel`);
-  url.searchParams.set('filter[link_anuncio][_contains]', normalized.replace(/^(www\.)?/, '').split('/').slice(0, 1).join('/'));
-  url.searchParams.set('fields', 'id,link_anuncio,nome_do_anuncio,site,date_created');
-  url.searchParams.set('limit', '50');
+  const domainPath = normalized.split('/')[0];
+  let page = 1;
+  const pageSize = 500;
 
-  const response = await fetch(url.toString(), {
-    headers: {
-      Authorization: `Bearer ${DIRECTUS_TOKEN}`,
-      'Content-Type': 'application/json',
-    },
-  });
+  while (true) {
+    const url = new URL(`${DIRECTUS_URL}/items/leiloes_imovel`);
+    url.searchParams.set('filter[link_anuncio][_contains]', domainPath);
+    url.searchParams.set('fields', 'id,link_anuncio,nome_do_anuncio,site,date_created');
+    url.searchParams.set('limit', String(pageSize));
+    url.searchParams.set('page', String(page));
 
-  if (!response.ok) return null;
+    const response = await fetch(url.toString(), {
+      headers: {
+        Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+    });
 
-  const result = await response.json();
-  const items = result.data || [];
+    if (!response.ok) return null;
 
-  for (const item of items) {
-    if (item.link_anuncio && normalizeUrl(item.link_anuncio) === normalized) {
-      return item;
+    const result = await response.json();
+    const items = result.data || [];
+
+    for (const item of items) {
+      if (item.link_anuncio && normalizeUrl(item.link_anuncio) === normalized) {
+        return item;
+      }
     }
+
+    if (items.length < pageSize) break;
+    page++;
   }
 
   return null;
