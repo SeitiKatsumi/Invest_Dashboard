@@ -406,6 +406,11 @@ export async function createLeilao(data: LeilaoInsert): Promise<Leilao> {
     if (existing) {
       throw new Error(`DUPLICATA: Já existe um leilão com este link (ID #${existing.id} - "${existing.nome_do_anuncio || 'Sem nome'}"). O registro não foi criado.`);
     }
+    const normalized = normalizeUrl(cleanData.link_anuncio);
+    if (normalized) {
+      const protocol = cleanData.link_anuncio.match(/^https?:\/\//)?.[0] || 'https://';
+      cleanData.link_anuncio = protocol + normalized;
+    }
   }
 
   const response = await fetch(`${DIRECTUS_URL}/items/leiloes_imovel`, {
@@ -458,7 +463,9 @@ export async function findDuplicates(): Promise<{ groups: DuplicateGroup[]; tota
       },
     });
 
-    if (!response.ok) break;
+    if (!response.ok) {
+      throw new Error(`Directus retornou erro ${response.status} ao buscar leilões (página ${page})`);
+    }
 
     const result = await response.json();
     const items = result.data || [];

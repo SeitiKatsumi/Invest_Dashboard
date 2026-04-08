@@ -99,7 +99,8 @@ class InternalJobManager {
         const norm = normalizeUrl(u);
         if (!seen.has(norm)) {
           seen.add(norm);
-          dedupedUrls.push(u);
+          const protocol = u.match(/^https?:\/\//)?.[0] || 'https://';
+          dedupedUrls.push(protocol + norm);
         }
       }
       result.urls_found = dedupedUrls;
