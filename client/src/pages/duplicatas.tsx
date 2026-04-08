@@ -117,10 +117,14 @@ export default function DuplicatasPage() {
   const groups = data?.groups || [];
   const filtered = groups.filter((g) => {
     if (!search) return true;
-    const s = search.toLowerCase();
+    const s = search.toLowerCase().trim();
     return (
       g.normalizedUrl.toLowerCase().includes(s) ||
-      g.items.some((item) => item.nome_do_anuncio?.toLowerCase().includes(s))
+      g.items.some((item) =>
+        item.nome_do_anuncio?.toLowerCase().includes(s) ||
+        String(item.id) === s ||
+        String(item.site) === s
+      )
     );
   });
 
@@ -268,7 +272,7 @@ export default function DuplicatasPage() {
                     <div className="relative">
                       <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                       <Input
-                        placeholder="Buscar por URL ou nome..."
+                        placeholder="Buscar por ID, URL, nome ou site..."
                         className="pl-9 h-9 w-[250px]"
                         value={search}
                         onChange={(e) => {
@@ -316,9 +320,19 @@ export default function DuplicatasPage() {
               <CardContent>
                 {filtered.length === 0 ? (
                   <div className="text-center py-12 text-muted-foreground">
-                    <CheckCircle2 className="h-12 w-12 mx-auto mb-3 text-green-500" />
-                    <p className="text-lg font-medium">Nenhuma duplicata encontrada!</p>
-                    <p className="text-sm mt-1">Todos os leilões possuem URLs únicas.</p>
+                    {search ? (
+                      <>
+                        <Search className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
+                        <p className="text-lg font-medium">Nenhum resultado para "{search}"</p>
+                        <p className="text-sm mt-1">Tente buscar por ID do registro, URL ou nome do leilão.</p>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="h-12 w-12 mx-auto mb-3 text-green-500" />
+                        <p className="text-lg font-medium">Nenhuma duplicata encontrada!</p>
+                        <p className="text-sm mt-1">Todos os leilões possuem URLs únicas.</p>
+                      </>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-4">
