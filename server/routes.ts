@@ -371,9 +371,11 @@ export async function registerRoutes(
       res.json(result);
     } catch (error) {
       console.error("Error cleaning up items:", error);
-      res.status(500).json({
-        error: "Falha ao excluir itens",
-        message: error instanceof Error ? error.message : "Erro desconhecido",
+      const message = error instanceof Error ? error.message : "Erro desconhecido";
+      const isValidation = message.includes("Nenhum") || message.includes("escaneamento");
+      res.status(isValidation ? 400 : 500).json({
+        error: isValidation ? "Requisição inválida" : "Falha ao excluir itens",
+        message,
       });
     }
   });
