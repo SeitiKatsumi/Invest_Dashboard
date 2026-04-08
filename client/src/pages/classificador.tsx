@@ -91,20 +91,52 @@ export default function ClassificadorPage() {
   });
 
   const isRunning = statusQuery.data?.status === "running";
+  const [sseProgress, setSseProgress] = useState<{
+    processed?: number;
+    total?: number;
+    nonPropertyCount?: number;
+    tokensUsed?: number;
+    estimatedCost?: number;
+    event?: string;
+  } | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
-    if (isRunning) {
-      pollingRef.current = setInterval(() => {
+    if (isRunning && !eventSourceRef.current) {
+      const es = new EventSource("/api/classificador/stream");
+      eventSourceRef.current = es;
+
+      es.onmessage = (evt) => {
+        try {
+          const data = JSON.parse(evt.data);
+          setSseProgress(data);
+
+          if (data.event === "completed" || data.event === "error" || data.event === "aborted") {
+            es.close();
+            eventSourceRef.current = null;
+            queryClient.invalidateQueries({ queryKey: ["/api/classificador/status"] });
+          }
+        } catch {}
+      };
+
+      es.onerror = () => {
+        es.close();
+        eventSourceRef.current = null;
         queryClient.invalidateQueries({ queryKey: ["/api/classificador/status"] });
-      }, 2000);
-    } else {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-        pollingRef.current = null;
-      }
+      };
     }
+
+    if (!isRunning && eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+      setSseProgress(null);
+    }
+
     return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
     };
   }, [isRunning]);
 
@@ -313,23 +345,31 @@ export default function ClassificadorPage() {
             </div>
           </CardHeader>
           <CardContent>
-            {isRunning && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    Processando... {(status?.processed || 0).toLocaleString("pt-BR")} de {(status?.total || 0).toLocaleString("pt-BR")}
-                  </span>
-                  <span className="font-medium">{progressPercent}%</span>
+            {isRunning && (() => {
+              const liveProcessed = sseProgress?.processed ?? status?.processed ?? 0;
+              const liveTotal = sseProgress?.total ?? status?.total ?? 0;
+              const liveNonPropCount = sseProgress?.nonPropertyCount ?? nonPropertyItems.length;
+              const liveTokens = sseProgress?.tokensUsed ?? status?.tokensUsed ?? 0;
+              const liveCost = sseProgress?.estimatedCost ?? status?.estimatedCost ?? 0;
+              const livePct = liveTotal ? Math.round((liveProcessed / liveTotal) * 100) : 0;
+              return (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      Processando... {liveProcessed.toLocaleString("pt-BR")} de {liveTotal.toLocaleString("pt-BR")}
+                    </span>
+                    <span className="font-medium">{livePct}%</span>
+                  </div>
+                  <Progress value={livePct} className="h-3" />
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>{liveNonPropCount} não-imóveis encontrados até agora</span>
+                    <span>
+                      {liveTokens.toLocaleString("pt-BR")} tokens • US$ {liveCost.toFixed(4)}
+                    </span>
+                  </div>
                 </div>
-                <Progress value={progressPercent} className="h-3" />
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{nonPropertyItems.length} não-imóveis encontrados até agora</span>
-                  <span>
-                    {(status?.tokensUsed || 0).toLocaleString("pt-BR")} tokens • US$ {(status?.estimatedCost || 0).toFixed(4)}
-                  </span>
-                </div>
-              </div>
-            )}
+              );
+            })()}
 
             {status?.status === "completed" && (
               <div className="space-y-2">

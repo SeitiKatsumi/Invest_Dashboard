@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { getDashboardStats, getDetailedLogs, getSites, createLeilao, findSiteByUrl, findDuplicates, deleteLeilaoItems } from "./directus";
-import { getEstimate, startScan, getScanStatus, abortScan, cleanupItems, resetScan } from "./classifier";
+import { getEstimate, startScan, getScanStatus, abortScan, cleanupItems, resetScan, scanEmitter } from "./classifier";
 import { leilaoInsertSchema } from "@shared/schema";
 import { extractAuctionDataFromImage } from "./openai";
 import { getOpenAIApiKey, setOpenAIApiKey, isOpenAIKeyConfigured, getMaskedKey, getUsageSummary } from "./openai-usage";
@@ -308,6 +308,44 @@ export async function registerRoutes(
       return res.json({ status: "idle" });
     }
     res.json(status);
+  });
+
+  app.get("/api/classificador/stream", (req, res) => {
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    });
+
+    const currentStatus = getScanStatus();
+    if (currentStatus) {
+      res.write(`data: ${JSON.stringify(currentStatus)}\n\n`);
+    } else {
+      res.write(`data: ${JSON.stringify({ status: "idle" })}\n\n`);
+    }
+
+    const onScan = (data: any) => {
+      try {
+        const payload = { ...data };
+        if (payload.nonPropertyIds) {
+          payload.nonPropertyCount = payload.nonPropertyIds.length;
+          delete payload.nonPropertyIds;
+        }
+        res.write(`data: ${JSON.stringify(payload)}\n\n`);
+      } catch {}
+    };
+
+    scanEmitter.on("scan", onScan);
+
+    const heartbeat = setInterval(() => {
+      try { res.write(": heartbeat\n\n"); } catch {}
+    }, 15000);
+
+    req.on("close", () => {
+      scanEmitter.off("scan", onScan);
+      clearInterval(heartbeat);
+    });
   });
 
   app.post("/api/classificador/abort", async (_req, res) => {

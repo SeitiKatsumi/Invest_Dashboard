@@ -1,3 +1,4 @@
+import { EventEmitter } from "events";
 import { getOpenAIApiKey, isOpenAIKeyConfigured } from "./openai-usage.js";
 import { trackUsage } from "./openai-usage.js";
 import { deleteLeilaoItems } from "./directus.js";
@@ -6,6 +7,9 @@ const DIRECTUS_URL = process.env.DIRECTUS_URL?.trim();
 const DIRECTUS_TOKEN = process.env.DIRECTUS_TOKEN?.trim();
 
 const BATCH_SIZE = 100;
+
+export const scanEmitter = new EventEmitter();
+scanEmitter.setMaxListeners(50);
 const SYSTEM_PROMPT = `Você é um classificador de leilões. Sua tarefa é determinar se cada item é um IMÓVEL ou NÃO-IMÓVEL.
 
 IMÓVEL inclui: casa, apartamento, terreno, lote, sala comercial, galpão, fazenda, sítio, chácara, prédio, cobertura, flat, kitnet, sobrado, edícula, barracão, box de estacionamento, vaga de garagem, área rural, gleba, fração ideal, direitos sobre imóvel, edificação, loja, escritório, ponto comercial, hotel, pousada, resort.
@@ -191,18 +195,24 @@ export async function startScan(): Promise<void> {
     estimatedCost: 0,
   };
 
+  function emitEvent(event: string, data?: Record<string, unknown>) {
+    scanEmitter.emit("scan", { event, ...currentScan, ...data });
+  }
+
   (async () => {
     try {
       console.log("[Classifier] Fetching all records...");
       const allRecords = await fetchAllRecords();
       currentScan!.total = allRecords.length;
       console.log(`[Classifier] ${allRecords.length} records to classify`);
+      emitEvent("started", { total: allRecords.length });
 
       for (let i = 0; i < allRecords.length; i += BATCH_SIZE) {
         if (scanAborted) {
           currentScan!.status = "completed";
           currentScan!.error = "Escaneamento cancelado pelo usuário";
           console.log("[Classifier] Scan aborted by user");
+          emitEvent("aborted");
           return;
         }
 
@@ -221,18 +231,22 @@ export async function startScan(): Promise<void> {
           }
         } catch (err) {
           console.error(`[Classifier] Batch error at offset ${i}:`, err);
+          emitEvent("error", { batchError: (err as Error).message });
         }
 
         currentScan!.processed = Math.min(i + BATCH_SIZE, allRecords.length);
+        emitEvent("progress");
       }
 
       currentScan!.status = "completed";
       console.log(`[Classifier] Scan complete: ${currentScan!.nonPropertyIds.length} non-property items found`);
+      emitEvent("completed");
     } catch (err) {
       console.error("[Classifier] Scan error:", err);
       if (currentScan) {
         currentScan.status = "error";
         currentScan.error = err instanceof Error ? err.message : "Erro desconhecido";
+        emitEvent("error");
       }
     }
   })();
