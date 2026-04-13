@@ -15,6 +15,7 @@ import {
   Settings,
   PanelLeftClose,
   PanelLeft,
+  Archive,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -24,6 +25,7 @@ const NAV_ITEMS = [
   { href: "/cadastro", label: "Cadastrar Leilão", icon: Plus },
   { href: "/duplicatas", label: "Duplicatas", icon: Copy },
   { href: "/classificador", label: "Classificador IA", icon: Brain },
+  { href: "/arquivamento", label: "Arquivamento", icon: Archive },
   { href: "/logs", label: "Logs Detalhados", icon: FileText },
   { href: "/settings", label: "Configurações", icon: Settings },
 ];

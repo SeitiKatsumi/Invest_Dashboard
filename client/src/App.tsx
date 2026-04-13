@@ -13,6 +13,7 @@ import WhatsAppPage from "@/pages/whatsapp";
 import SettingsPage from "@/pages/settings";
 import DuplicatasPage from "@/pages/duplicatas";
 import ClassificadorPage from "@/pages/classificador";
+import ArquivamentoPage from "@/pages/arquivamento";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -27,6 +28,7 @@ function Router() {
         <Route path="/settings" component={SettingsPage} />
         <Route path="/duplicatas" component={DuplicatasPage} />
         <Route path="/classificador" component={ClassificadorPage} />
+        <Route path="/arquivamento" component={ArquivamentoPage} />
         <Route component={NotFound} />
       </Switch>
     </Sidebar>

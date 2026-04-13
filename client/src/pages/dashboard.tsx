@@ -6,7 +6,6 @@ import { LeiloesPanel } from "@/components/dashboard/leiloes-panel";
 import { LogsPanel } from "@/components/dashboard/logs-panel";
 import { UrlConsultaPanel } from "@/components/dashboard/url-consulta-panel";
 import { LeiloesTemporalChart } from "@/components/dashboard/leiloes-temporal-chart";
-import { ArchiverPanel } from "@/components/dashboard/archiver-panel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -234,8 +233,6 @@ export default function Dashboard() {
             />
           </div>
         </div>
-
-        <ArchiverPanel />
 
         <footer className="text-center py-4 text-sm text-muted-foreground border-t">
           <p>Dashboard de Monitoramento de Leilões • Dados atualizados a cada 60 segundos</p>
