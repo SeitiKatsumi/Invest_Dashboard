@@ -16,6 +16,12 @@ import {
   getDayNames,
 } from "./scraper-scheduler";
 import {
+  initArchiver,
+  getArchiverStatus,
+  runArchiver,
+  getLastArchiverRun,
+} from "./auction-archiver";
+import {
   getScrapingApiStatus,
   startOnboarding,
   startScraping,
@@ -1342,7 +1348,35 @@ export async function registerRoutes(
     res.json(getDayNames());
   });
 
+  app.get("/api/archiver/status", (_req, res) => {
+    try {
+      const status = getArchiverStatus();
+      res.json(status);
+    } catch (error) {
+      res.status(500).json({ error: "Falha ao obter status do arquivamento" });
+    }
+  });
+
+  app.post("/api/archiver/run", async (_req, res) => {
+    try {
+      const result = await runArchiver();
+      res.json(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Falha ao executar arquivamento";
+      if (message.includes("already running")) {
+        res.status(409).json({ error: message });
+      } else {
+        res.status(500).json({ error: message });
+      }
+    }
+  });
+
+  app.get("/api/archiver/last-run", (_req, res) => {
+    res.json(getLastArchiverRun());
+  });
+
   await initScheduler();
+  initArchiver();
 
   return httpServer;
 }
