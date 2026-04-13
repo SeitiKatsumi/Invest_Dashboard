@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "wouter";
-import { ArrowLeft, Save, Loader2, Search, Building2, MapPin, FileText, DollarSign, Calendar, Link2, CheckCircle2, ExternalLink, ImageIcon, Upload, Sparkles, X } from "lucide-react";
+import { Save, Loader2, Search, Building2, MapPin, FileText, DollarSign, Calendar, Link2, CheckCircle2, ExternalLink, ImageIcon, Upload, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -13,7 +13,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Site, leilaoInsertSchema, LeilaoInsert } from "@shared/schema";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 
 interface ViaCepResponse {
@@ -357,17 +356,8 @@ export default function CadastroPage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto flex h-14 items-center justify-between px-4">
-          <div className="flex items-center gap-4">
-            <Link href="/">
-              <Button variant="ghost" size="sm" className="gap-2" data-testid="button-back-dashboard">
-                <ArrowLeft className="h-4 w-4" />
-                Voltar ao Dashboard
-              </Button>
-            </Link>
-            <h1 className="text-xl font-semibold">Cadastro Manual de Leilão</h1>
-          </div>
-          <ThemeToggle />
+        <div className="container mx-auto flex h-14 items-center px-4">
+          <h1 className="text-xl font-semibold">Cadastro Manual de Leilão</h1>
         </div>
       </header>
 

@@ -1,7 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { LogScraping, Site } from "@shared/schema";
-import investLogo from "@assets/Icon_Invest_1769010072868.jpg";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { StatusBadge } from "@/components/dashboard/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Link } from "wouter";
 import {
   Table,
   TableBody,
@@ -26,7 +23,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { 
-  ArrowLeft,
   RefreshCw, 
   AlertCircle,
   Search,
@@ -164,36 +160,21 @@ export default function LogsPage() {
       <div className="max-w-[1600px] mx-auto p-4 md:p-6 space-y-6">
         {/* Header */}
         <header className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-4">
-            <Link href="/">
-              <Button variant="outline" size="icon" data-testid="button-back">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            </Link>
-            <img 
-              src={investLogo} 
-              alt="Invest Leilões" 
-              className="h-10 w-10 rounded-lg object-contain"
-            />
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Logs de Scraping</h1>
-              <p className="text-sm text-muted-foreground">
-                {data.total.toLocaleString("pt-BR")} registros no total
-              </p>
-            </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Logs de Scraping</h1>
+            <p className="text-sm text-muted-foreground">
+              {data.total.toLocaleString("pt-BR")} registros no total
+            </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => refetch()}
-              disabled={isFetching}
-              data-testid="button-refresh"
-            >
-              <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-            </Button>
-            <ThemeToggle />
-          </div>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            data-testid="button-refresh"
+          >
+            <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+          </Button>
         </header>
 
         {/* Status Summary */}

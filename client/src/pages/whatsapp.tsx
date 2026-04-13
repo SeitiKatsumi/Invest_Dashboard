@@ -2,9 +2,6 @@ import { useState, useEffect, useRef, useCallback, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { WhatsAppGrupo, WhatsAppDisparo, Leilao } from "@shared/schema";
-import { Link } from "wouter";
-import { ThemeToggle } from "@/components/theme-toggle";
-import investLogo from "@assets/Icon_Invest_1769010072868.jpg";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -39,7 +36,6 @@ import {
   Send,
   Search,
   RefreshCw,
-  LayoutDashboard,
   CheckCircle2,
   XCircle,
   Clock,
@@ -48,7 +44,6 @@ import {
   MapPin,
   Users,
   History,
-  ArrowLeft,
   Download,
   Link as LinkIcon,
   ChevronDown,
@@ -1417,31 +1412,15 @@ export default function WhatsAppPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 space-y-6">
-        <header className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-4">
-            <img
-              src={investLogo}
-              alt="Invest Leilões"
-              className="h-12 w-12 rounded-xl object-contain"
-            />
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2">
-                <MessageSquare className="h-7 w-7 text-green-600" />
-                Disparo WhatsApp
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Envie leilões para os grupos da comunidade Invest
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link href="/">
-              <Button variant="outline" className="gap-2" data-testid="button-back-dashboard">
-                <ArrowLeft className="h-4 w-4" />
-                <span className="hidden sm:inline">Dashboard</span>
-              </Button>
-            </Link>
-            <ThemeToggle />
+        <header className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2">
+              <MessageSquare className="h-7 w-7 text-green-600" />
+              Disparo WhatsApp
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Envie leilões para os grupos da comunidade Invest
+            </p>
           </div>
         </header>
 

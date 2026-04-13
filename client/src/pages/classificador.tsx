@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import investLogo from "@assets/Icon_Invest_1769010072868.jpg";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { Link } from "wouter";
 import {
   Dialog,
   DialogContent,
@@ -28,7 +25,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  ArrowLeft,
   RefreshCw,
   Trash2,
   Search,
@@ -225,23 +221,12 @@ export default function ClassificadorPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto p-4 md:p-6 max-w-7xl space-y-6">
-        <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Link href="/">
-              <Button variant="ghost" size="icon" data-testid="button-back-dashboard">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-            </Link>
-            <img src={investLogo} alt="Invest Leilões" className="h-10 w-10 rounded-xl object-contain" />
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Classificador IA</h1>
-              <p className="text-sm text-muted-foreground">
-                Identifique e remova leilões que não são imóveis usando IA
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
+        <header className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Classificador IA</h1>
+            <p className="text-sm text-muted-foreground">
+              Identifique e remova leilões que não são imóveis usando IA
+            </p>
           </div>
         </header>
 

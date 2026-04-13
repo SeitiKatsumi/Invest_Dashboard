@@ -1,17 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { DashboardStats } from "@shared/schema";
-import investLogo from "@assets/Icon_Invest_1769010072868.jpg";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { SitesPanel } from "@/components/dashboard/sites-panel";
 import { LeiloesPanel } from "@/components/dashboard/leiloes-panel";
 import { LogsPanel } from "@/components/dashboard/logs-panel";
 import { UrlConsultaPanel } from "@/components/dashboard/url-consulta-panel";
 import { LeiloesTemporalChart } from "@/components/dashboard/leiloes-temporal-chart";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Link } from "wouter";
 import { 
   Globe, 
   Building2, 
@@ -19,21 +16,12 @@ import {
   Image, 
   RefreshCw, 
   AlertCircle,
-  LayoutDashboard,
-  FileText,
-  Plus,
-  Bot,
-  MessageSquare,
-  Settings,
-  Copy,
-  Brain,
   CheckCircle2
 } from "lucide-react";
 
 function LoadingSkeleton() {
   return (
-    <div className="space-y-6 p-6">
-      {/* Header Skeleton */}
+    <div className="space-y-6 p-4 md:p-6">
       <div className="flex items-center justify-between">
         <div className="space-y-2">
           <Skeleton className="h-8 w-64" />
@@ -41,8 +29,6 @@ function LoadingSkeleton() {
         </div>
         <Skeleton className="h-10 w-10 rounded-lg" />
       </div>
-      
-      {/* Stats Skeleton */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[...Array(4)].map((_, i) => (
           <Card key={i}>
@@ -59,8 +45,6 @@ function LoadingSkeleton() {
           </Card>
         ))}
       </div>
-
-      {/* Panels Skeleton */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card>
           <CardContent className="p-6 space-y-4">
@@ -126,77 +110,24 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-[1600px] mx-auto p-4 md:p-6 space-y-6">
-        {/* Header */}
-        <header className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-4">
-            <img 
-              src={investLogo} 
-              alt="Invest Leilões" 
-              className="h-12 w-12 rounded-xl object-contain"
-            />
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Painel de Monitoramento Invest Leilões</h1>
-              <p className="text-sm text-muted-foreground">
-                Acompanhe o processamento de leilões em tempo real
-              </p>
-            </div>
+        <header className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Painel de Monitoramento</h1>
+            <p className="text-sm text-muted-foreground">
+              Acompanhe o processamento de leilões em tempo real
+            </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Link href="/whatsapp">
-              <Button className="gap-2 bg-green-600 hover:bg-green-700" data-testid="button-whatsapp-page">
-                <MessageSquare className="h-4 w-4" />
-                <span className="hidden sm:inline">WhatsApp</span>
-              </Button>
-            </Link>
-            <Link href="/scraping">
-              <Button className="gap-2" data-testid="button-scraping-page">
-                <Bot className="h-4 w-4" />
-                <span className="hidden sm:inline">AI Scraping</span>
-              </Button>
-            </Link>
-            <Link href="/cadastro">
-              <Button variant="outline" className="gap-2" data-testid="button-cadastro-page">
-                <Plus className="h-4 w-4" />
-                <span className="hidden sm:inline">Cadastrar Leilão</span>
-              </Button>
-            </Link>
-            <Link href="/duplicatas">
-              <Button variant="outline" className="gap-2" data-testid="button-duplicatas-page">
-                <Copy className="h-4 w-4" />
-                <span className="hidden sm:inline">Duplicatas</span>
-              </Button>
-            </Link>
-            <Link href="/classificador">
-              <Button variant="outline" className="gap-2" data-testid="button-classificador-page">
-                <Brain className="h-4 w-4" />
-                <span className="hidden sm:inline">Classificador IA</span>
-              </Button>
-            </Link>
-            <Link href="/logs">
-              <Button variant="outline" className="gap-2" data-testid="button-logs-page">
-                <FileText className="h-4 w-4" />
-                <span className="hidden sm:inline">Logs Detalhados</span>
-              </Button>
-            </Link>
-            <Link href="/settings">
-              <Button variant="outline" size="icon" data-testid="button-settings-page">
-                <Settings className="h-4 w-4" />
-              </Button>
-            </Link>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => refetch()}
-              disabled={isFetching}
-              data-testid="button-refresh"
-            >
-              <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-            </Button>
-            <ThemeToggle />
-          </div>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            data-testid="button-refresh"
+          >
+            <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+          </Button>
         </header>
 
-        {/* Leilões Ativos Destaque */}
         <Card className="border-2 border-emerald-500/30 bg-gradient-to-r from-emerald-500/5 via-emerald-500/10 to-teal-500/5 dark:from-emerald-500/10 dark:via-emerald-500/15 dark:to-teal-500/10" data-testid="card-leiloes-ativos">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -231,7 +162,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             title="Total de Sites"
@@ -263,7 +193,6 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Leilões Panel - Full Width */}
         <LeiloesPanel
           total={data.leiloes.total}
           comImagem={data.leiloes.comImagem}
@@ -275,7 +204,6 @@ export default function Dashboard() {
           naoPublicados={data.leiloes.naoPublicados}
         />
 
-        {/* Sites Panel */}
         <SitesPanel
           total={data.sites.total}
           ligados={data.sites.ligados}
@@ -283,10 +211,8 @@ export default function Dashboard() {
           sites={data.sites.list}
         />
 
-        {/* Temporal Chart */}
         <LeiloesTemporalChart data={data.leiloesTemporal} />
 
-        {/* URL Consulta + Logs */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <UrlConsultaPanel
             total={data.urlConsulta.total}
@@ -308,7 +234,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Footer */}
         <footer className="text-center py-4 text-sm text-muted-foreground border-t">
           <p>Dashboard de Monitoramento de Leilões • Dados atualizados a cada 60 segundos</p>
         </footer>

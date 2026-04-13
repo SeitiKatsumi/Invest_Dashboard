@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/lib/theme-provider";
+import { Sidebar } from "@/components/sidebar";
 import Dashboard from "@/pages/dashboard";
 import LogsPage from "@/pages/logs";
 import CadastroPage from "@/pages/cadastro";
@@ -16,17 +17,19 @@ import NotFound from "@/pages/not-found";
 
 function Router() {
   return (
-    <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/logs" component={LogsPage} />
-      <Route path="/cadastro" component={CadastroPage} />
-      <Route path="/scraping" component={ScrapingPage} />
-      <Route path="/whatsapp" component={WhatsAppPage} />
-      <Route path="/settings" component={SettingsPage} />
-      <Route path="/duplicatas" component={DuplicatasPage} />
-      <Route path="/classificador" component={ClassificadorPage} />
-      <Route component={NotFound} />
-    </Switch>
+    <Sidebar>
+      <Switch>
+        <Route path="/" component={Dashboard} />
+        <Route path="/logs" component={LogsPage} />
+        <Route path="/cadastro" component={CadastroPage} />
+        <Route path="/scraping" component={ScrapingPage} />
+        <Route path="/whatsapp" component={WhatsAppPage} />
+        <Route path="/settings" component={SettingsPage} />
+        <Route path="/duplicatas" component={DuplicatasPage} />
+        <Route path="/classificador" component={ClassificadorPage} />
+        <Route component={NotFound} />
+      </Switch>
+    </Sidebar>
   );
 }
 

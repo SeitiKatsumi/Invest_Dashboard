@@ -1,16 +1,12 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Link } from "wouter";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import investLogo from "@assets/Icon_Invest_1769010072868.jpg";
 import {
-  ArrowLeft,
   Key,
   Eye,
   EyeOff,
@@ -114,22 +110,10 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-[1200px] mx-auto p-4 md:p-6 space-y-6">
-        <header className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-4">
-            <img src={investLogo} alt="Invest Leilões" className="h-12 w-12 rounded-xl object-contain" />
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold tracking-tight" data-testid="text-settings-title">Configurações</h1>
-              <p className="text-sm text-muted-foreground">Gerencie tokens e monitore uso da IA</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link href="/">
-              <Button variant="outline" className="gap-2" data-testid="button-back-dashboard">
-                <ArrowLeft className="h-4 w-4" />
-                <span className="hidden sm:inline">Dashboard</span>
-              </Button>
-            </Link>
-            <ThemeToggle />
+        <header className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight" data-testid="text-settings-title">Configurações</h1>
+            <p className="text-sm text-muted-foreground">Gerencie tokens e monitore uso da IA</p>
           </div>
         </header>
 
