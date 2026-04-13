@@ -41,10 +41,30 @@ function getMostAdvancedPracaDate(leilao: { praca_1: string | null; praca_2: str
   return null;
 }
 
-async function fetchPublishedLeiloes(): Promise<any[]> {
+export interface EligibleLeilao {
+  id: number;
+  nome_do_anuncio: string | null;
+  link_anuncio: string | null;
+  praca_1: string | null;
+  praca_2: string | null;
+  praca_3: string | null;
+  most_advanced_date: string;
+  has_image: boolean;
+}
+
+export interface PreviewResult {
+  totalPublished: number;
+  eligible: EligibleLeilao[];
+}
+
+async function fetchPublishedLeiloes(includeNames = false): Promise<any[]> {
   if (!DIRECTUS_URL || !DIRECTUS_TOKEN) {
     throw new Error('DIRECTUS_URL and DIRECTUS_TOKEN must be set');
   }
+
+  const fields = includeNames
+    ? 'id,nome_do_anuncio,link_anuncio,praca_1,praca_2,praca_3,arquivo_imagem'
+    : 'id,praca_1,praca_2,praca_3,arquivo_imagem';
 
   const allItems: any[] = [];
   let page = 1;
@@ -53,7 +73,7 @@ async function fetchPublishedLeiloes(): Promise<any[]> {
   while (true) {
     const url = new URL(`${DIRECTUS_URL}/items/leiloes_imovel`);
     url.searchParams.set('filter[status][_eq]', 'published');
-    url.searchParams.set('fields', 'id,praca_1,praca_2,praca_3,arquivo_imagem');
+    url.searchParams.set('fields', fields);
     url.searchParams.set('limit', String(pageSize));
     url.searchParams.set('page', String(page));
 
@@ -124,6 +144,32 @@ async function clearImageField(leilaoId: number): Promise<void> {
   if (!response.ok) {
     throw new Error(`Failed to clear image field for leilão ${leilaoId}: ${response.status}`);
   }
+}
+
+export async function previewEligible(): Promise<PreviewResult> {
+  const leiloes = await fetchPublishedLeiloes(true);
+  const now = new Date();
+  const eligible: EligibleLeilao[] = [];
+
+  for (const leilao of leiloes) {
+    const mostAdvanced = getMostAdvancedPracaDate(leilao);
+    if (!mostAdvanced || mostAdvanced >= now) continue;
+
+    eligible.push({
+      id: leilao.id,
+      nome_do_anuncio: leilao.nome_do_anuncio || null,
+      link_anuncio: leilao.link_anuncio || null,
+      praca_1: leilao.praca_1 || null,
+      praca_2: leilao.praca_2 || null,
+      praca_3: leilao.praca_3 || null,
+      most_advanced_date: mostAdvanced.toISOString(),
+      has_image: !!leilao.arquivo_imagem,
+    });
+  }
+
+  eligible.sort((a, b) => new Date(a.most_advanced_date).getTime() - new Date(b.most_advanced_date).getTime());
+
+  return { totalPublished: leiloes.length, eligible };
 }
 
 export async function runArchiver(): Promise<ArchiverRunResult> {

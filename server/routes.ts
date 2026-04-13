@@ -20,6 +20,7 @@ import {
   getArchiverStatus,
   runArchiver,
   getLastArchiverRun,
+  previewEligible,
 } from "./auction-archiver";
 import {
   getScrapingApiStatus,
@@ -1346,6 +1347,16 @@ export async function registerRoutes(
 
   app.get("/api/scheduler/days", (_req, res) => {
     res.json(getDayNames());
+  });
+
+  app.get("/api/archiver/preview", async (_req, res) => {
+    try {
+      const result = await previewEligible();
+      res.json(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Falha ao verificar elegíveis";
+      res.status(500).json({ error: message });
+    }
   });
 
   app.get("/api/archiver/status", (_req, res) => {
