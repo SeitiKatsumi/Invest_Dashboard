@@ -42,3 +42,7 @@ waitForPort = 5000
 
 [userenv.shared]
 SCRAPING_API_URL = "https://api-scrap-invest.server04.11mind.com.br"
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 20000
