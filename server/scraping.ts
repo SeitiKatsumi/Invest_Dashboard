@@ -94,6 +94,45 @@ export async function deleteConfig(configId: string) {
   return scrapingApiFetch(`/api/configs/${configId}`, { method: "DELETE" });
 }
 
+export type ErrorCategory = 'cloudflare' | 'timeout' | 'access_denied' | 'config_invalid' | 'empty_result' | 'not_validated' | 'ok' | 'unknown';
+
+export function classifyScrapingError(site: {
+  scraping_config?: string | Record<string, unknown> | null;
+  scraping_error?: string | null;
+  scraping_error_analysis?: string | null;
+}): ErrorCategory {
+  const cfg = typeof site.scraping_config === 'string'
+    ? (() => { try { return JSON.parse(site.scraping_config); } catch { return null; } })()
+    : site.scraping_config;
+
+  const validationStatus = cfg?.validation_status as string | undefined;
+
+  if (validationStatus === 'not_validated_access_blocked') {
+    const error = (site.scraping_error || '').toLowerCase();
+    if (/cloudflare/i.test(error) || /cloudflare/i.test(site.scraping_error_analysis || '')) {
+      return 'cloudflare';
+    }
+    return 'not_validated';
+  }
+
+  if (!site.scraping_error) {
+    if (!site.scraping_config) return 'ok';
+    return 'ok';
+  }
+
+  const error = site.scraping_error.toLowerCase();
+  const analysis = (site.scraping_error_analysis || '').toLowerCase();
+  const combined = `${error} ${analysis}`;
+
+  if (/cloudflare|captcha|challenge/i.test(combined)) return 'cloudflare';
+  if (/timeout|timed out|expirou|abort/i.test(combined)) return 'timeout';
+  if (/403|blocked|denied|forbidden|access denied/i.test(combined)) return 'access_denied';
+  if (/config invalidada|config inválida|mini-scrape.*config/i.test(combined)) return 'config_invalid';
+  if (/sem resultado|empty|0 urls|retornou 0|encontrou 0/i.test(combined)) return 'empty_result';
+
+  return 'unknown';
+}
+
 export async function saveSiteScrapingConfig(siteId: number, config: Record<string, unknown>) {
   if (!DIRECTUS_URL || !DIRECTUS_TOKEN) {
     throw new Error("DIRECTUS_URL and DIRECTUS_TOKEN must be set");

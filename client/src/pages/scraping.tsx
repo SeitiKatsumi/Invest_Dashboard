@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Site } from "@shared/schema";
+import { Site, ErrorCategory } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,9 +66,41 @@ import {
   ShieldX,
   FileWarning,
   HardDrive,
+  Lock,
+  FolderOpen,
+  CircleDot,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
+
+const ERROR_CATEGORY_META: Record<ErrorCategory, { label: string; icon: typeof Shield; badgeClass: string; color: string }> = {
+  cloudflare: { label: 'Cloudflare', icon: ShieldAlert, badgeClass: 'bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-700', color: 'text-orange-500' },
+  timeout: { label: 'Timeout', icon: Clock, badgeClass: 'bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-950 dark:text-yellow-300 dark:border-yellow-700', color: 'text-yellow-500' },
+  access_denied: { label: 'Acesso Negado', icon: Lock, badgeClass: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-950 dark:text-red-300 dark:border-red-700', color: 'text-red-500' },
+  config_invalid: { label: 'Config Inválida', icon: AlertTriangle, badgeClass: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-950 dark:text-red-300 dark:border-red-700', color: 'text-red-500' },
+  empty_result: { label: 'Sem Resultados', icon: FolderOpen, badgeClass: 'bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-950 dark:text-yellow-300 dark:border-yellow-700', color: 'text-yellow-500' },
+  not_validated: { label: 'Não Validado', icon: ShieldX, badgeClass: 'bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-700', color: 'text-orange-500' },
+  ok: { label: 'OK', icon: CheckCircle2, badgeClass: 'bg-green-100 text-green-700 border-green-300 dark:bg-green-950 dark:text-green-300 dark:border-green-700', color: 'text-green-500' },
+  unknown: { label: 'Outro Erro', icon: AlertTriangle, badgeClass: 'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-950 dark:text-gray-300 dark:border-gray-700', color: 'text-gray-500' },
+};
+
+function getValidationStatus(site: Site): string | undefined {
+  if (!site.scraping_config) return undefined;
+  const cfg = typeof site.scraping_config === 'string'
+    ? (() => { try { return JSON.parse(site.scraping_config); } catch { return null; } })()
+    : site.scraping_config;
+  return cfg?.validation_status as string | undefined;
+}
+
+type ConfigVisualState = 'validated' | 'not_validated' | 'error' | 'none';
+
+function getConfigVisualState(site: Site): ConfigVisualState {
+  const validationStatus = getValidationStatus(site);
+  if (validationStatus === 'not_validated_access_blocked') return 'not_validated';
+  if (site.scraping_error) return 'error';
+  if (site.scraping_config) return 'validated';
+  return 'none';
+}
 
 const ITEMS_PER_PAGE = 15;
 
@@ -390,6 +422,7 @@ function SitesTable({
   const [search, setSearch] = useState("");
   const [filterConfig, setFilterConfig] = useState<"all" | "with" | "without" | "error">("all");
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("active");
+  const [filterErrorCategory, setFilterErrorCategory] = useState<ErrorCategory | "all" | "any_error">("all");
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const { toast } = useToast();
@@ -403,6 +436,20 @@ function SitesTable({
   const { data: auctionCounts } = useQuery<Record<number, number>>({
     queryKey: ["/api/scraping/sites/auction-counts"],
   });
+
+  const healthSummary = useMemo(() => {
+    if (!sites) return null;
+    const counts: Record<string, number> = { ok: 0, cloudflare: 0, timeout: 0, access_denied: 0, config_invalid: 0, empty_result: 0, not_validated: 0, unknown: 0, no_config: 0 };
+    for (const site of sites) {
+      const cat = site.error_category || 'ok';
+      if (!site.scraping_config && cat === 'ok') {
+        counts.no_config++;
+      } else {
+        counts[cat] = (counts[cat] || 0) + 1;
+      }
+    }
+    return counts;
+  }, [sites]);
 
   const toggleStatusMutation = useMutation({
     mutationFn: async ({ siteId, newStatus }: { siteId: number; newStatus: "ligado" | "desligado" }) => {
@@ -449,13 +496,18 @@ function SitesTable({
       filterStatus === "all" ||
       (filterStatus === "active" && site.liga_desliga === "ligado") ||
       (filterStatus === "inactive" && site.liga_desliga !== "ligado");
-    return matchSearch && matchConfig && matchStatus;
+    const cat = site.error_category || 'ok';
+    const matchErrorCategory =
+      filterErrorCategory === "all" ||
+      (filterErrorCategory === "any_error" && cat !== 'ok') ||
+      filterErrorCategory === cat;
+    return matchSearch && matchConfig && matchStatus && matchErrorCategory;
   });
 
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
   const paged = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
-  useEffect(() => { setPage(1); }, [search, filterConfig, filterStatus]);
+  useEffect(() => { setPage(1); }, [search, filterConfig, filterStatus, filterErrorCategory]);
 
   const toggleSelect = (id: number) => {
     setSelectedIds((prev) => {
@@ -503,6 +555,87 @@ function SitesTable({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {healthSummary && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-2" data-testid="health-summary">
+            <button
+              onClick={() => { setFilterErrorCategory("all"); setFilterConfig("all"); setFilterStatus("all"); }}
+              className={`flex items-center gap-2 p-2.5 rounded-lg border transition-colors cursor-pointer ${filterErrorCategory === "all" && filterConfig === "all" && filterStatus === "all" ? "bg-primary/10 border-primary" : "hover:bg-muted"}`}
+              data-testid="health-total"
+            >
+              <Globe className="h-4 w-4 text-primary shrink-0" />
+              <div className="text-left">
+                <div className="text-lg font-bold leading-none">{sites?.length || 0}</div>
+                <div className="text-[10px] text-muted-foreground">Total</div>
+              </div>
+            </button>
+            <button
+              onClick={() => { setFilterErrorCategory("ok"); setFilterConfig("with"); setFilterStatus("all"); }}
+              className={`flex items-center gap-2 p-2.5 rounded-lg border transition-colors cursor-pointer ${filterErrorCategory === "ok" ? "bg-green-50 border-green-300 dark:bg-green-950 dark:border-green-700" : "hover:bg-muted"}`}
+              data-testid="health-ok"
+            >
+              <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+              <div className="text-left">
+                <div className="text-lg font-bold leading-none text-green-600">{healthSummary.ok}</div>
+                <div className="text-[10px] text-muted-foreground">Funcionando</div>
+              </div>
+            </button>
+            {healthSummary.cloudflare > 0 && (
+              <button
+                onClick={() => setFilterErrorCategory("cloudflare")}
+                className={`flex items-center gap-2 p-2.5 rounded-lg border transition-colors cursor-pointer ${filterErrorCategory === "cloudflare" ? "bg-orange-50 border-orange-300 dark:bg-orange-950 dark:border-orange-700" : "hover:bg-muted"}`}
+                data-testid="health-cloudflare"
+              >
+                <ShieldAlert className="h-4 w-4 text-orange-500 shrink-0" />
+                <div className="text-left">
+                  <div className="text-lg font-bold leading-none text-orange-600">{healthSummary.cloudflare}</div>
+                  <div className="text-[10px] text-muted-foreground">Cloudflare</div>
+                </div>
+              </button>
+            )}
+            {healthSummary.timeout > 0 && (
+              <button
+                onClick={() => setFilterErrorCategory("timeout")}
+                className={`flex items-center gap-2 p-2.5 rounded-lg border transition-colors cursor-pointer ${filterErrorCategory === "timeout" ? "bg-yellow-50 border-yellow-300 dark:bg-yellow-950 dark:border-yellow-700" : "hover:bg-muted"}`}
+                data-testid="health-timeout"
+              >
+                <Clock className="h-4 w-4 text-yellow-500 shrink-0" />
+                <div className="text-left">
+                  <div className="text-lg font-bold leading-none text-yellow-600">{healthSummary.timeout}</div>
+                  <div className="text-[10px] text-muted-foreground">Timeout</div>
+                </div>
+              </button>
+            )}
+            {(healthSummary.config_invalid + healthSummary.access_denied + healthSummary.empty_result + healthSummary.not_validated + healthSummary.unknown) > 0 && (
+              <button
+                onClick={() => setFilterErrorCategory("any_error")}
+                className={`flex items-center gap-2 p-2.5 rounded-lg border transition-colors cursor-pointer ${filterErrorCategory === "any_error" ? "bg-red-50 border-red-300 dark:bg-red-950 dark:border-red-700" : "hover:bg-muted"}`}
+                data-testid="health-other-errors"
+              >
+                <AlertTriangle className="h-4 w-4 text-red-500 shrink-0" />
+                <div className="text-left">
+                  <div className="text-lg font-bold leading-none text-red-600">
+                    {healthSummary.config_invalid + healthSummary.access_denied + healthSummary.empty_result + healthSummary.not_validated + healthSummary.unknown}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">Outros Erros</div>
+                </div>
+              </button>
+            )}
+            {healthSummary.no_config > 0 && (
+              <button
+                onClick={() => { setFilterErrorCategory("all"); setFilterConfig("without"); }}
+                className={`flex items-center gap-2 p-2.5 rounded-lg border transition-colors cursor-pointer ${filterConfig === "without" ? "bg-muted border-muted-foreground/30" : "hover:bg-muted"}`}
+                data-testid="health-no-config"
+              >
+                <CircleDot className="h-4 w-4 text-muted-foreground shrink-0" />
+                <div className="text-left">
+                  <div className="text-lg font-bold leading-none text-muted-foreground">{healthSummary.no_config}</div>
+                  <div className="text-[10px] text-muted-foreground">Sem Config</div>
+                </div>
+              </button>
+            )}
+          </div>
+        )}
+
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -576,6 +709,18 @@ function SitesTable({
           </div>
         </div>
 
+        {filterErrorCategory !== "all" && (
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Filtro de erro:</span>
+            <Badge variant="outline" className={ERROR_CATEGORY_META[filterErrorCategory === "any_error" ? "unknown" : filterErrorCategory]?.badgeClass}>
+              {filterErrorCategory === "any_error" ? "Todos com erro" : ERROR_CATEGORY_META[filterErrorCategory]?.label}
+            </Badge>
+            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setFilterErrorCategory("all")} data-testid="button-clear-error-filter">
+              <X className="h-3 w-3 mr-1" /> Limpar
+            </Button>
+          </div>
+        )}
+
         {selectedIds.size > 0 && (
           <div className="flex items-center justify-between gap-3 p-3 bg-primary/5 border rounded-md flex-wrap">
             <div className="flex items-center gap-2 text-sm">
@@ -632,6 +777,7 @@ function SitesTable({
                   <th className="text-center p-3 font-medium">Motor</th>
                   <th className="text-center p-3 font-medium hidden lg:table-cell">Leilões</th>
                   <th className="text-center p-3 font-medium">Config</th>
+                  <th className="text-center p-3 font-medium hidden md:table-cell">Categoria</th>
                   <th className="text-center p-3 font-medium hidden lg:table-cell">Último Scraping</th>
                   <th className="text-center p-3 font-medium hidden lg:table-cell">URLs</th>
                   <th className="text-right p-3 font-medium">Ações</th>
@@ -687,36 +833,51 @@ function SitesTable({
                         )}
                       </td>
                       <td className="p-3 text-center">
-                        {hasConfig && !site.scraping_error ? (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => onViewConfig(site)}
-                            data-testid={`button-view-config-${site.id}`}
-                          >
-                            <CheckCircle2 className="h-4 w-4 text-green-500" />
-                          </Button>
-                        ) : site.scraping_error ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-auto py-1 px-2 max-w-[220px]"
-                            onClick={() => onViewError(site)}
-                            data-testid={`button-view-error-${site.id}`}
-                            title={site.scraping_error}
-                          >
-                            <div className="flex items-center gap-1.5">
-                              <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0" />
-                              <span className="text-xs text-red-600 dark:text-red-400 text-left truncate">
-                                {site.scraping_error.length > 40
-                                  ? site.scraping_error.slice(0, 40) + "…"
-                                  : site.scraping_error}
-                              </span>
-                            </div>
-                          </Button>
-                        ) : (
-                          <XCircle className="h-4 w-4 text-muted-foreground mx-auto" />
-                        )}
+                        {(() => {
+                          const configState = getConfigVisualState(site);
+                          if (configState === 'validated') {
+                            return (
+                              <Button variant="ghost" size="icon" onClick={() => onViewConfig(site)} data-testid={`button-view-config-${site.id}`} title="Config validada">
+                                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                              </Button>
+                            );
+                          }
+                          if (configState === 'not_validated') {
+                            return (
+                              <Button variant="ghost" size="icon" onClick={() => onViewError(site)} data-testid={`button-view-warning-${site.id}`} title="Config não validada — acesso bloqueado">
+                                <ShieldAlert className="h-4 w-4 text-orange-500" />
+                              </Button>
+                            );
+                          }
+                          if (configState === 'error') {
+                            return (
+                              <Button variant="ghost" size="sm" className="h-auto py-1 px-2 max-w-[220px]" onClick={() => onViewError(site)} data-testid={`button-view-error-${site.id}`} title={site.scraping_error || ''}>
+                                <div className="flex items-center gap-1.5">
+                                  <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0" />
+                                  <span className="text-xs text-red-600 dark:text-red-400 text-left truncate">
+                                    {(site.scraping_error || '').length > 40 ? site.scraping_error!.slice(0, 40) + "…" : site.scraping_error}
+                                  </span>
+                                </div>
+                              </Button>
+                            );
+                          }
+                          return <XCircle className="h-4 w-4 text-muted-foreground mx-auto" />;
+                        })()}
+                      </td>
+                      <td className="p-3 text-center hidden md:table-cell">
+                        {(() => {
+                          const cat = site.error_category || 'ok';
+                          if (cat === 'ok' && !site.scraping_config) return <span className="text-xs text-muted-foreground">—</span>;
+                          if (cat === 'ok') return null;
+                          const meta = ERROR_CATEGORY_META[cat];
+                          const Icon = meta.icon;
+                          return (
+                            <Badge variant="outline" className={`text-[10px] px-1.5 py-0.5 ${meta.badgeClass}`} data-testid={`badge-category-${site.id}`}>
+                              <Icon className="h-3 w-3 mr-1 shrink-0" />
+                              {meta.label}
+                            </Badge>
+                          );
+                        })()}
                       </td>
                       <td className="p-3 text-center hidden lg:table-cell">
                         {site.last_scraping_at ? (
@@ -770,7 +931,7 @@ function SitesTable({
                 })}
                 {paged.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="p-8 text-center text-muted-foreground">
+                    <td colSpan={11} className="p-8 text-center text-muted-foreground">
                       Nenhum site encontrado
                     </td>
                   </tr>
@@ -1393,34 +1554,42 @@ function ErrorDialog({
 }) {
   const errorText = site?.scraping_error || "";
   const diagnosis = classifyError(errorText);
+  const cat = site?.error_category || 'unknown';
+  const catMeta = ERROR_CATEGORY_META[cat];
+  const CatIcon = catMeta.icon;
+  const configState = site ? getConfigVisualState(site) : 'none';
+  const isWarning = configState === 'not_validated';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-red-500">
-            <AlertTriangle className="h-5 w-5" />
-            Diagnóstico de Erro
+          <DialogTitle className={`flex items-center gap-2 ${isWarning ? 'text-orange-500' : 'text-red-500'}`}>
+            {isWarning ? <ShieldAlert className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />}
+            {isWarning ? 'Aviso — Config Não Validada' : 'Diagnóstico de Erro'}
           </DialogTitle>
           <DialogDescription>
             {site?.nome_site || `Site #${site?.id}`} — {site?.url_listagem || site?.url_site}
           </DialogDescription>
         </DialogHeader>
         <div className="overflow-auto flex-1 min-h-0 space-y-4">
-          <div className={`flex items-center gap-3 p-3 rounded-lg border ${diagnosis.color}`}>
+          <div className={`flex items-center gap-3 p-3 rounded-lg border ${catMeta.badgeClass}`}>
+            <CatIcon className={`h-5 w-5 shrink-0 ${catMeta.color}`} />
             <div>
-              <Badge variant="outline" className="mb-1" data-testid="badge-error-type">
-                {diagnosis.label}
+              <Badge variant="outline" className={`mb-1 ${catMeta.badgeClass}`} data-testid="badge-error-type">
+                {catMeta.label}
               </Badge>
               <p className="text-sm font-medium" data-testid="text-error-type-label">
-                Tipo: {diagnosis.label}
+                Categoria: {catMeta.label}
               </p>
             </div>
           </div>
 
           <div>
-            <Label className="text-sm font-medium text-red-500">Mensagem de Erro</Label>
-            <div className="mt-1 p-3 bg-red-500/10 border border-red-500/20 rounded-md">
+            <Label className={`text-sm font-medium ${isWarning ? 'text-orange-500' : 'text-red-500'}`}>
+              {isWarning ? 'Detalhes do Aviso' : 'Mensagem de Erro'}
+            </Label>
+            <div className={`mt-1 p-3 rounded-md border ${isWarning ? 'bg-orange-500/10 border-orange-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
               <p className="text-sm whitespace-pre-wrap font-mono" data-testid="text-error-message">
                 {errorText || "Erro desconhecido"}
               </p>

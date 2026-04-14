@@ -11,6 +11,8 @@ export interface InsertUser {
   password: string;
 }
 
+export type ErrorCategory = 'cloudflare' | 'timeout' | 'access_denied' | 'config_invalid' | 'empty_result' | 'not_validated' | 'ok' | 'unknown';
+
 export interface Site {
   id: number;
   status: string;
@@ -26,6 +28,7 @@ export interface Site {
   last_scraping_at: string | null;
   last_scraping_urls_found: number | null;
   scraping_engine: "external" | "internal" | null;
+  error_category?: ErrorCategory;
 }
 
 export interface ScrapingJob {

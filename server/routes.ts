@@ -49,6 +49,7 @@ import {
   drainBrowserPool,
   scoreConfig,
   persistBatchReportToDirectus,
+  classifyScrapingError,
 } from "./scraping";
 import {
   connectWhatsApp,
@@ -405,7 +406,15 @@ export async function registerRoutes(
   app.get("/api/scraping/sites", async (req, res) => {
     try {
       const sites = await getSitesWithConfig();
-      res.json(sites);
+      const sitesWithCategory = sites.map((site: Record<string, unknown>) => ({
+        ...site,
+        error_category: classifyScrapingError(site as {
+          scraping_config?: string | Record<string, unknown> | null;
+          scraping_error?: string | null;
+          scraping_error_analysis?: string | null;
+        }),
+      }));
+      res.json(sitesWithCategory);
     } catch (error) {
       console.error("Error fetching sites with config:", error);
       res.status(500).json({
@@ -508,7 +517,17 @@ export async function registerRoutes(
             }
 
             await saveSiteScrapingConfig(siteId, configObj);
-            await clearSiteScrapingError(siteId);
+
+            if (isNotValidatedDueToAccess) {
+              await saveSiteScrapingError(
+                siteId,
+                `Config gerada mas não validada — ${result.cloudflare_detected ? 'Cloudflare detectado' : 'acesso bloqueado'}. Necessita validação manual.`,
+                String(diagnostics.config_validation_message || '')
+              );
+            } else {
+              await clearSiteScrapingError(siteId);
+            }
+
             await updateSiteEngine(siteId, "internal");
           } catch (saveError) {
             console.error("Error saving config to Directus:", saveError);
