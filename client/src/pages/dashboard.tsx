@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { DashboardStats } from "@shared/schema";
 import { StatCard } from "@/components/dashboard/stat-card";
@@ -9,6 +10,13 @@ import { LeiloesTemporalChart } from "@/components/dashboard/leiloes-temporal-ch
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { 
   Globe, 
   Building2, 
@@ -16,7 +24,8 @@ import {
   Image, 
   RefreshCw, 
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  ChevronRight
 } from "lucide-react";
 
 function LoadingSkeleton() {
@@ -94,6 +103,7 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
 }
 
 export default function Dashboard() {
+  const [ativosDialogOpen, setAtivosDialogOpen] = useState(false);
   const { data, isLoading, isError, refetch, isFetching } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard"],
     refetchInterval: 60000,
@@ -128,7 +138,11 @@ export default function Dashboard() {
           </Button>
         </header>
 
-        <Card className="border-2 border-emerald-500/30 bg-gradient-to-r from-emerald-500/5 via-emerald-500/10 to-teal-500/5 dark:from-emerald-500/10 dark:via-emerald-500/15 dark:to-teal-500/10" data-testid="card-leiloes-ativos">
+        <Card
+          className="border-2 border-emerald-500/30 bg-gradient-to-r from-emerald-500/5 via-emerald-500/10 to-teal-500/5 dark:from-emerald-500/10 dark:via-emerald-500/15 dark:to-teal-500/10 cursor-pointer transition-shadow hover:shadow-lg"
+          onClick={() => setAtivosDialogOpen(true)}
+          data-testid="card-leiloes-ativos"
+        >
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
@@ -158,9 +172,42 @@ export default function Dashboard() {
                   <p>inativos</p>
                 </div>
               </div>
+              <ChevronRight className="h-5 w-5 text-muted-foreground ml-2 shrink-0" />
             </div>
           </CardContent>
         </Card>
+
+        <Dialog open={ativosDialogOpen} onOpenChange={setAtivosDialogOpen}>
+          <DialogContent className="max-w-md max-h-[80vh]" data-testid="dialog-ativos-por-site">
+            <DialogHeader>
+              <DialogTitle>Leilões Ativos por Site</DialogTitle>
+              <DialogDescription>
+                Total de leilões ativos: {data.leiloes.ativos.toLocaleString("pt-BR")}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="overflow-y-auto max-h-[60vh] -mx-1 px-1">
+              {Object.entries(data.leiloes.ativosPorSite)
+                .sort(([, a], [, b]) => b - a)
+                .map(([site, count]) => (
+                  <div
+                    key={site}
+                    className="flex items-center justify-between py-3 border-b last:border-b-0"
+                    data-testid={`row-site-ativos-${site}`}
+                  >
+                    <span className="text-sm font-medium truncate mr-4">{site}</span>
+                    <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 shrink-0">
+                      {count.toLocaleString("pt-BR")}
+                    </span>
+                  </div>
+                ))}
+              {Object.keys(data.leiloes.ativosPorSite).length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Nenhum leilão ativo encontrado.
+                </p>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard

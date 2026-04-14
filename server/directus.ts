@@ -135,6 +135,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const porTipo: Record<string, number> = {};
   const porUf: Record<string, number> = {};
   const porSite: Record<string, number> = {};
+  const ativosPorSite: Record<string, number> = {};
   let comImagem = 0;
   let semImagem = 0;
   let publicados = 0;
@@ -173,6 +174,10 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     // Ativos (published no Directus)
     if (leilao.status === "published") {
       ativos++;
+      const siteName = leilao.site
+        ? (siteNameLookup[leilao.site] || `Site #${leilao.site}`)
+        : "Sem site";
+      ativosPorSite[siteName] = (ativosPorSite[siteName] || 0) + 1;
     }
   });
 
@@ -184,6 +189,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     porTipo,
     porUf,
     porSite,
+    ativosPorSite,
     publicados,
     naoPublicados,
   };

@@ -113,6 +113,7 @@ export interface DashboardStats {
     porTipo: Record<string, number>;
     porUf: Record<string, number>;
     porSite: Record<string, number>;
+    ativosPorSite: Record<string, number>;
     publicados: number;
     naoPublicados: number;
   };
@@ -204,6 +205,7 @@ export const dashboardStatsSchema = z.object({
     porTipo: z.record(z.string(), z.number()),
     porUf: z.record(z.string(), z.number()),
     porSite: z.record(z.string(), z.number()),
+    ativosPorSite: z.record(z.string(), z.number()),
     publicados: z.number(),
     naoPublicados: z.number(),
   }),
