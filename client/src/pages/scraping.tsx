@@ -79,7 +79,6 @@ const ERROR_CATEGORY_META: Record<ErrorCategory, { label: string; icon: typeof S
   access_denied: { label: 'Acesso Negado', icon: Lock, badgeClass: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-950 dark:text-red-300 dark:border-red-700', color: 'text-red-500' },
   config_invalid: { label: 'Config Inválida', icon: AlertTriangle, badgeClass: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-950 dark:text-red-300 dark:border-red-700', color: 'text-red-500' },
   empty_result: { label: 'Sem Resultados', icon: FolderOpen, badgeClass: 'bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-950 dark:text-yellow-300 dark:border-yellow-700', color: 'text-yellow-500' },
-  not_validated: { label: 'Não Validado', icon: ShieldX, badgeClass: 'bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-700', color: 'text-orange-500' },
   ok: { label: 'OK', icon: CheckCircle2, badgeClass: 'bg-green-100 text-green-700 border-green-300 dark:bg-green-950 dark:text-green-300 dark:border-green-700', color: 'text-green-500' },
   unknown: { label: 'Outro Erro', icon: AlertTriangle, badgeClass: 'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-950 dark:text-gray-300 dark:border-gray-700', color: 'text-gray-500' },
 };
@@ -422,7 +421,7 @@ function SitesTable({
   const [search, setSearch] = useState("");
   const [filterConfig, setFilterConfig] = useState<"all" | "with" | "without" | "error">("all");
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("active");
-  const [filterErrorCategory, setFilterErrorCategory] = useState<ErrorCategory | "all" | "any_error">("all");
+  const [filterErrorCategory, setFilterErrorCategory] = useState<ErrorCategory | "all">("all");
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const { toast } = useToast();
@@ -439,7 +438,7 @@ function SitesTable({
 
   const healthSummary = useMemo(() => {
     if (!sites) return null;
-    const counts: Record<string, number> = { ok: 0, cloudflare: 0, timeout: 0, access_denied: 0, config_invalid: 0, empty_result: 0, not_validated: 0, unknown: 0, no_config: 0 };
+    const counts: Record<string, number> = { ok: 0, cloudflare: 0, timeout: 0, access_denied: 0, config_invalid: 0, empty_result: 0, unknown: 0, no_config: 0 };
     for (const site of sites) {
       const cat = site.error_category || 'ok';
       if (!site.scraping_config && cat === 'ok') {
@@ -499,7 +498,6 @@ function SitesTable({
     const cat = site.error_category || 'ok';
     const matchErrorCategory =
       filterErrorCategory === "all" ||
-      (filterErrorCategory === "any_error" && cat !== 'ok') ||
       filterErrorCategory === cat;
     return matchSearch && matchConfig && matchStatus && matchErrorCategory;
   });
@@ -556,83 +554,70 @@ function SitesTable({
       </CardHeader>
       <CardContent className="space-y-4">
         {healthSummary && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-2" data-testid="health-summary">
-            <button
-              onClick={() => { setFilterErrorCategory("all"); setFilterConfig("all"); setFilterStatus("all"); }}
-              className={`flex items-center gap-2 p-2.5 rounded-lg border transition-colors cursor-pointer ${filterErrorCategory === "all" && filterConfig === "all" && filterStatus === "all" ? "bg-primary/10 border-primary" : "hover:bg-muted"}`}
-              data-testid="health-total"
-            >
-              <Globe className="h-4 w-4 text-primary shrink-0" />
-              <div className="text-left">
-                <div className="text-lg font-bold leading-none">{sites?.length || 0}</div>
-                <div className="text-[10px] text-muted-foreground">Total</div>
-              </div>
-            </button>
-            <button
-              onClick={() => { setFilterErrorCategory("ok"); setFilterConfig("with"); setFilterStatus("all"); }}
-              className={`flex items-center gap-2 p-2.5 rounded-lg border transition-colors cursor-pointer ${filterErrorCategory === "ok" ? "bg-green-50 border-green-300 dark:bg-green-950 dark:border-green-700" : "hover:bg-muted"}`}
-              data-testid="health-ok"
-            >
-              <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-              <div className="text-left">
-                <div className="text-lg font-bold leading-none text-green-600">{healthSummary.ok}</div>
-                <div className="text-[10px] text-muted-foreground">Funcionando</div>
-              </div>
-            </button>
-            {healthSummary.cloudflare > 0 && (
+          <div className="space-y-3" data-testid="health-summary">
+            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-8 gap-2">
               <button
-                onClick={() => setFilterErrorCategory("cloudflare")}
-                className={`flex items-center gap-2 p-2.5 rounded-lg border transition-colors cursor-pointer ${filterErrorCategory === "cloudflare" ? "bg-orange-50 border-orange-300 dark:bg-orange-950 dark:border-orange-700" : "hover:bg-muted"}`}
-                data-testid="health-cloudflare"
+                onClick={() => { setFilterErrorCategory("all"); setFilterConfig("all"); setFilterStatus("all"); }}
+                className={`flex items-center gap-2 p-2.5 rounded-lg border transition-colors cursor-pointer ${filterErrorCategory === "all" && filterConfig === "all" && filterStatus === "all" ? "bg-primary/10 border-primary" : "hover:bg-muted"}`}
+                data-testid="health-total"
               >
-                <ShieldAlert className="h-4 w-4 text-orange-500 shrink-0" />
+                <Globe className="h-4 w-4 text-primary shrink-0" />
                 <div className="text-left">
-                  <div className="text-lg font-bold leading-none text-orange-600">{healthSummary.cloudflare}</div>
-                  <div className="text-[10px] text-muted-foreground">Cloudflare</div>
+                  <div className="text-lg font-bold leading-none">{sites?.length || 0}</div>
+                  <div className="text-[10px] text-muted-foreground">Total</div>
                 </div>
               </button>
-            )}
-            {healthSummary.timeout > 0 && (
               <button
-                onClick={() => setFilterErrorCategory("timeout")}
-                className={`flex items-center gap-2 p-2.5 rounded-lg border transition-colors cursor-pointer ${filterErrorCategory === "timeout" ? "bg-yellow-50 border-yellow-300 dark:bg-yellow-950 dark:border-yellow-700" : "hover:bg-muted"}`}
-                data-testid="health-timeout"
+                onClick={() => { setFilterErrorCategory("ok"); setFilterConfig("with"); setFilterStatus("all"); }}
+                className={`flex items-center gap-2 p-2.5 rounded-lg border transition-colors cursor-pointer ${filterErrorCategory === "ok" ? "bg-green-50 border-green-300 dark:bg-green-950 dark:border-green-700" : "hover:bg-muted"}`}
+                data-testid="health-ok"
               >
-                <Clock className="h-4 w-4 text-yellow-500 shrink-0" />
+                <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
                 <div className="text-left">
-                  <div className="text-lg font-bold leading-none text-yellow-600">{healthSummary.timeout}</div>
-                  <div className="text-[10px] text-muted-foreground">Timeout</div>
+                  <div className="text-lg font-bold leading-none text-green-600">{healthSummary.ok}</div>
+                  <div className="text-[10px] text-muted-foreground">OK</div>
                 </div>
               </button>
-            )}
-            {(healthSummary.config_invalid + healthSummary.access_denied + healthSummary.empty_result + healthSummary.not_validated + healthSummary.unknown) > 0 && (
-              <button
-                onClick={() => setFilterErrorCategory("any_error")}
-                className={`flex items-center gap-2 p-2.5 rounded-lg border transition-colors cursor-pointer ${filterErrorCategory === "any_error" ? "bg-red-50 border-red-300 dark:bg-red-950 dark:border-red-700" : "hover:bg-muted"}`}
-                data-testid="health-other-errors"
-              >
-                <AlertTriangle className="h-4 w-4 text-red-500 shrink-0" />
-                <div className="text-left">
-                  <div className="text-lg font-bold leading-none text-red-600">
-                    {healthSummary.config_invalid + healthSummary.access_denied + healthSummary.empty_result + healthSummary.not_validated + healthSummary.unknown}
+              {([
+                ['cloudflare', ShieldAlert, 'text-orange-500', 'text-orange-600', 'bg-orange-50 border-orange-300 dark:bg-orange-950 dark:border-orange-700'],
+                ['timeout', Clock, 'text-yellow-500', 'text-yellow-600', 'bg-yellow-50 border-yellow-300 dark:bg-yellow-950 dark:border-yellow-700'],
+                ['access_denied', Lock, 'text-red-500', 'text-red-600', 'bg-red-50 border-red-300 dark:bg-red-950 dark:border-red-700'],
+                ['config_invalid', AlertTriangle, 'text-red-500', 'text-red-600', 'bg-red-50 border-red-300 dark:bg-red-950 dark:border-red-700'],
+                ['empty_result', FolderOpen, 'text-yellow-500', 'text-yellow-600', 'bg-yellow-50 border-yellow-300 dark:bg-yellow-950 dark:border-yellow-700'],
+                ['unknown', AlertTriangle, 'text-gray-500', 'text-gray-600', 'bg-gray-50 border-gray-300 dark:bg-gray-950 dark:border-gray-700'],
+              ] as const).map(([cat, Icon, iconColor, textColor, activeClass]) => {
+                const count = healthSummary[cat] || 0;
+                if (count === 0) return null;
+                const meta = ERROR_CATEGORY_META[cat as ErrorCategory];
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => setFilterErrorCategory(cat as ErrorCategory)}
+                    className={`flex items-center gap-2 p-2.5 rounded-lg border transition-colors cursor-pointer ${filterErrorCategory === cat ? activeClass : "hover:bg-muted"}`}
+                    data-testid={`health-${cat}`}
+                  >
+                    <Icon className={`h-4 w-4 ${iconColor} shrink-0`} />
+                    <div className="text-left">
+                      <div className={`text-lg font-bold leading-none ${textColor}`}>{count}</div>
+                      <div className="text-[10px] text-muted-foreground">{meta?.label || cat}</div>
+                    </div>
+                  </button>
+                );
+              })}
+              {healthSummary.no_config > 0 && (
+                <button
+                  onClick={() => { setFilterErrorCategory("all"); setFilterConfig("without"); }}
+                  className={`flex items-center gap-2 p-2.5 rounded-lg border transition-colors cursor-pointer ${filterConfig === "without" ? "bg-muted border-muted-foreground/30" : "hover:bg-muted"}`}
+                  data-testid="health-no-config"
+                >
+                  <CircleDot className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <div className="text-left">
+                    <div className="text-lg font-bold leading-none text-muted-foreground">{healthSummary.no_config}</div>
+                    <div className="text-[10px] text-muted-foreground">Sem Config</div>
                   </div>
-                  <div className="text-[10px] text-muted-foreground">Outros Erros</div>
-                </div>
-              </button>
-            )}
-            {healthSummary.no_config > 0 && (
-              <button
-                onClick={() => { setFilterErrorCategory("all"); setFilterConfig("without"); }}
-                className={`flex items-center gap-2 p-2.5 rounded-lg border transition-colors cursor-pointer ${filterConfig === "without" ? "bg-muted border-muted-foreground/30" : "hover:bg-muted"}`}
-                data-testid="health-no-config"
-              >
-                <CircleDot className="h-4 w-4 text-muted-foreground shrink-0" />
-                <div className="text-left">
-                  <div className="text-lg font-bold leading-none text-muted-foreground">{healthSummary.no_config}</div>
-                  <div className="text-[10px] text-muted-foreground">Sem Config</div>
-                </div>
-              </button>
-            )}
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -712,8 +697,8 @@ function SitesTable({
         {filterErrorCategory !== "all" && (
           <div className="flex items-center gap-2 text-sm">
             <span className="text-muted-foreground">Filtro de erro:</span>
-            <Badge variant="outline" className={ERROR_CATEGORY_META[filterErrorCategory === "any_error" ? "unknown" : filterErrorCategory]?.badgeClass}>
-              {filterErrorCategory === "any_error" ? "Todos com erro" : ERROR_CATEGORY_META[filterErrorCategory]?.label}
+            <Badge variant="outline" className={ERROR_CATEGORY_META[filterErrorCategory as ErrorCategory]?.badgeClass || ''}>
+              {ERROR_CATEGORY_META[filterErrorCategory as ErrorCategory]?.label || filterErrorCategory}
             </Badge>
             <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setFilterErrorCategory("all")} data-testid="button-clear-error-filter">
               <X className="h-3 w-3 mr-1" /> Limpar
