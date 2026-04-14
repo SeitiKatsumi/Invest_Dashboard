@@ -186,7 +186,7 @@ export default function Dashboard() {
               </DialogDescription>
             </DialogHeader>
             <div className="overflow-y-auto max-h-[60vh] -mx-1 px-1">
-              {Object.entries(data.leiloes.ativosPorSite)
+              {Object.entries(data.leiloes.ativosPorSite || {})
                 .sort(([, a], [, b]) => b - a)
                 .map(([site, count]) => (
                   <div
@@ -200,7 +200,7 @@ export default function Dashboard() {
                     </span>
                   </div>
                 ))}
-              {Object.keys(data.leiloes.ativosPorSite).length === 0 && (
+              {Object.keys(data.leiloes.ativosPorSite || {}).length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-4">
                   Nenhum leilão ativo encontrado.
                 </p>
