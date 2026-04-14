@@ -126,7 +126,7 @@ export default function LimpezaPage() {
       if (!res.ok) throw new Error("Falha ao buscar preview");
       return res.json();
     },
-    enabled: canPreview,
+    enabled: false,
     refetchOnWindowFocus: false,
     staleTime: 60000,
   });
