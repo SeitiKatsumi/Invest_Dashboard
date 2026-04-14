@@ -588,7 +588,7 @@ export class DeterministicCrawler {
     let placeholderLinks = 0;
     $('a[href]').each((_, el) => {
       const href = $(el).attr('href') || '';
-      if (isPlaceholderHref(href)) placeholderLinks++;
+      if (this.isPlaceholderHref(href)) placeholderLinks++;
     });
     const realLinks = linkCount - placeholderLinks;
     const emptyContainers = $('#lotes-lista:empty, #leiloes:empty, [id*="lotes"]:empty, [id*="leilao"]:empty').length;
