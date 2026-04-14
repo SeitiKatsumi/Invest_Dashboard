@@ -11,7 +11,7 @@ export interface InsertUser {
   password: string;
 }
 
-export type ErrorCategory = 'cloudflare' | 'timeout' | 'access_denied' | 'config_invalid' | 'empty_result' | 'ok' | 'unknown';
+export type ErrorCategory = 'cloudflare' | 'timeout' | 'access_denied' | 'config_invalid' | 'empty_result' | 'spa_dynamic_content' | 'ok' | 'unknown';
 
 export interface Site {
   id: number;

@@ -102,6 +102,7 @@ export class DeterministicCrawler {
   private listingCount = 0;
   private detailCount = 0;
   private errors: string[] = [];
+  private spaDetected = false;
 
   private progressCallback?: (progress: number, message: string) => void;
   private abortSignal?: AbortSignal;
@@ -205,6 +206,11 @@ export class DeterministicCrawler {
     return false;
   }
 
+  private isPlaceholderHref(href: string): boolean {
+    const trimmed = href.trim();
+    return trimmed === '#' || trimmed === '' || trimmed.startsWith('javascript:') || trimmed === '#!' || /^#[a-zA-Z]/.test(trimmed);
+  }
+
   private extractLinks($: cheerio.CheerioAPI, currentUrl: string): string[] {
     const links: string[] = [];
 
@@ -212,7 +218,7 @@ export class DeterministicCrawler {
       try {
         $(selector).each((_, el) => {
           const href = $(el).attr('href');
-          if (!href) return;
+          if (!href || this.isPlaceholderHref(href)) return;
           const fullUrl = normalizeUrl(href, currentUrl);
           if (!fullUrl) return;
           if (isSameDomain(fullUrl, this.domain) && !this.matchesBlocklist(fullUrl)) {
@@ -231,7 +237,7 @@ export class DeterministicCrawler {
       try {
         $('a[href]').each((_, el) => {
           const href = $(el).attr('href');
-          if (!href) return;
+          if (!href || this.isPlaceholderHref(href)) return;
           const fullUrl = normalizeUrl(href, currentUrl);
           if (!fullUrl) return;
           if (isSameDomain(fullUrl, this.domain) && !this.matchesBlocklist(fullUrl)) {
@@ -392,6 +398,28 @@ export class DeterministicCrawler {
     return this.buildResult();
   }
 
+  private async waitForDynamicContent(page: Page): Promise<boolean> {
+    const SPA_CONTENT_SELECTORS = [
+      '.link-lote[href]:not([href="#"])',
+      '#lotes-lista li',
+      '#leiloes li',
+      '.portfolio-item a[href]:not([href="#"])',
+      '[id*="lote"] a[href]:not([href="#"])',
+      '.card-container a[href]:not([href="#"])',
+      '.product a[href]:not([href="#"])',
+    ];
+
+    try {
+      const selectorExpr = SPA_CONTENT_SELECTORS.join(', ');
+      await page.waitForSelector(selectorExpr, { timeout: 15000 });
+      console.log(`[Crawler] Conteúdo dinâmico renderizado`);
+      await sleep(2000);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async crawlWithPlaywright(startUrl: string, maxPages: number, externalPage?: Page): Promise<CrawlResult> {
     let page: Page;
     let poolHandle: { browser: Browser; context: BrowserContext; page: Page } | undefined;
@@ -404,6 +432,7 @@ export class DeterministicCrawler {
     }
 
     const urlsToVisit: string[] = [startUrl];
+    let spaDetectedOnce = false;
 
     try {
       while (urlsToVisit.length > 0 && this.visitedUrls.size < maxPages) {
@@ -425,7 +454,17 @@ export class DeterministicCrawler {
             await page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
           }
 
-          await sleep(1000);
+          const spaStatus = this.detectSpaOrBlocked(htmlCheck);
+          if (spaStatus === 'spa' || spaDetectedOnce) {
+            if (!spaDetectedOnce) {
+              console.log(`[Crawler] SPA/Firebase detectado em ${currentUrl}. Aguardando renderização dinâmica...`);
+              spaDetectedOnce = true;
+              this.spaDetected = true;
+            }
+            await this.waitForDynamicContent(page);
+          } else {
+            await sleep(1000);
+          }
 
           const html = await page.content();
           this.visitedUrls.add(currentUrl);
@@ -514,6 +553,7 @@ export class DeterministicCrawler {
       listing_pages: this.listingCount,
       detail_pages: this.detailCount,
       errors: this.errors.slice(0, 20),
+      spa_detected: this.spaDetected,
       config_used: {
         domain: this.domain,
         allowlist_patterns: this.normalized.allowlist_patterns,
@@ -539,6 +579,22 @@ export class DeterministicCrawler {
 
     if (hasReactRoot && hasMinimalContent) return 'spa';
     if (linkCount < 3 && scriptCount > 3) return 'spa';
+
+    const htmlLower = html.toLowerCase();
+    const hasVlance = htmlLower.includes('/vlance/') || htmlLower.includes('vlanceconfigcontainer');
+    const hasFirebase = htmlLower.includes('firebase') && (htmlLower.includes('container.js') || htmlLower.includes('paginacaolotes'));
+    if (hasVlance || hasFirebase) return 'spa';
+
+    let placeholderLinks = 0;
+    $('a[href]').each((_, el) => {
+      const href = $(el).attr('href') || '';
+      if (isPlaceholderHref(href)) placeholderLinks++;
+    });
+    const realLinks = linkCount - placeholderLinks;
+    const emptyContainers = $('#lotes-lista:empty, #leiloes:empty, [id*="lotes"]:empty, [id*="leilao"]:empty').length;
+    if (emptyContainers > 0 && scriptCount > 5 && realLinks < 10) return 'spa';
+
+    if (placeholderLinks > 5 && realLinks < 5 && scriptCount > 5) return 'spa';
 
     return 'ok';
   }
@@ -632,5 +688,6 @@ export class DeterministicCrawler {
     this.listingCount = 0;
     this.detailCount = 0;
     this.errors = [];
+    this.spaDetected = false;
   }
 }

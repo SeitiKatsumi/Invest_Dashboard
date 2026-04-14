@@ -150,12 +150,57 @@ interface LinkExtractionResult {
   newLinks: string[];
 }
 
+function isPlaceholderHref(href: string): boolean {
+  const trimmed = href.trim();
+  return trimmed === '#' || trimmed === '' || trimmed.startsWith('javascript:') || trimmed === '#!' || /^#[a-zA-Z]/.test(trimmed);
+}
+
+function detectSpaContent(html: string): boolean {
+  const lower = html.toLowerCase();
+  const hasVlance = lower.includes('/vlance/') || lower.includes('vlanceconfigcontainer');
+  const hasFirebase = lower.includes('firebase') && (lower.includes('container.js') || lower.includes('paginacaolotes'));
+  if (hasVlance || hasFirebase) return true;
+
+  const $ = cheerio.load(html);
+  const placeholderLinks = $('a[href="#"]').length;
+  const realLinks = $('a[href]').length - placeholderLinks;
+  const scriptCount = $('script[src]').length;
+  const emptyContainers = $('#lotes-lista:empty, #leiloes:empty, [id*="lotes"]:empty, [id*="leilao"]:empty').length;
+  if (emptyContainers > 0 && scriptCount > 5 && realLinks < 10) return true;
+  if (placeholderLinks > 5 && realLinks < 5 && scriptCount > 5) return true;
+
+  return false;
+}
+
+async function waitForDynamicContentExplorer(page: Page): Promise<boolean> {
+  const selectors = [
+    '.link-lote[href]:not([href="#"])',
+    '#lotes-lista li',
+    '#leiloes li',
+    '.portfolio-item a[href]:not([href="#"])',
+    '[id*="lote"] a[href]:not([href="#"])',
+    '.card-container a[href]:not([href="#"])',
+    '.product a[href]:not([href="#"])',
+  ];
+
+  try {
+    const selectorExpr = selectors.join(', ');
+    await page.waitForSelector(selectorExpr, { timeout: 15000 });
+    console.log(`[Explorer] Conteúdo dinâmico renderizado`);
+    await sleep(2000);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function extractLinkInfo($: cheerio.CheerioAPI, currentUrl: string, domain: string, allLinks: Set<string>): LinkExtractionResult {
   const linksData: SampleLink[] = [];
   const newLinks: string[] = [];
 
   $('a[href]').each((_, el) => {
     const href = $(el).attr('href') || '';
+    if (isPlaceholderHref(href)) return;
     const fullUrl = normalizeUrl(href, currentUrl);
     if (!fullUrl || !isSameDomain(fullUrl, domain) || !isValidPageUrl(fullUrl)) return;
 
@@ -442,6 +487,7 @@ async function exploreWithPlaywright(
   let accessBlocked = false;
   let accessBlockReason: string | undefined;
   let blockedCount = 0;
+  let spaDetected = false;
 
   const poolHandle = await browserPool.acquire();
   const page: Page = poolHandle.page;
@@ -505,7 +551,16 @@ async function exploreWithPlaywright(
           }
         }
 
-        await sleep(3000);
+        const isSpa = detectSpaContent(htmlCheck);
+        if (isSpa) {
+          if (!spaDetected) {
+            console.log(`[Explorer/Playwright] SPA/Firebase detectado em ${currentUrl}. Aguardando conteúdo dinâmico...`);
+            spaDetected = true;
+          }
+          await waitForDynamicContentExplorer(page);
+        } else {
+          await sleep(3000);
+        }
         visitedUrls.add(currentUrl);
 
         const html = await page.content();
@@ -568,6 +623,7 @@ async function exploreWithPlaywright(
     cloudflare_detected: cloudflareDetected,
     access_blocked: accessBlocked,
     access_block_reason: accessBlockReason,
+    spa_detected: spaDetected,
   };
 }
 

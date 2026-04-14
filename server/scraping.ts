@@ -94,7 +94,7 @@ export async function deleteConfig(configId: string) {
   return scrapingApiFetch(`/api/configs/${configId}`, { method: "DELETE" });
 }
 
-export type ErrorCategory = 'cloudflare' | 'timeout' | 'access_denied' | 'config_invalid' | 'empty_result' | 'ok' | 'unknown';
+export type ErrorCategory = 'cloudflare' | 'timeout' | 'access_denied' | 'config_invalid' | 'spa_dynamic_content' | 'empty_result' | 'ok' | 'unknown';
 
 export function classifyScrapingError(site: {
   scraping_config?: string | Record<string, unknown> | null;
@@ -119,6 +119,7 @@ export function classifyScrapingError(site: {
   if (/timeout|timed out|expirou|abort/i.test(combined)) return 'timeout';
   if (/403|blocked|denied|forbidden|access denied/i.test(combined)) return 'access_denied';
   if (/config invalidada|config inválida|mini-scrape.*config/i.test(combined)) return 'config_invalid';
+  if (/spa.?dynamic|conteúdo dinâmico|firebase|vlance|spa detectad/i.test(combined)) return 'spa_dynamic_content';
   if (/sem resultado|empty|0 urls|retornou 0|encontrou 0/i.test(combined)) return 'empty_result';
 
   if (isAccessBlocked) return 'access_denied';
@@ -566,11 +567,24 @@ export async function startInternalOnboarding(
     usePlaywright: true,
   });
 
+  const spaDetected = explorationResult.spa_detected || false;
+  const detailCount = explorationResult.stats?.detailCount || 0;
+  const categoryCount = explorationResult.stats?.categoryCount || 0;
+  const hasCategoriesButNoDetails = categoryCount > 0 && detailCount === 0;
+
+  if (spaDetected) {
+    console.log(`[InternalOnboarding] SPA/Firebase detectado para ${domain}. Detalhes: ${detailCount}, Categorias: ${categoryCount}`);
+  }
+  if (hasCategoriesButNoDetails && spaDetected) {
+    console.log(`[InternalOnboarding] AVISO: Encontradas ${categoryCount} categorias mas 0 URLs de detalhe — conteúdo provavelmente renderizado via JavaScript.`);
+  }
+
   const explorationDiagnostics = {
     cloudflare_detected: explorationResult.cloudflare_detected || false,
     access_blocked: explorationResult.access_blocked || false,
     access_block_reason: explorationResult.access_block_reason,
     exploration_links_found: explorationResult.allLinksFound.length,
+    spa_detected: spaDetected,
   };
 
   const analysisResult = await analyzeAndGenerateConfig(
@@ -634,11 +648,17 @@ export async function startInternalOnboarding(
     };
   }
 
-  return {
+  const result: Record<string, unknown> = {
     config: analysisResult.config,
     exploration_summary: analysisResult.exploration_summary as Record<string, unknown> | undefined,
     ...explorationDiagnostics,
   };
+
+  if (spaDetected && hasCategoriesButNoDetails) {
+    result.spa_warning = `SPA/Firebase detectado. ${categoryCount} páginas de categoria encontradas, mas 0 URLs de detalhe de lotes. Conteúdo dinâmico pode não ter sido totalmente renderizado.`;
+  }
+
+  return result;
 }
 
 export async function startInternalScraping(
@@ -680,6 +700,12 @@ export async function startInternalScraping(
         classification = 'empty';
       } else if (configConfidence.confidence < 30) {
         classification = 'config_suspect';
+      }
+
+      if (result.spa_detected && result.total_urls === 0 && siteId) {
+        const spaErrorMsg = `SPA/Firebase detectado. Conteúdo dinâmico não renderizou URLs de detalhe. Categorias encontradas: ${result.categories_found}`;
+        await saveSiteScrapingError(siteId, spaErrorMsg, `SPA detectado — vlance/Firebase. O conteúdo é carregado via JavaScript e não foi possível extrair lotes individuais.`);
+        console.log(`[InternalScraping] SPA detectado para site ${siteId}: ${spaErrorMsg}`);
       }
 
       const shouldAutoRetry = !_autoRetried

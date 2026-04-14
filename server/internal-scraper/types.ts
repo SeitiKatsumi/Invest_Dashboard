@@ -62,6 +62,7 @@ export interface ExplorationResult {
   cloudflare_detected?: boolean;
   access_blocked?: boolean;
   access_block_reason?: string;
+  spa_detected?: boolean;
 }
 
 export interface ScrapingConfig {
@@ -125,6 +126,7 @@ export interface CrawlResult {
   detail_pages: number;
   errors: string[];
   warnings?: string[];
+  spa_detected?: boolean;
   config_used: {
     domain: string;
     allowlist_patterns: string[];

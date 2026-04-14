@@ -78,6 +78,7 @@ const ERROR_CATEGORY_META: Record<ErrorCategory, { label: string; icon: typeof S
   timeout: { label: 'Timeout', icon: Clock, badgeClass: 'bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-950 dark:text-yellow-300 dark:border-yellow-700', color: 'text-yellow-500' },
   access_denied: { label: 'Acesso Negado', icon: Lock, badgeClass: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-950 dark:text-red-300 dark:border-red-700', color: 'text-red-500' },
   config_invalid: { label: 'Config Inválida', icon: AlertTriangle, badgeClass: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-950 dark:text-red-300 dark:border-red-700', color: 'text-red-500' },
+  spa_dynamic_content: { label: 'SPA/Firebase', icon: Globe, badgeClass: 'bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-700', color: 'text-purple-500' },
   empty_result: { label: 'Sem Resultados', icon: FolderOpen, badgeClass: 'bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-950 dark:text-yellow-300 dark:border-yellow-700', color: 'text-yellow-500' },
   ok: { label: 'OK', icon: CheckCircle2, badgeClass: 'bg-green-100 text-green-700 border-green-300 dark:bg-green-950 dark:text-green-300 dark:border-green-700', color: 'text-green-500' },
   unknown: { label: 'Outro Erro', icon: AlertTriangle, badgeClass: 'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-950 dark:text-gray-300 dark:border-gray-700', color: 'text-gray-500' },
@@ -438,7 +439,7 @@ function SitesTable({
 
   const healthSummary = useMemo(() => {
     if (!sites) return null;
-    const counts: Record<string, number> = { ok: 0, cloudflare: 0, timeout: 0, access_denied: 0, config_invalid: 0, empty_result: 0, unknown: 0, no_config: 0 };
+    const counts: Record<string, number> = { ok: 0, cloudflare: 0, timeout: 0, access_denied: 0, config_invalid: 0, spa_dynamic_content: 0, empty_result: 0, unknown: 0, no_config: 0 };
     for (const site of sites) {
       const cat = site.error_category || 'ok';
       if (!site.scraping_config && cat === 'ok') {
@@ -583,6 +584,7 @@ function SitesTable({
                 ['timeout', Clock, 'text-yellow-500', 'text-yellow-600', 'bg-yellow-50 border-yellow-300 dark:bg-yellow-950 dark:border-yellow-700'],
                 ['access_denied', Lock, 'text-red-500', 'text-red-600', 'bg-red-50 border-red-300 dark:bg-red-950 dark:border-red-700'],
                 ['config_invalid', AlertTriangle, 'text-red-500', 'text-red-600', 'bg-red-50 border-red-300 dark:bg-red-950 dark:border-red-700'],
+                ['spa_dynamic_content', Globe, 'text-purple-500', 'text-purple-600', 'bg-purple-50 border-purple-300 dark:bg-purple-950 dark:border-purple-700'],
                 ['empty_result', FolderOpen, 'text-yellow-500', 'text-yellow-600', 'bg-yellow-50 border-yellow-300 dark:bg-yellow-950 dark:border-yellow-700'],
                 ['unknown', AlertTriangle, 'text-gray-500', 'text-gray-600', 'bg-gray-50 border-gray-300 dark:bg-gray-950 dark:border-gray-700'],
               ] as const).map(([cat, Icon, iconColor, textColor, activeClass]) => {
@@ -1517,6 +1519,8 @@ function classifyError(error: string): { type: string; label: string; color: str
     return { type: 'connection', label: 'Conexão', color: 'text-yellow-600 bg-yellow-50 border-yellow-200 dark:bg-yellow-950 dark:border-yellow-800', suggestion: 'O servidor recusou a conexão. O site pode estar temporariamente fora do ar. Tente novamente mais tarde.' };
   if (lower.includes('ssl') || lower.includes('certificate') || lower.includes('cert'))
     return { type: 'ssl', label: 'SSL/Certificado', color: 'text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-950 dark:border-amber-800', suggestion: 'Problema com o certificado SSL do site. Pode indicar site inseguro ou certificado expirado.' };
+  if (lower.includes('spa') || lower.includes('firebase') || lower.includes('vlance') || lower.includes('conteúdo dinâmico'))
+    return { type: 'spa', label: 'SPA/Firebase', color: 'text-purple-600 bg-purple-50 border-purple-200 dark:bg-purple-950 dark:border-purple-800', suggestion: 'Este site carrega conteúdo via JavaScript/Firebase (SPA). Os lotes são renderizados dinamicamente e podem não aparecer no HTML estático. O sistema tentou aguardar a renderização, mas pode ser necessário ajuste manual na configuração.' };
   if (lower.includes('config invalidada') || lower.includes('mini-scrape') || lower.includes('0 urls'))
     return { type: 'config', label: 'Config Inválida', color: 'text-blue-600 bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800', suggestion: 'A configuração gerada pela IA não conseguiu extrair URLs. Tente rodar o onboarding novamente com um modelo diferente, ou verifique se a URL de listagem está correta.' };
   if (lower.includes('json') || lower.includes('parse') || lower.includes('syntax'))
