@@ -14,6 +14,7 @@ import SettingsPage from "@/pages/settings";
 import DuplicatasPage from "@/pages/duplicatas";
 import ClassificadorPage from "@/pages/classificador";
 import ArquivamentoPage from "@/pages/arquivamento";
+import LimpezaPage from "@/pages/limpeza";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -29,6 +30,7 @@ function Router() {
         <Route path="/duplicatas" component={DuplicatasPage} />
         <Route path="/classificador" component={ClassificadorPage} />
         <Route path="/arquivamento" component={ArquivamentoPage} />
+        <Route path="/limpeza" component={LimpezaPage} />
         <Route component={NotFound} />
       </Switch>
     </Sidebar>

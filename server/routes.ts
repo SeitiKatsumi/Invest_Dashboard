@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { getDashboardStats, getDetailedLogs, getSites, createLeilao, findSiteByUrl, findDuplicates, deleteLeilaoItems } from "./directus";
+import { getDashboardStats, getDetailedLogs, getSites, createLeilao, findSiteByUrl, findDuplicates, deleteLeilaoItems, previewLimpeza, executeLimpeza } from "./directus";
 import { getEstimate, startScan, getScanStatus, abortScan, cleanupItems, resetScan, scanEmitter } from "./classifier";
 import { leilaoInsertSchema } from "@shared/schema";
 import { extractAuctionDataFromImage } from "./openai";
@@ -1384,6 +1384,66 @@ export async function registerRoutes(
 
   app.get("/api/archiver/last-run", (_req, res) => {
     res.json(getLastArchiverRun());
+  });
+
+  // ======= LIMPEZA (SELECTIVE CLEANUP) API ROUTES =======
+
+  app.get("/api/limpeza/preview", async (req, res) => {
+    try {
+      const siteId = parseInt(req.query.site_id as string, 10);
+      const dateFrom = req.query.date_from as string;
+      const dateTo = req.query.date_to as string;
+
+      if (!siteId || isNaN(siteId) || siteId < 1) {
+        return res.status(400).json({ error: "site_id é obrigatório e deve ser um número positivo" });
+      }
+      if (!dateFrom || !dateTo) {
+        return res.status(400).json({ error: "date_from e date_to são obrigatórios" });
+      }
+      if (isNaN(new Date(dateFrom).getTime()) || isNaN(new Date(dateTo).getTime())) {
+        return res.status(400).json({ error: "Datas inválidas" });
+      }
+      if (new Date(dateFrom) > new Date(dateTo)) {
+        return res.status(400).json({ error: "date_from deve ser anterior a date_to" });
+      }
+
+      const result = await previewLimpeza(siteId, dateFrom, dateTo);
+      res.json(result);
+    } catch (error) {
+      console.error("Error previewing limpeza:", error);
+      res.status(500).json({
+        error: "Falha ao buscar preview da limpeza",
+        message: error instanceof Error ? error.message : "Erro desconhecido",
+      });
+    }
+  });
+
+  app.post("/api/limpeza/execute", async (req, res) => {
+    try {
+      const { site_id, date_from, date_to } = req.body;
+
+      if (!site_id || typeof site_id !== "number" || site_id < 1) {
+        return res.status(400).json({ error: "site_id é obrigatório e deve ser um número positivo" });
+      }
+      if (!date_from || !date_to) {
+        return res.status(400).json({ error: "date_from e date_to são obrigatórios" });
+      }
+      if (isNaN(new Date(date_from).getTime()) || isNaN(new Date(date_to).getTime())) {
+        return res.status(400).json({ error: "Datas inválidas" });
+      }
+      if (new Date(date_from) > new Date(date_to)) {
+        return res.status(400).json({ error: "date_from deve ser anterior a date_to" });
+      }
+
+      const result = await executeLimpeza(site_id, date_from, date_to);
+      res.json(result);
+    } catch (error) {
+      console.error("Error executing limpeza:", error);
+      res.status(500).json({
+        error: "Falha ao executar limpeza",
+        message: error instanceof Error ? error.message : "Erro desconhecido",
+      });
+    }
   });
 
   await initScheduler();

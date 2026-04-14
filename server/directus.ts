@@ -560,6 +560,185 @@ export async function deleteLeilaoItems(ids: number[]): Promise<{ deleted: numbe
   return { deleted, errors };
 }
 
+export interface LimpezaPreviewItem {
+  id: number;
+  nome_do_anuncio: string | null;
+  link_anuncio: string | null;
+  date_created: string | null;
+  has_image: boolean;
+}
+
+export interface LimpezaPreviewResult {
+  total: number;
+  items: LimpezaPreviewItem[];
+  imagesCount: number;
+}
+
+export async function previewLimpeza(
+  siteId: number,
+  dateFrom: string,
+  dateTo: string
+): Promise<LimpezaPreviewResult> {
+  if (!DIRECTUS_URL || !DIRECTUS_TOKEN) {
+    throw new Error("DIRECTUS_URL and DIRECTUS_TOKEN must be set");
+  }
+
+  const allItems: LimpezaPreviewItem[] = [];
+  let page = 1;
+  const pageSize = 500;
+
+  while (true) {
+    const url = new URL(`${DIRECTUS_URL}/items/leiloes_imovel`);
+    url.searchParams.set('filter[site][_eq]', String(siteId));
+    url.searchParams.set('filter[date_created][_gte]', dateFrom);
+    url.searchParams.set('filter[date_created][_lte]', dateTo);
+    url.searchParams.set('fields', 'id,nome_do_anuncio,link_anuncio,date_created,arquivo_imagem');
+    url.searchParams.set('sort', '-date_created');
+    url.searchParams.set('limit', String(pageSize));
+    url.searchParams.set('page', String(page));
+
+    const response = await fetch(url.toString(), {
+      headers: {
+        Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Directus API error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    const items = result.data || [];
+    if (items.length === 0) break;
+
+    for (const item of items) {
+      allItems.push({
+        id: item.id,
+        nome_do_anuncio: item.nome_do_anuncio || null,
+        link_anuncio: item.link_anuncio || null,
+        date_created: item.date_created || null,
+        has_image: !!item.arquivo_imagem,
+      });
+    }
+
+    if (items.length < pageSize) break;
+    page++;
+  }
+
+  return {
+    total: allItems.length,
+    items: allItems,
+    imagesCount: allItems.filter(i => i.has_image).length,
+  };
+}
+
+export interface LimpezaExecuteResult {
+  totalDeleted: number;
+  imagesDeleted: number;
+  errors: number;
+  errorDetails: string[];
+}
+
+export async function executeLimpeza(
+  siteId: number,
+  dateFrom: string,
+  dateTo: string
+): Promise<LimpezaExecuteResult> {
+  if (!DIRECTUS_URL || !DIRECTUS_TOKEN) {
+    throw new Error("DIRECTUS_URL and DIRECTUS_TOKEN must be set");
+  }
+
+  const result: LimpezaExecuteResult = {
+    totalDeleted: 0,
+    imagesDeleted: 0,
+    errors: 0,
+    errorDetails: [],
+  };
+
+  let page = 1;
+  const pageSize = 500;
+  const allItems: { id: number; arquivo_imagem: string | null }[] = [];
+
+  while (true) {
+    const url = new URL(`${DIRECTUS_URL}/items/leiloes_imovel`);
+    url.searchParams.set('filter[site][_eq]', String(siteId));
+    url.searchParams.set('filter[date_created][_gte]', dateFrom);
+    url.searchParams.set('filter[date_created][_lte]', dateTo);
+    url.searchParams.set('fields', 'id,arquivo_imagem');
+    url.searchParams.set('limit', String(pageSize));
+    url.searchParams.set('page', String(page));
+
+    const response = await fetch(url.toString(), {
+      headers: {
+        Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Directus API error fetching items: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const items = data.data || [];
+    if (items.length === 0) break;
+
+    allItems.push(...items);
+    if (items.length < pageSize) break;
+    page++;
+  }
+
+  if (allItems.length === 0) {
+    return result;
+  }
+
+  const batchSize = 20;
+  for (let i = 0; i < allItems.length; i += batchSize) {
+    const batch = allItems.slice(i, i + batchSize);
+
+    const promises = batch.map(async (item) => {
+      try {
+        const delUrl = `${DIRECTUS_URL}/items/leiloes_imovel/${item.id}`;
+        const delRes = await fetch(delUrl, {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (delRes.ok) {
+          result.totalDeleted++;
+
+          if (item.arquivo_imagem) {
+            try {
+              const imgUrl = `${DIRECTUS_URL}/files/${item.arquivo_imagem}`;
+              const imgRes = await fetch(imgUrl, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${DIRECTUS_TOKEN}` },
+              });
+              if (imgRes.ok) {
+                result.imagesDeleted++;
+              }
+            } catch {}
+          }
+        } else {
+          result.errors++;
+          result.errorDetails.push(`ID ${item.id}: HTTP ${delRes.status}`);
+        }
+      } catch (err) {
+        result.errors++;
+        result.errorDetails.push(`ID ${item.id}: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      }
+    });
+
+    await Promise.all(promises);
+  }
+
+  return result;
+}
+
 export async function getDetailedLogs(): Promise<{ logs: LogScraping[]; total: number }> {
   // Fetch sites for name lookup
   const sitesResponse = await directusFetch<Site[]>("input_library_url", { 
