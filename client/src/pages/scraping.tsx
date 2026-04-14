@@ -1037,10 +1037,10 @@ function OnboardingDialog({
         </DialogHeader>
 
         <div className="space-y-4 overflow-y-auto flex-1 min-h-0">
-          <div>
+          <div className="min-w-0">
             <Label className="text-sm font-medium">Site</Label>
             <p className="text-sm font-semibold mt-1">{site?.nome_site || `Site #${site?.id}`}</p>
-            <p className="text-xs text-muted-foreground">{site?.url_listagem || site?.url_site}</p>
+            <p className="text-xs text-muted-foreground break-all line-clamp-2">{site?.url_listagem || site?.url_site}</p>
             <div className="mt-1">
               <Badge variant="outline" className={engine === "internal"
                 ? "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800"
@@ -1216,10 +1216,10 @@ function ScrapingDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          <div>
+          <div className="min-w-0">
             <Label className="text-sm font-medium">Site</Label>
             <p className="text-sm font-semibold mt-1">{site?.nome_site || `Site #${site?.id}`}</p>
-            <p className="text-xs text-muted-foreground">{site?.url_listagem || site?.url_site}</p>
+            <p className="text-xs text-muted-foreground break-all line-clamp-2">{site?.url_listagem || site?.url_site}</p>
             <div className="mt-1">
               <Badge variant="outline" className={engine === "internal"
                 ? "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800"
