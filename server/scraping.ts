@@ -506,7 +506,15 @@ export async function startInternalOnboarding(
   siteId?: number,
   maxPages?: number,
   model?: string,
-): Promise<{ config?: ScrapingConfig; error?: string; exploration_summary?: Record<string, unknown> }> {
+): Promise<{
+  config?: ScrapingConfig;
+  error?: string;
+  exploration_summary?: Record<string, unknown>;
+  cloudflare_detected?: boolean;
+  access_blocked?: boolean;
+  access_block_reason?: string;
+  exploration_links_found?: number;
+}> {
   const { extractDomain } = await import('./internal-scraper/utils.js');
   const domain = extractDomain(siteUrl);
 
@@ -526,6 +534,13 @@ export async function startInternalOnboarding(
     usePlaywright: true,
   });
 
+  const explorationDiagnostics = {
+    cloudflare_detected: explorationResult.cloudflare_detected || false,
+    access_blocked: explorationResult.access_blocked || false,
+    access_block_reason: explorationResult.access_block_reason,
+    exploration_links_found: explorationResult.allLinksFound.length,
+  };
+
   const analysisResult = await analyzeAndGenerateConfig(
     explorationResult,
     domain,
@@ -538,15 +553,59 @@ export async function startInternalOnboarding(
   );
 
   if (!analysisResult.success || !analysisResult.config) {
+    const isFullyBlocked = explorationDiagnostics.access_blocked || explorationDiagnostics.cloudflare_detected;
+
+    if (isFullyBlocked) {
+      console.log(`[InternalOnboarding] Exploração bloqueada para ${domain}. Gerando config tentativa baseada em padrões conhecidos.`);
+      const { generateId } = await import('./internal-scraper/utils.js');
+      const now = new Date().toISOString();
+      const fallbackConfig: ScrapingConfig = {
+        id: `${Date.now().toString(36)}${generateId(6)}`.slice(0, 12),
+        domain,
+        allowlist_patterns: [
+          `/lote/\\d+`, `/imovel/\\d+`, `/item/\\d+`, `/produto/\\d+`,
+          `/anuncio/\\d+`, `/property/\\d+`, `/listing/\\d+`,
+          `/lote/[^/]+/\\d+`, `/imovel/[^/]+/\\d+`, `/item/[^/]+/\\d+`,
+        ],
+        blocklist_patterns: [
+          '\\.(jpg|jpeg|png|gif|svg|webp|ico|css|js|woff|woff2|pdf|zip)(\\?|$)',
+          '(facebook|twitter|instagram|linkedin|youtube|whatsapp)\\.com',
+          '(mailto:|tel:|javascript:|#)',
+          '/(login|register|cart|checkout|share)(/|$)',
+        ],
+        pagination_pattern: '(\\?|&)(page|pagina|p)=\\d+',
+        pagination_type: 'query_param',
+        listing_page_indicators: ['/imoveis', '/leiloes', '/eventos', '/buscar', '/search'],
+        detail_page_indicators: ['/lote/\\d+', '/imovel/\\d+', '/item/\\d+'],
+        max_listing_pages: 200,
+        max_detail_pages: 5000,
+        link_selectors: ['a[href]'],
+        category_patterns: ['/categoria/', '/eventos/', '/leilao/'],
+        created_at: now,
+        updated_at: now,
+        analysis_notes: `Config tentativa gerada automaticamente — exploração bloqueada por ${explorationDiagnostics.cloudflare_detected ? 'Cloudflare' : 'acesso negado'}. Necessita validação manual.`,
+        tokens_used: 0,
+      };
+
+      return {
+        config: fallbackConfig,
+        error: `Exploração bloqueada (${explorationDiagnostics.access_block_reason || 'acesso negado'}). Config tentativa gerada com padrões genéricos.`,
+        exploration_summary: analysisResult.exploration_summary as Record<string, unknown> | undefined,
+        ...explorationDiagnostics,
+      };
+    }
+
     return {
       error: analysisResult.error || "Análise não retornou configuração",
       exploration_summary: analysisResult.exploration_summary as Record<string, unknown> | undefined,
+      ...explorationDiagnostics,
     };
   }
 
   return {
     config: analysisResult.config,
     exploration_summary: analysisResult.exploration_summary as Record<string, unknown> | undefined,
+    ...explorationDiagnostics,
   };
 }
 

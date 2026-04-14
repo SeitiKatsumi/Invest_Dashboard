@@ -59,6 +59,9 @@ export interface ExplorationResult {
   };
   usedPlaywright?: boolean;
   warnings?: string[];
+  cloudflare_detected?: boolean;
+  access_blocked?: boolean;
+  access_block_reason?: string;
 }
 
 export interface ScrapingConfig {

@@ -22,6 +22,11 @@ const DETAIL_PATTERNS = [
   /\/lote\/\d+/i, /\/imovel\/\d+/i, /\/item\/\d+/i,
   /\/produto\/\d+/i, /\/property\/\d+/i, /\/listing\/\d+/i,
   /\/anuncio\/\d+/i, /\/detalhe\/\d+/i, /\/id\/\d+/i, /\/p\/\d+/i,
+  /\/lote\/[^/]+\/\d+/i, /\/imovel\/[^/]+\/\d+/i, /\/item\/[^/]+\/\d+/i,
+  /\/produto\/[^/]+\/\d+/i, /\/property\/[^/]+\/\d+/i, /\/listing\/[^/]+\/\d+/i,
+  /\/anuncio\/[^/]+\/\d+/i, /\/detalhe\/[^/]+\/\d+/i,
+  /\/venda\/[^/]+\/\d+/i, /\/aluguel\/[^/]+\/\d+/i,
+  /\/leilao\/[^/]+\/\d+/i, /\/auction\/[^/]+\/\d+/i,
   /-\d{4,}$/, /\/\d{4,}$/, /\/\d{4,}\//,
 ];
 
@@ -188,26 +193,134 @@ function extractLinkInfo($: cheerio.CheerioAPI, currentUrl: string, domain: stri
   };
 }
 
-async function fetchPage(url: string): Promise<string | null> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
-  try {
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': randomUserAgent(),
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
-      },
-      redirect: 'follow',
-      signal: controller.signal,
-    });
-    if (response.status !== 200) return null;
-    return await response.text();
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timeout);
+const CF_INDICATORS = [
+  'Just a moment', 'Checking your browser', 'cf-browser-verification',
+  'challenge-platform', 'Attention Required', 'Access denied',
+  'Enable JavaScript and cookies to continue',
+];
+
+function detectCloudflare(html: string): boolean {
+  return CF_INDICATORS.some(ind => html.includes(ind));
+}
+
+interface FetchResult {
+  html: string | null;
+  status: number;
+  cloudflare: boolean;
+  blocked: boolean;
+  blockReason?: string;
+}
+
+const FETCH_STRATEGIES = [
+  {
+    name: 'standard',
+    headers: (ua: string) => ({
+      'User-Agent': ua,
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+    }),
+    delay: 0,
+  },
+  {
+    name: 'with-referer',
+    headers: (ua: string) => ({
+      'User-Agent': ua,
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+      'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+      'Accept-Encoding': 'gzip, deflate, br',
+      'Referer': 'https://www.google.com/',
+      'DNT': '1',
+      'Connection': 'keep-alive',
+      'Upgrade-Insecure-Requests': '1',
+      'Sec-Fetch-Dest': 'document',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Site': 'cross-site',
+      'Sec-Fetch-User': '?1',
+      'Cache-Control': 'max-age=0',
+    }),
+    delay: 3000,
+  },
+  {
+    name: 'delayed-retry',
+    headers: (ua: string) => ({
+      'User-Agent': ua,
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+      'Pragma': 'no-cache',
+      'Cache-Control': 'no-cache',
+    }),
+    delay: 7000,
+  },
+];
+
+async function fetchPageWithDiagnostics(url: string): Promise<FetchResult> {
+  let cookieJar = '';
+
+  for (let i = 0; i < FETCH_STRATEGIES.length; i++) {
+    const strategy = FETCH_STRATEGIES[i];
+    if (strategy.delay > 0) await sleep(strategy.delay);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    try {
+      const ua = randomUserAgent();
+      const headers: Record<string, string> = { ...strategy.headers(ua) };
+      if (cookieJar) {
+        headers['Cookie'] = cookieJar;
+      }
+
+      const response = await fetch(url, {
+        headers,
+        redirect: 'follow',
+        signal: controller.signal,
+      });
+
+      const setCookie = response.headers.get('set-cookie');
+      if (setCookie) {
+        const cookies = setCookie.split(',').map(c => c.split(';')[0].trim()).filter(Boolean);
+        cookieJar = cookies.join('; ');
+      }
+
+      const status = response.status;
+
+      if (status === 403 || status === 503) {
+        const text = await response.text();
+        const isCf = detectCloudflare(text);
+        if (isCf) {
+          console.log(`[Explorer/Fetch] Cloudflare detected on ${url} (strategy: ${strategy.name}, status: ${status})`);
+          if (i < FETCH_STRATEGIES.length - 1) continue;
+          return { html: null, status, cloudflare: true, blocked: true, blockReason: `Cloudflare challenge (HTTP ${status})` };
+        }
+        if (i < FETCH_STRATEGIES.length - 1) continue;
+        return { html: null, status, cloudflare: false, blocked: true, blockReason: `HTTP ${status} - Access denied` };
+      }
+
+      if (status !== 200) {
+        return { html: null, status, cloudflare: false, blocked: status === 401 || status === 407, blockReason: status >= 400 ? `HTTP ${status}` : undefined };
+      }
+
+      const text = await response.text();
+      if (detectCloudflare(text)) {
+        console.log(`[Explorer/Fetch] Cloudflare challenge page on ${url} (strategy: ${strategy.name})`);
+        if (i < FETCH_STRATEGIES.length - 1) continue;
+        return { html: null, status: 200, cloudflare: true, blocked: true, blockReason: 'Cloudflare challenge page returned with HTTP 200' };
+      }
+
+      return { html: text, status, cloudflare: false, blocked: false };
+    } catch (err) {
+      const isTimeout = err instanceof Error && (err.name === 'AbortError' || err.message.includes('abort'));
+      if (i < FETCH_STRATEGIES.length - 1) continue;
+      return { html: null, status: 0, cloudflare: false, blocked: isTimeout, blockReason: isTimeout ? 'Request timeout — possible access block' : 'Network error' };
+    } finally {
+      clearTimeout(timeout);
+    }
   }
+  return { html: null, status: 0, cloudflare: false, blocked: false };
+}
+
+async function fetchPage(url: string): Promise<string | null> {
+  const result = await fetchPageWithDiagnostics(url);
+  return result.html;
 }
 
 async function exploreWithFetch(
@@ -225,6 +338,10 @@ async function exploreWithFetch(
   const urlsToVisit: string[] = [baseUrl];
   let detailSamples = 0;
   const maxDetailSamples = 20;
+  let cloudflareDetected = false;
+  let accessBlocked = false;
+  let accessBlockReason: string | undefined;
+  let blockedCount = 0;
 
   while (urlsToVisit.length > 0 && visitedUrls.size < maxPages) {
     const currentUrl = urlsToVisit.shift()!;
@@ -240,11 +357,19 @@ async function exploreWithFetch(
       detailSamples++;
     }
 
-    const html = await fetchPage(currentUrl);
-    if (!html) continue;
+    const fetchResult = await fetchPageWithDiagnostics(currentUrl);
+
+    if (fetchResult.cloudflare) cloudflareDetected = true;
+    if (fetchResult.blocked) {
+      blockedCount++;
+      accessBlocked = true;
+      if (!accessBlockReason) accessBlockReason = fetchResult.blockReason;
+    }
+
+    if (!fetchResult.html) continue;
 
     visitedUrls.add(currentUrl);
-    const $ = cheerio.load(html);
+    const $ = cheerio.load(fetchResult.html);
 
     const { info: linkInfo, newLinks } = extractLinkInfo($, currentUrl, domain, allLinks);
     const pageData: PageData = {
@@ -275,6 +400,10 @@ async function exploreWithFetch(
     }
   }
 
+  if (blockedCount > 0) {
+    console.log(`[Explorer/Fetch] ${blockedCount} page(s) blocked. Cloudflare: ${cloudflareDetected}. Reason: ${accessBlockReason}`);
+  }
+
   return {
     pagesExplored: results.length,
     data: results,
@@ -288,6 +417,9 @@ async function exploreWithFetch(
       categoryCount: categoryUrls.size,
     },
     usedPlaywright: false,
+    cloudflare_detected: cloudflareDetected,
+    access_blocked: accessBlocked,
+    access_block_reason: accessBlockReason,
   };
 }
 
@@ -306,6 +438,10 @@ async function exploreWithPlaywright(
   const urlsToVisit: string[] = [baseUrl];
   let detailSamples = 0;
   const maxDetailSamples = 20;
+  let cloudflareDetected = false;
+  let accessBlocked = false;
+  let accessBlockReason: string | undefined;
+  let blockedCount = 0;
 
   const poolHandle = await browserPool.acquire();
   const page: Page = poolHandle.page;
@@ -331,21 +467,42 @@ async function exploreWithPlaywright(
           timeout: 45000,
         });
 
+        const responseStatus = response ? response.status() : 0;
         if (response) {
-          console.log(`[Explorer/Playwright] Status: ${response.status()}`);
+          console.log(`[Explorer/Playwright] Status: ${responseStatus}`);
+        }
+
+        if (responseStatus === 403 || responseStatus === 503) {
+          blockedCount++;
+          accessBlocked = true;
         }
 
         const htmlCheck = await page.content();
-        const cfIndicators = [
-          'Just a moment', 'Checking your browser', 'cf-browser-verification',
-          'challenge-platform', 'Attention Required', 'Access denied',
-        ];
-        const isBlocked = cfIndicators.some(ind => htmlCheck.includes(ind));
+        const isBlocked = detectCloudflare(htmlCheck);
 
         if (isBlocked) {
-          console.log('[Explorer/Playwright] Detectado bloqueio, aguardando...');
+          cloudflareDetected = true;
+          console.log('[Explorer/Playwright] Cloudflare detectado, tentando aguardar...');
+
           await sleep(10000);
           await page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
+
+          const htmlAfterWait = await page.content();
+          if (detectCloudflare(htmlAfterWait)) {
+            console.log('[Explorer/Playwright] Cloudflare ainda presente após primeira espera, tentando reload...');
+            await sleep(5000);
+            await page.reload({ waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
+            await sleep(5000);
+
+            const htmlAfterReload = await page.content();
+            if (detectCloudflare(htmlAfterReload)) {
+              blockedCount++;
+              accessBlocked = true;
+              if (!accessBlockReason) accessBlockReason = 'Cloudflare challenge não superado pelo Playwright';
+              console.log('[Explorer/Playwright] Cloudflare não superado, pulando página');
+              continue;
+            }
+          }
         }
 
         await sleep(3000);
@@ -391,6 +548,10 @@ async function exploreWithPlaywright(
     await browserPool.release(poolHandle.browser);
   }
 
+  if (blockedCount > 0) {
+    console.log(`[Explorer/Playwright] ${blockedCount} page(s) blocked. Cloudflare: ${cloudflareDetected}. Reason: ${accessBlockReason}`);
+  }
+
   return {
     pagesExplored: results.length,
     data: results,
@@ -404,6 +565,9 @@ async function exploreWithPlaywright(
       categoryCount: categoryUrls.size,
     },
     usedPlaywright: true,
+    cloudflare_detected: cloudflareDetected,
+    access_blocked: accessBlocked,
+    access_block_reason: accessBlockReason,
   };
 }
 

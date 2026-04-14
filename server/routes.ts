@@ -437,6 +437,18 @@ export async function registerRoutes(
         let miniScrapeResult: { urls_found: number; valid: boolean } | undefined;
         const diagnostics: Record<string, unknown> = {};
 
+        diagnostics.cloudflare_detected = result.cloudflare_detected || false;
+        diagnostics.access_blocked = result.access_blocked || false;
+        diagnostics.access_block_reason = result.access_block_reason;
+        diagnostics.exploration_links_found = result.exploration_links_found || 0;
+
+        const isAccessBlocked = result.access_blocked || result.cloudflare_detected;
+        const isFallbackConfig = !!(result.config && result.error);
+        if (isFallbackConfig) {
+          diagnostics.fallback_config = true;
+          diagnostics.fallback_reason = result.error;
+        }
+
         if (result.config) {
           configConfidence = scoreConfig(result.config as Record<string, unknown>);
 
@@ -447,15 +459,33 @@ export async function registerRoutes(
             miniScrapeResult = { urls_found: testResult.total_urls, valid: testResult.total_urls > 0 };
 
             if (testResult.total_urls === 0) {
-              diagnostics.config_validation = 'config_invalid';
-              diagnostics.config_validation_message = `Mini-scrape de teste encontrou 0 URLs. Confiança da config: ${configConfidence.confidence}%. Config invalidada — nenhum resultado encontrado.`;
+              const crawlErrors = (testResult.errors || []).join(' ');
+              const isMiniScrapeAccessBlocked = isAccessBlocked
+                || /timeout|abort|ECONNREFUSED|ECONNRESET|403|503|cloudflare|blocked|denied/i.test(crawlErrors);
+
+              if (isMiniScrapeAccessBlocked) {
+                diagnostics.config_validation = 'not_validated_access_blocked';
+                diagnostics.config_validation_message = `Mini-scrape encontrou 0 URLs, mas detectou bloqueio de acesso (${result.cloudflare_detected ? 'Cloudflare' : crawlErrors.slice(0, 80) || 'HTTP 403/bloqueio'}). Config salva como não validada — necessita validação manual.`;
+              } else {
+                diagnostics.config_validation = 'config_invalid';
+                diagnostics.config_validation_message = `Mini-scrape de teste encontrou 0 URLs. Confiança da config: ${configConfidence.confidence}%. Config invalidada — nenhum resultado encontrado.`;
+              }
             } else {
               diagnostics.config_validation = 'validated';
               diagnostics.config_validation_message = `Mini-scrape encontrou ${testResult.total_urls} URLs. Config validada.`;
             }
           } catch (testErr) {
             console.warn('[Onboarding] Mini-scrape test failed:', testErr);
-            diagnostics.config_validation = 'test_failed';
+            const testErrMsg = testErr instanceof Error ? testErr.message : String(testErr);
+            const isMiniScrapeAccessError = isAccessBlocked
+              || /timeout|abort|ECONNREFUSED|ECONNRESET|403|503|cloudflare/i.test(testErrMsg);
+
+            if (isMiniScrapeAccessError) {
+              diagnostics.config_validation = 'not_validated_access_blocked';
+              diagnostics.config_validation_message = `Mini-scrape falhou (${testErrMsg.slice(0, 100)}), provável bloqueio de acesso. Config salva como não validada.`;
+            } else {
+              diagnostics.config_validation = 'test_failed';
+            }
           }
 
           diagnostics.confidence_score = configConfidence?.confidence;
@@ -464,12 +494,19 @@ export async function registerRoutes(
         }
 
         const isConfigInvalid = diagnostics.config_validation === 'config_invalid';
+        const isNotValidatedDueToAccess = diagnostics.config_validation === 'not_validated_access_blocked';
 
         if (siteId && result.config && !isConfigInvalid) {
           try {
             const configObj = typeof result.config === "object" && result.config !== null
               ? result.config as Record<string, unknown>
               : {};
+
+            if (isNotValidatedDueToAccess) {
+              (configObj as Record<string, unknown>).validation_status = 'not_validated_access_blocked';
+              (configObj as Record<string, unknown>).validation_note = String(diagnostics.config_validation_message || 'Não validada por bloqueio de acesso');
+            }
+
             await saveSiteScrapingConfig(siteId, configObj);
             await clearSiteScrapingError(siteId);
             await updateSiteEngine(siteId, "internal");
