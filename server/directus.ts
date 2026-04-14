@@ -720,8 +720,14 @@ export async function executeLimpeza(
               });
               if (imgRes.ok) {
                 result.imagesDeleted++;
+              } else {
+                result.errors++;
+                result.errorDetails.push(`ID ${item.id}: falha ao excluir imagem ${item.arquivo_imagem} (HTTP ${imgRes.status})`);
               }
-            } catch {}
+            } catch (imgErr) {
+              result.errors++;
+              result.errorDetails.push(`ID ${item.id}: erro ao excluir imagem - ${imgErr instanceof Error ? imgErr.message : 'Unknown error'}`);
+            }
           }
         } else {
           result.errors++;
