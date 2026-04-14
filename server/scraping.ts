@@ -549,6 +549,9 @@ export async function startInternalOnboarding(
   access_blocked?: boolean;
   access_block_reason?: string;
   exploration_links_found?: number;
+  spa_detected?: boolean;
+  spa_warning?: string;
+  [key: string]: unknown;
 }> {
   const { extractDomain } = await import('./internal-scraper/utils.js');
   const domain = extractDomain(siteUrl);
