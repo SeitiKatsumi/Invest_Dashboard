@@ -450,8 +450,11 @@ export async function registerRoutes(
         diagnostics.access_blocked = result.access_blocked || false;
         diagnostics.access_block_reason = result.access_block_reason;
         diagnostics.exploration_links_found = result.exploration_links_found || 0;
+        diagnostics.spa_detected = result.spa_detected || false;
+        diagnostics.spa_warning = result.spa_warning || null;
 
         const isAccessBlocked = result.access_blocked || result.cloudflare_detected;
+        const isSpaDetected = !!result.spa_detected;
         const isFallbackConfig = !!(result.config && result.error);
         if (isFallbackConfig) {
           diagnostics.fallback_config = true;
@@ -472,7 +475,10 @@ export async function registerRoutes(
               const isMiniScrapeAccessBlocked = isAccessBlocked
                 || /timeout|abort|ECONNREFUSED|ECONNRESET|403|503|cloudflare|blocked|denied/i.test(crawlErrors);
 
-              if (isMiniScrapeAccessBlocked) {
+              if (isSpaDetected || testResult.spa_detected) {
+                diagnostics.config_validation = 'not_validated_spa_dynamic_content';
+                diagnostics.config_validation_message = `SPA/Firebase detectado. Mini-scrape encontrou 0 URLs — conteúdo é renderizado dinamicamente via JavaScript. Config salva como não validada.`;
+              } else if (isMiniScrapeAccessBlocked) {
                 diagnostics.config_validation = 'not_validated_access_blocked';
                 diagnostics.config_validation_message = `Mini-scrape encontrou 0 URLs, mas detectou bloqueio de acesso (${result.cloudflare_detected ? 'Cloudflare' : crawlErrors.slice(0, 80) || 'HTTP 403/bloqueio'}). Config salva como não validada — necessita validação manual.`;
               } else {
@@ -504,6 +510,7 @@ export async function registerRoutes(
 
         const isConfigInvalid = diagnostics.config_validation === 'config_invalid';
         const isNotValidatedDueToAccess = diagnostics.config_validation === 'not_validated_access_blocked';
+        const isNotValidatedDueToSpa = diagnostics.config_validation === 'not_validated_spa_dynamic_content';
 
         if (siteId && result.config && !isConfigInvalid) {
           try {
@@ -511,14 +518,23 @@ export async function registerRoutes(
               ? result.config as Record<string, unknown>
               : {};
 
-            if (isNotValidatedDueToAccess) {
+            if (isNotValidatedDueToSpa) {
+              (configObj as Record<string, unknown>).validation_status = 'not_validated_spa_dynamic_content';
+              (configObj as Record<string, unknown>).validation_note = String(diagnostics.config_validation_message || 'SPA/Firebase — conteúdo dinâmico');
+            } else if (isNotValidatedDueToAccess) {
               (configObj as Record<string, unknown>).validation_status = 'not_validated_access_blocked';
               (configObj as Record<string, unknown>).validation_note = String(diagnostics.config_validation_message || 'Não validada por bloqueio de acesso');
             }
 
             await saveSiteScrapingConfig(siteId, configObj);
 
-            if (isNotValidatedDueToAccess) {
+            if (isNotValidatedDueToSpa) {
+              await saveSiteScrapingError(
+                siteId,
+                `SPA/Firebase detectado — config gerada mas não validada. Conteúdo renderizado via JavaScript.`,
+                String(diagnostics.spa_warning || diagnostics.config_validation_message || '')
+              );
+            } else if (isNotValidatedDueToAccess) {
               await saveSiteScrapingError(
                 siteId,
                 `Config gerada mas não validada — ${result.cloudflare_detected ? 'Cloudflare detectado' : 'acesso bloqueado'}. Necessita validação manual.`,

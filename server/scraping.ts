@@ -107,14 +107,16 @@ export function classifyScrapingError(site: {
 
   const validationStatus = cfg?.validation_status as string | undefined;
   const isAccessBlocked = validationStatus === 'not_validated_access_blocked';
+  const isSpaValidation = validationStatus === 'not_validated_spa_dynamic_content';
 
   const error = (site.scraping_error || '').toLowerCase();
   const analysis = (site.scraping_error_analysis || '').toLowerCase();
   const combined = `${error} ${analysis}`;
 
-  const hasSignal = !!(site.scraping_error || isAccessBlocked);
+  const hasSignal = !!(site.scraping_error || isAccessBlocked || isSpaValidation);
   if (!hasSignal) return 'ok';
 
+  if (isSpaValidation) return 'spa_dynamic_content';
   if (/cloudflare|captcha|challenge/i.test(combined)) return 'cloudflare';
   if (/timeout|timed out|expirou|abort/i.test(combined)) return 'timeout';
   if (/403|blocked|denied|forbidden|access denied/i.test(combined)) return 'access_denied';

@@ -1242,24 +1242,45 @@ function OnboardingDialog({
           )}
 
           {result && (
-            <div className="p-4 bg-green-500/10 rounded-md space-y-2">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-green-500" />
-                <p className="text-sm font-medium">Análise concluída</p>
+            <div className="space-y-2">
+              {result.spa_warning && (
+                <div className="p-4 bg-purple-500/10 border border-purple-300 dark:border-purple-700 rounded-md space-y-1" data-testid="alert-spa-warning">
+                  <div className="flex items-center gap-2">
+                    <Globe className="h-5 w-5 text-purple-500" />
+                    <p className="text-sm font-medium text-purple-700 dark:text-purple-300">SPA/Firebase Detectado</p>
+                  </div>
+                  <p className="text-xs text-purple-600 dark:text-purple-400">{String(result.spa_warning)}</p>
+                  <p className="text-xs text-muted-foreground mt-1">A config foi salva como não validada. O conteúdo deste site é carregado via JavaScript e pode necessitar ajustes manuais.</p>
+                </div>
+              )}
+              {result.config_validation === 'not_validated_spa_dynamic_content' && !result.spa_warning && (
+                <div className="p-4 bg-purple-500/10 border border-purple-300 dark:border-purple-700 rounded-md" data-testid="alert-spa-validation">
+                  <div className="flex items-center gap-2">
+                    <Globe className="h-5 w-5 text-purple-500" />
+                    <p className="text-sm font-medium text-purple-700 dark:text-purple-300">Config não validada — SPA</p>
+                  </div>
+                  <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">{String(result.config_validation_message || 'Conteúdo dinâmico detectado.')}</p>
+                </div>
+              )}
+              <div className="p-4 bg-green-500/10 rounded-md space-y-2">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                  <p className="text-sm font-medium">Análise concluída</p>
+                </div>
+                {"config_id" in result && result.config_id ? (
+                  <p className="text-xs text-muted-foreground">
+                    Config ID: <span className="font-mono">{String(result.config_id)}</span>
+                  </p>
+                ) : null}
+                {"config" in result && result.config ? (
+                  <details className="text-xs">
+                    <summary className="cursor-pointer text-muted-foreground">Ver configuração gerada</summary>
+                    <pre className="mt-2 p-2 bg-muted rounded text-xs overflow-auto max-h-48 whitespace-pre-wrap break-all">
+                      {JSON.stringify(result.config, null, 2)}
+                    </pre>
+                  </details>
+                ) : null}
               </div>
-              {"config_id" in result && result.config_id ? (
-                <p className="text-xs text-muted-foreground">
-                  Config ID: <span className="font-mono">{String(result.config_id)}</span>
-                </p>
-              ) : null}
-              {"config" in result && result.config ? (
-                <details className="text-xs">
-                  <summary className="cursor-pointer text-muted-foreground">Ver configuração gerada</summary>
-                  <pre className="mt-2 p-2 bg-muted rounded text-xs overflow-auto max-h-48 whitespace-pre-wrap break-all">
-                    {JSON.stringify(result.config, null, 2)}
-                  </pre>
-                </details>
-              ) : null}
             </div>
           )}
         </div>
