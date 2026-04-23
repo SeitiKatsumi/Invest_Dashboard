@@ -298,13 +298,25 @@ export function buildLeilaoMessage(leilao: Leilao): string {
   const descontoIsValid = descontoRaw !== "" && descontoNumeric > 0;
   if (descontoIsValid) {
     descontoStr = descontoRaw;
-  } else if (leilao.valor_avalaiacao_imovel && leilao.valor_leilao) {
+  } else if (leilao.valor_avalaiacao_imovel) {
     const avaliacao = parseNumericValue(String(leilao.valor_avalaiacao_imovel));
-    const leilaoVal = parseNumericValue(String(leilao.valor_leilao));
-    if (avaliacao > 0 && leilaoVal > 0 && leilaoVal < avaliacao) {
-      const pct = Math.round(((avaliacao - leilaoVal) / avaliacao) * 100);
-      if (pct > 0) {
-        descontoStr = `${pct}%`;
+    const candidates = [
+      leilao.valor_leilao,
+      (leilao as Record<string, unknown>).valor_praca1,
+      (leilao as Record<string, unknown>).valor_praca2,
+      (leilao as Record<string, unknown>).valor_praca3,
+    ]
+      .filter((v): v is string | number => v != null && String(v).trim() !== "")
+      .map((v) => parseNumericValue(String(v)))
+      .filter((n) => n > 0);
+
+    if (avaliacao > 0 && candidates.length > 0) {
+      const lowest = Math.min(...candidates);
+      if (lowest < avaliacao) {
+        const pct = Math.round(((avaliacao - lowest) / avaliacao) * 100);
+        if (pct > 0) {
+          descontoStr = `${pct}%`;
+        }
       }
     }
   }

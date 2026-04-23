@@ -66,6 +66,9 @@ export interface Leilao {
   link_edital: string | null;
   link_matricula: string | null;
   valor_leilao: string | null;
+  valor_praca1: string | null;
+  valor_praca2: string | null;
+  valor_praca3: string | null;
   desconto: string | null;
   numero_do_processo: string | null;
   cep: string | null;
