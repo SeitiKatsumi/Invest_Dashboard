@@ -329,7 +329,7 @@ export function buildLeilaoMessage(leilao: Leilao): string {
 
   lines.push("");
   lines.push("─────────────────");
-  lines.push(`🔗 *Link do Imóvel:* https://app.investleiloesbrasil.com.br/imovel/?id=${leilao.id}`);
+  lines.push(`🔗 *Link do Imóvel:* https://investleiloesbrasil.com.br/imovel/?id=${leilao.id}`);
   lines.push(`📲 *Está com dúvidas? Fale com um consultor:* https://bit.ly/imovel-mais`);
   lines.push("");
   lines.push("⚠️ Solicite análise desse imóvel até 7 dias antes da finalização do leilão");
