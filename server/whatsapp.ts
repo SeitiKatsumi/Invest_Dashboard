@@ -293,8 +293,11 @@ export function buildLeilaoMessage(leilao: Leilao): string {
   }
 
   let descontoStr = "";
-  if (leilao.desconto && String(leilao.desconto).trim() !== "" && String(leilao.desconto).trim() !== "0" && String(leilao.desconto).trim() !== "0%") {
-    descontoStr = String(leilao.desconto);
+  const descontoRaw = leilao.desconto != null ? String(leilao.desconto).trim() : "";
+  const descontoNumeric = descontoRaw ? parseNumericValue(descontoRaw) : 0;
+  const descontoIsValid = descontoRaw !== "" && descontoNumeric > 0;
+  if (descontoIsValid) {
+    descontoStr = descontoRaw;
   } else if (leilao.valor_avalaiacao_imovel && leilao.valor_leilao) {
     const avaliacao = parseNumericValue(String(leilao.valor_avalaiacao_imovel));
     const leilaoVal = parseNumericValue(String(leilao.valor_leilao));
