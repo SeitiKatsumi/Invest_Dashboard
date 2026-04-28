@@ -1423,9 +1423,15 @@ export async function registerRoutes(
       const groupCount = groupJids.length;
       for (const item of items) {
         const leilaoId = Number(item?.leilao_id);
-        const mensagem: string | null = typeof item?.mensagem === "string" ? item.mensagem : null;
+        const rawMsg = typeof item?.mensagem === "string" ? item.mensagem : "";
+        const mensagem: string | null = rawMsg.trim().length > 0 ? rawMsg : null;
         if (!Number.isFinite(leilaoId) || leilaoId <= 0) {
           perItem.push({ leilaoId: 0, ok: false, sent: 0, failed: groupCount, error: "leilao_id inválido" });
+          totalFailed += groupCount;
+          continue;
+        }
+        if (!mensagem) {
+          perItem.push({ leilaoId, ok: false, sent: 0, failed: groupCount, error: "mensagem é obrigatória" });
           totalFailed += groupCount;
           continue;
         }
