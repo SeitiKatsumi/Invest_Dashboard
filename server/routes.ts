@@ -1420,11 +1420,13 @@ export async function registerRoutes(
         error?: string;
       }> = [];
 
+      const groupCount = groupJids.length;
       for (const item of items) {
         const leilaoId = Number(item?.leilao_id);
         const mensagem: string | null = typeof item?.mensagem === "string" ? item.mensagem : null;
         if (!Number.isFinite(leilaoId) || leilaoId <= 0) {
           perItem.push({ leilaoId: 0, ok: false, sent: 0, failed: 0, error: "leilao_id inválido" });
+          totalFailed += groupCount;
           continue;
         }
 
@@ -1432,6 +1434,7 @@ export async function registerRoutes(
           const leilao = await getLeilaoById(leilaoId);
           if (!leilao) {
             perItem.push({ leilaoId, ok: false, sent: 0, failed: 0, error: "Leilão não encontrado" });
+            totalFailed += groupCount;
             continue;
           }
 
