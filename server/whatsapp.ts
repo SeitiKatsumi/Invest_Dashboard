@@ -533,6 +533,20 @@ export async function updateAgendamento(id: number, patch: Partial<{
 
 export const updateAgendamentoStatus = updateAgendamento;
 
+export async function claimAgendamento(id: number): Promise<WhatsAppAgendamento | null> {
+  const params = new URLSearchParams();
+  params.set("filter[id][_eq]", String(id));
+  params.set("filter[status][_eq]", "pendente");
+  const result = await directusRequest(
+    "PATCH",
+    `whatsapp_agendamentos?${params.toString()}`,
+    { status: "executando" },
+  );
+  const items = Array.isArray(result?.data) ? result.data : [];
+  if (items.length === 0) return null;
+  return normalizeAgendamento(items[0]);
+}
+
 export async function cancelAgendamento(id: number): Promise<WhatsAppAgendamento> {
   const current = await getAgendamentoById(id);
   if (!current) {

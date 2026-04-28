@@ -1,7 +1,7 @@
 import {
   getDueAgendamentos,
-  getAgendamentoById,
   updateAgendamento,
+  claimAgendamento,
   getLeilaoById,
   getGrupos,
   sendLeilaoToGroups,
@@ -51,29 +51,19 @@ function isConnectionError(msg: string): boolean {
 async function executeAgendamento(ag: WhatsAppAgendamento): Promise<void> {
   console.log(`[WhatsApp Scheduler] Executando agendamento #${ag.id} (leilão ${ag.leilao_id})`);
 
-  // Re-leitura defensiva: se foi cancelado entre a busca e a execução, pula.
-  let fresh: WhatsAppAgendamento | null = null;
+  // Claim atômico: PATCH com filtro status=pendente. Se outro processo cancelou
+  // ou já reivindicou, o filtro não casa e nada é atualizado, evitando corrida.
+  let claimed: WhatsAppAgendamento | null = null;
   try {
-    fresh = await getAgendamentoById(ag.id);
+    claimed = await claimAgendamento(ag.id);
   } catch (e) {
-    console.error(`[WhatsApp Scheduler] Falha ao reler agendamento #${ag.id}:`, e);
+    console.error(`[WhatsApp Scheduler] Falha ao reivindicar agendamento #${ag.id}:`, e);
     return;
   }
-  if (!fresh) {
-    console.log(`[WhatsApp Scheduler] Agendamento #${ag.id} não encontrado, pulando`);
-    return;
-  }
-  if (fresh.status !== "pendente") {
+  if (!claimed) {
     console.log(
-      `[WhatsApp Scheduler] Agendamento #${ag.id} já está em status '${fresh.status}', pulando`,
+      `[WhatsApp Scheduler] Agendamento #${ag.id} não estava mais pendente (provável cancelamento), pulando`,
     );
-    return;
-  }
-
-  try {
-    await updateAgendamento(ag.id, { status: "executando" });
-  } catch (e) {
-    console.error(`[WhatsApp Scheduler] Falha ao marcar agendamento #${ag.id} como executando:`, e);
     return;
   }
 

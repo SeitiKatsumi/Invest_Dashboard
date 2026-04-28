@@ -1040,16 +1040,12 @@ function DisparoPanel() {
       toast({
         title: "Agendamentos criados!",
         description: errorCount > 0
-          ? `${createdCount} agendados com sucesso, ${errorCount} falharam (mantidos na fila)`
+          ? `${createdCount} agendados com sucesso, ${errorCount} falharam — confira os erros e re-adicione se necessário`
           : `${createdCount} agendamento(s) criado(s)`,
+        variant: errorCount > 0 ? "destructive" : undefined,
       });
-      if (errorCount === 0) {
-        setQueue([]);
-        setSelectedGrupos([]);
-      } else {
-        const failedIdxSet = new Set(errors.map((e) => e.index));
-        setQueue((prev) => prev.filter((_, idx) => failedIdxSet.has(idx)));
-      }
+      setQueue([]);
+      setSelectedGrupos([]);
     },
     onError: (error: Error) => {
       toast({
