@@ -531,6 +531,8 @@ export async function updateAgendamento(id: number, patch: Partial<{
   return normalizeAgendamento(result?.data);
 }
 
+export const updateAgendamentoStatus = updateAgendamento;
+
 export async function cancelAgendamento(id: number): Promise<WhatsAppAgendamento> {
   const current = await getAgendamentoById(id);
   if (!current) {
