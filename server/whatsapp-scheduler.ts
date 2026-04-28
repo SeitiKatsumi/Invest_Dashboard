@@ -8,7 +8,7 @@ import {
   createDisparo,
   getConnectionStatus,
 } from "./whatsapp.js";
-import type { WhatsAppAgendamento } from "@shared/schema";
+import type { Leilao, WhatsAppAgendamento } from "@shared/schema";
 
 const TICK_MS = 60_000;
 const DIRECTUS_URL = process.env.DIRECTUS_URL?.trim();
@@ -17,9 +17,9 @@ const DIRECTUS_TOKEN = process.env.DIRECTUS_TOKEN?.trim();
 let interval: ReturnType<typeof setInterval> | null = null;
 let isProcessing = false;
 
-async function buildImageUrl(leilao: any): Promise<string | null> {
-  let imageUrl: string | null = leilao?.link_imagem || null;
-  if (!imageUrl && leilao?.arquivo_imagem && DIRECTUS_URL && DIRECTUS_TOKEN) {
+async function buildImageUrl(leilao: Leilao): Promise<string | null> {
+  let imageUrl: string | null = leilao.link_imagem || null;
+  if (!imageUrl && leilao.arquivo_imagem && DIRECTUS_URL && DIRECTUS_TOKEN) {
     try {
       const imgResp = await fetch(`${DIRECTUS_URL}/assets/${leilao.arquivo_imagem}`, {
         headers: { Authorization: `Bearer ${DIRECTUS_TOKEN}` },

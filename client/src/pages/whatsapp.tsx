@@ -992,7 +992,7 @@ function DisparoPanel() {
   }, [addToQueue]);
 
   const dispararMultiMutation = useMutation({
-    mutationFn: (data: { items: { leilao_id: number; mensagem: string }[]; grupoIds: number[] }) =>
+    mutationFn: (data: { items: { leilao_id: number; mensagem: string }[]; grupo_ids: number[] }) =>
       apiRequest("POST", "/api/whatsapp/disparar-multi", data).then((r) => r.json()),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/disparos"] });
@@ -1015,7 +1015,7 @@ function DisparoPanel() {
   const agendarMutation = useMutation({
     mutationFn: (data: {
       items: { leilao_id: number; mensagem: string; scheduled_at: string }[];
-      grupoIds: number[];
+      grupo_ids: number[];
     }) => apiRequest("POST", "/api/whatsapp/agendamentos", data).then((r) => r.json()),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/agendamentos"] });
@@ -1059,7 +1059,7 @@ function DisparoPanel() {
     }
     dispararMultiMutation.mutate({
       items: queue.map((q) => ({ leilao_id: q.leilao.id, mensagem: q.mensagem })),
-      grupoIds: selectedGrupos,
+      grupo_ids: selectedGrupos,
     });
   };
 
@@ -1106,7 +1106,7 @@ function DisparoPanel() {
         mensagem: q.mensagem,
         scheduled_at: new Date(q.scheduledAt).toISOString(),
       })),
-      grupoIds: selectedGrupos,
+      grupo_ids: selectedGrupos,
     });
   };
 
@@ -1310,9 +1310,9 @@ function DisparoPanel() {
                       </div>
                     </div>
                     <div className="flex items-start gap-3 flex-shrink-0">
-                      {(item.leilao as any).link_imagem && (
+                      {item.leilao.link_imagem && (
                         <img
-                          src={(item.leilao as any).link_imagem}
+                          src={item.leilao.link_imagem}
                           alt="Imagem do leilão"
                           className="w-16 h-16 rounded-lg object-cover"
                           onError={(e) => (e.currentTarget.style.display = "none")}

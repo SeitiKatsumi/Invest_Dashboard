@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { getDashboardStats, getDetailedLogs, getSites, createLeilao, findSiteByUrl, findDuplicates, deleteLeilaoItems, previewLimpeza, executeLimpeza } from "./directus";
 import { getEstimate, startScan, getScanStatus, abortScan, cleanupItems, resetScan, scanEmitter } from "./classifier";
-import { leilaoInsertSchema } from "@shared/schema";
+import { leilaoInsertSchema, type WhatsAppAgendamento, type WhatsAppAgendamentoStatus } from "@shared/schema";
 import { extractAuctionDataFromImage } from "./openai";
 import { getOpenAIApiKey, setOpenAIApiKey, isOpenAIKeyConfigured, getMaskedKey, getUsageSummary } from "./openai-usage";
 import {
@@ -72,6 +72,17 @@ import {
   listAgendamentos,
   cancelAgendamento,
 } from "./whatsapp";
+
+function isCollectionMissingError(msg: string): boolean {
+  return (
+    msg.includes("FORBIDDEN") ||
+    msg.includes("403") ||
+    msg.includes("404") ||
+    msg.toLowerCase().includes("not found")
+  );
+}
+
+const COLLECTION_MISSING_HINT = "Verifique se a coleção 'whatsapp_agendamentos' existe no Directus.";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -1381,16 +1392,16 @@ export async function registerRoutes(
 
   app.post("/api/whatsapp/disparar-multi", async (req, res) => {
     try {
-      const { items, grupoIds } = req.body || {};
+      const { items, grupo_ids } = req.body || {};
       if (!Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ error: "items é obrigatório (array de imóveis)" });
       }
-      if (!Array.isArray(grupoIds) || grupoIds.length === 0) {
-        return res.status(400).json({ error: "grupoIds é obrigatório" });
+      if (!Array.isArray(grupo_ids) || grupo_ids.length === 0) {
+        return res.status(400).json({ error: "grupo_ids é obrigatório" });
       }
 
       const grupos = await getGrupos();
-      const selectedGrupos = grupos.filter((g) => grupoIds.includes(g.id));
+      const selectedGrupos = grupos.filter((g) => grupo_ids.includes(g.id));
       const groupJids = selectedGrupos.map((g) => g.jid);
       if (groupJids.length === 0) {
         return res.status(400).json({ error: "Nenhum grupo válido selecionado" });
@@ -1421,10 +1432,10 @@ export async function registerRoutes(
             continue;
           }
 
-          let imageUrl: string | null = (leilao as any).link_imagem || null;
-          if (!imageUrl && (leilao as any).arquivo_imagem) {
+          let imageUrl: string | null = leilao.link_imagem || null;
+          if (!imageUrl && leilao.arquivo_imagem) {
             const DIRECTUS_URL = process.env.DIRECTUS_URL?.trim();
-            const assetId = (leilao as any).arquivo_imagem;
+            const assetId = leilao.arquivo_imagem;
             try {
               const imgResp = await fetch(`${DIRECTUS_URL}/assets/${assetId}`, {
                 headers: { Authorization: `Bearer ${process.env.DIRECTUS_TOKEN?.trim()}` },
@@ -1488,25 +1499,25 @@ export async function registerRoutes(
 
   app.post("/api/whatsapp/agendamentos", async (req, res) => {
     try {
-      const { items, grupoIds } = req.body || {};
+      const { items, grupo_ids } = req.body || {};
       if (!Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ error: "items é obrigatório (array de imóveis a agendar)" });
       }
-      if (!Array.isArray(grupoIds) || grupoIds.length === 0) {
-        return res.status(400).json({ error: "grupoIds é obrigatório" });
+      if (!Array.isArray(grupo_ids) || grupo_ids.length === 0) {
+        return res.status(400).json({ error: "grupo_ids é obrigatório" });
       }
 
       const grupos = await getGrupos();
       const validGrupoIds = new Set(grupos.map((g) => g.id));
-      const sanitizedGrupoIds = grupoIds
-        .map((n: any) => Number(n))
-        .filter((n: number) => Number.isFinite(n) && validGrupoIds.has(n));
+      const sanitizedGrupoIds: number[] = (grupo_ids as unknown[])
+        .map((n) => Number(n))
+        .filter((n): n is number => Number.isFinite(n) && validGrupoIds.has(n));
       if (sanitizedGrupoIds.length === 0) {
         return res.status(400).json({ error: "Nenhum grupo válido informado" });
       }
 
       const now = Date.now();
-      const created: any[] = [];
+      const created: WhatsAppAgendamento[] = [];
       const errors: Array<{ index: number; error: string }> = [];
 
       for (let i = 0; i < items.length; i++) {
@@ -1568,22 +1579,27 @@ export async function registerRoutes(
       res.status(500).json({
         error: "Falha ao criar agendamentos",
         message: msg,
-        hint: msg.includes("404") || msg.toLowerCase().includes("not found")
-          ? "Verifique se a coleção 'whatsapp_agendamentos' existe no Directus."
-          : undefined,
+        hint: isCollectionMissingError(msg) ? COLLECTION_MISSING_HINT : undefined,
       });
     }
   });
 
   app.get("/api/whatsapp/agendamentos", async (req, res) => {
     try {
-      const status = req.query.status as string | undefined;
-      const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
-      const validStatuses = ["pendente", "executando", "concluido", "erro", "cancelado"];
-      const result = await listAgendamentos({
-        status: status && validStatuses.includes(status) ? (status as any) : undefined,
-        limit,
-      });
+      const statusParam = typeof req.query.status === "string" ? req.query.status : undefined;
+      const limit = typeof req.query.limit === "string" ? parseInt(req.query.limit) : undefined;
+      const validStatuses: WhatsAppAgendamentoStatus[] = [
+        "pendente",
+        "executando",
+        "concluido",
+        "erro",
+        "cancelado",
+      ];
+      const status: WhatsAppAgendamentoStatus | undefined =
+        statusParam && (validStatuses as string[]).includes(statusParam)
+          ? (statusParam as WhatsAppAgendamentoStatus)
+          : undefined;
+      const result = await listAgendamentos({ status, limit });
       res.json(result);
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Erro desconhecido";
@@ -1591,9 +1607,7 @@ export async function registerRoutes(
       res.status(500).json({
         error: "Falha ao buscar agendamentos",
         message: msg,
-        hint: msg.includes("404") || msg.toLowerCase().includes("not found")
-          ? "Verifique se a coleção 'whatsapp_agendamentos' existe no Directus."
-          : undefined,
+        hint: isCollectionMissingError(msg) ? COLLECTION_MISSING_HINT : undefined,
       });
     }
   });

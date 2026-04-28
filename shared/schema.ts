@@ -77,6 +77,7 @@ export interface Leilao {
   endereco: string | null;
   link_anuncio: string | null;
   arquivo_imagem: string | null;
+  link_imagem?: string | null;
   status_publicacao_wp: string | null;
   site: number | null;
   date_created: string | null;

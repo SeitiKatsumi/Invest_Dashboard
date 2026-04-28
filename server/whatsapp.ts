@@ -426,34 +426,51 @@ export async function getDisparos(limit = 50): Promise<WhatsAppDisparo[]> {
   return result?.data || [];
 }
 
-function normalizeAgendamento(raw: any): WhatsAppAgendamento {
+function toNumberArray(input: unknown): number[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .map((n) => Number(n))
+    .filter((n): n is number => Number.isFinite(n));
+}
+
+function normalizeAgendamento(raw: Record<string, unknown>): WhatsAppAgendamento {
   let grupoIds: number[] = [];
-  if (Array.isArray(raw?.grupo_ids)) {
-    grupoIds = raw.grupo_ids.map((n: any) => Number(n)).filter((n: number) => Number.isFinite(n));
-  } else if (typeof raw?.grupo_ids === "string") {
+  const rawGrupos = raw.grupo_ids;
+  if (Array.isArray(rawGrupos)) {
+    grupoIds = toNumberArray(rawGrupos);
+  } else if (typeof rawGrupos === "string") {
     try {
-      const parsed = JSON.parse(raw.grupo_ids);
-      if (Array.isArray(parsed)) {
-        grupoIds = parsed.map((n: any) => Number(n)).filter((n: number) => Number.isFinite(n));
-      }
+      const parsed = JSON.parse(rawGrupos);
+      grupoIds = toNumberArray(parsed);
     } catch {
-      // ignore
+      // ignore JSON parse errors — leave list empty
     }
   }
+  const validStatuses: WhatsAppAgendamentoStatus[] = [
+    "pendente",
+    "executando",
+    "concluido",
+    "erro",
+    "cancelado",
+  ];
+  const rawStatus = typeof raw.status === "string" ? raw.status : "";
+  const status: WhatsAppAgendamentoStatus = (validStatuses as string[]).includes(rawStatus)
+    ? (rawStatus as WhatsAppAgendamentoStatus)
+    : "pendente";
   return {
-    id: raw.id,
-    leilao_id: raw.leilao_id,
-    leilao_nome: raw.leilao_nome ?? null,
+    id: Number(raw.id),
+    leilao_id: Number(raw.leilao_id),
+    leilao_nome: typeof raw.leilao_nome === "string" ? raw.leilao_nome : null,
     grupo_ids: grupoIds,
-    mensagem: raw.mensagem ?? "",
-    scheduled_at: raw.scheduled_at,
-    status: (raw.status as WhatsAppAgendamentoStatus) || "pendente",
-    sent_count: raw.sent_count ?? null,
-    failed_count: raw.failed_count ?? null,
-    executed_at: raw.executed_at ?? null,
-    error_message: raw.error_message ?? null,
-    date_created: raw.date_created ?? null,
-    date_updated: raw.date_updated ?? null,
+    mensagem: typeof raw.mensagem === "string" ? raw.mensagem : "",
+    scheduled_at: typeof raw.scheduled_at === "string" ? raw.scheduled_at : "",
+    status,
+    sent_count: typeof raw.sent_count === "number" ? raw.sent_count : null,
+    failed_count: typeof raw.failed_count === "number" ? raw.failed_count : null,
+    executed_at: typeof raw.executed_at === "string" ? raw.executed_at : null,
+    error_message: typeof raw.error_message === "string" ? raw.error_message : null,
+    date_created: typeof raw.date_created === "string" ? raw.date_created : null,
+    date_updated: typeof raw.date_updated === "string" ? raw.date_updated : null,
   };
 }
 
