@@ -1400,8 +1400,11 @@ export async function registerRoutes(
         return res.status(400).json({ error: "grupo_ids é obrigatório" });
       }
 
+      const sanitizedGrupoIds: number[] = (grupo_ids as unknown[])
+        .map((n) => Number(n))
+        .filter((n): n is number => Number.isFinite(n));
       const grupos = await getGrupos();
-      const selectedGrupos = grupos.filter((g) => grupo_ids.includes(g.id));
+      const selectedGrupos = grupos.filter((g) => sanitizedGrupoIds.includes(g.id));
       const groupJids = selectedGrupos.map((g) => g.jid);
       if (groupJids.length === 0) {
         return res.status(400).json({ error: "Nenhum grupo válido selecionado" });
@@ -1566,9 +1569,11 @@ export async function registerRoutes(
       }
 
       if (created.length === 0) {
+        const collectionMissing = errors.some((e) => isCollectionMissingError(e.error));
         return res.status(400).json({
           error: "Nenhum agendamento foi criado",
           details: errors,
+          hint: collectionMissing ? COLLECTION_MISSING_HINT : undefined,
         });
       }
 
