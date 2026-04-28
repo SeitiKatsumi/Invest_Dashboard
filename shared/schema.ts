@@ -196,6 +196,29 @@ export interface WhatsAppDisparo {
   date_created: string | null;
 }
 
+export type WhatsAppAgendamentoStatus =
+  | "pendente"
+  | "executando"
+  | "concluido"
+  | "erro"
+  | "cancelado";
+
+export interface WhatsAppAgendamento {
+  id: number;
+  leilao_id: number;
+  leilao_nome: string | null;
+  grupo_ids: number[];
+  mensagem: string;
+  scheduled_at: string;
+  status: WhatsAppAgendamentoStatus;
+  sent_count: number | null;
+  failed_count: number | null;
+  executed_at: string | null;
+  error_message: string | null;
+  date_created: string | null;
+  date_updated: string | null;
+}
+
 export const dashboardStatsSchema = z.object({
   sites: z.object({
     total: z.number(),

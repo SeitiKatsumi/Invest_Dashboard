@@ -68,6 +68,9 @@ import {
   getWhatsAppGroups,
   resolveInviteLink,
   buildLeilaoMessage,
+  createAgendamento,
+  listAgendamentos,
+  cancelAgendamento,
 } from "./whatsapp";
 
 export async function registerRoutes(
@@ -1373,6 +1376,247 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching disparos:", error);
       res.status(500).json({ error: "Falha ao buscar histórico" });
+    }
+  });
+
+  app.post("/api/whatsapp/disparar-multi", async (req, res) => {
+    try {
+      const { items, grupoIds } = req.body || {};
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ error: "items é obrigatório (array de imóveis)" });
+      }
+      if (!Array.isArray(grupoIds) || grupoIds.length === 0) {
+        return res.status(400).json({ error: "grupoIds é obrigatório" });
+      }
+
+      const grupos = await getGrupos();
+      const selectedGrupos = grupos.filter((g) => grupoIds.includes(g.id));
+      const groupJids = selectedGrupos.map((g) => g.jid);
+      if (groupJids.length === 0) {
+        return res.status(400).json({ error: "Nenhum grupo válido selecionado" });
+      }
+
+      let totalSent = 0;
+      let totalFailed = 0;
+      const perItem: Array<{
+        leilaoId: number;
+        ok: boolean;
+        sent: number;
+        failed: number;
+        error?: string;
+      }> = [];
+
+      for (const item of items) {
+        const leilaoId = Number(item?.leilao_id);
+        const mensagem: string | null = typeof item?.mensagem === "string" ? item.mensagem : null;
+        if (!Number.isFinite(leilaoId) || leilaoId <= 0) {
+          perItem.push({ leilaoId: 0, ok: false, sent: 0, failed: 0, error: "leilao_id inválido" });
+          continue;
+        }
+
+        try {
+          const leilao = await getLeilaoById(leilaoId);
+          if (!leilao) {
+            perItem.push({ leilaoId, ok: false, sent: 0, failed: 0, error: "Leilão não encontrado" });
+            continue;
+          }
+
+          let imageUrl: string | null = (leilao as any).link_imagem || null;
+          if (!imageUrl && (leilao as any).arquivo_imagem) {
+            const DIRECTUS_URL = process.env.DIRECTUS_URL?.trim();
+            const assetId = (leilao as any).arquivo_imagem;
+            try {
+              const imgResp = await fetch(`${DIRECTUS_URL}/assets/${assetId}`, {
+                headers: { Authorization: `Bearer ${process.env.DIRECTUS_TOKEN?.trim()}` },
+              });
+              if (imgResp.ok) {
+                const buf = Buffer.from(await imgResp.arrayBuffer());
+                imageUrl = `data:image/jpeg;base64,${buf.toString("base64")}`;
+              }
+            } catch (e) {
+              console.warn("Could not fetch Directus asset for WhatsApp:", e);
+            }
+          }
+
+          const result = await sendLeilaoToGroups(leilao, groupJids, imageUrl, mensagem);
+
+          for (const grupo of selectedGrupos) {
+            const wasSent = result.sent.includes(grupo.jid);
+            const failInfo = result.failed.find((f) => f.jid === grupo.jid);
+            try {
+              await createDisparo({
+                leilao_id: leilao.id,
+                leilao_nome: leilao.nome_do_anuncio || `Leilão #${leilao.id}`,
+                grupo_id: grupo.id,
+                grupo_nome: grupo.nome,
+                status: wasSent ? "enviado" : "erro",
+                erro_mensagem: failInfo?.error || null,
+              });
+            } catch (e) {
+              console.error("Error saving disparo record:", e);
+            }
+          }
+
+          totalSent += result.sent.length;
+          totalFailed += result.failed.length;
+          perItem.push({
+            leilaoId,
+            ok: result.failed.length === 0,
+            sent: result.sent.length,
+            failed: result.failed.length,
+          });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : "Erro desconhecido";
+          perItem.push({ leilaoId, ok: false, sent: 0, failed: 0, error: msg });
+        }
+      }
+
+      res.json({
+        success: true,
+        totalSent,
+        totalFailed,
+        items: perItem,
+      });
+    } catch (error) {
+      console.error("Error in disparar-multi:", error);
+      res.status(500).json({
+        error: "Falha no disparo múltiplo",
+        message: error instanceof Error ? error.message : "Erro desconhecido",
+      });
+    }
+  });
+
+  app.post("/api/whatsapp/agendamentos", async (req, res) => {
+    try {
+      const { items, grupoIds } = req.body || {};
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ error: "items é obrigatório (array de imóveis a agendar)" });
+      }
+      if (!Array.isArray(grupoIds) || grupoIds.length === 0) {
+        return res.status(400).json({ error: "grupoIds é obrigatório" });
+      }
+
+      const grupos = await getGrupos();
+      const validGrupoIds = new Set(grupos.map((g) => g.id));
+      const sanitizedGrupoIds = grupoIds
+        .map((n: any) => Number(n))
+        .filter((n: number) => Number.isFinite(n) && validGrupoIds.has(n));
+      if (sanitizedGrupoIds.length === 0) {
+        return res.status(400).json({ error: "Nenhum grupo válido informado" });
+      }
+
+      const now = Date.now();
+      const created: any[] = [];
+      const errors: Array<{ index: number; error: string }> = [];
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const leilaoId = Number(item?.leilao_id);
+        const mensagem = typeof item?.mensagem === "string" ? item.mensagem.trim() : "";
+        const scheduledAtRaw = item?.scheduled_at;
+
+        if (!Number.isFinite(leilaoId) || leilaoId <= 0) {
+          errors.push({ index: i, error: "leilao_id inválido" });
+          continue;
+        }
+        if (!mensagem) {
+          errors.push({ index: i, error: "mensagem obrigatória" });
+          continue;
+        }
+        const scheduledDate = scheduledAtRaw ? new Date(scheduledAtRaw) : null;
+        if (!scheduledDate || isNaN(scheduledDate.getTime())) {
+          errors.push({ index: i, error: "scheduled_at inválido" });
+          continue;
+        }
+        if (scheduledDate.getTime() <= now) {
+          errors.push({ index: i, error: "scheduled_at deve estar no futuro" });
+          continue;
+        }
+
+        try {
+          const leilao = await getLeilaoById(leilaoId);
+          if (!leilao) {
+            errors.push({ index: i, error: `Leilão ${leilaoId} não encontrado` });
+            continue;
+          }
+
+          const ag = await createAgendamento({
+            leilao_id: leilao.id,
+            leilao_nome: leilao.nome_do_anuncio || `Leilão #${leilao.id}`,
+            grupo_ids: sanitizedGrupoIds,
+            mensagem,
+            scheduled_at: scheduledDate.toISOString(),
+          });
+          created.push(ag);
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : "Erro desconhecido";
+          errors.push({ index: i, error: msg });
+        }
+      }
+
+      if (created.length === 0) {
+        return res.status(400).json({
+          error: "Nenhum agendamento foi criado",
+          details: errors,
+        });
+      }
+
+      res.json({ success: true, created, errors });
+    } catch (error) {
+      console.error("Error creating agendamentos:", error);
+      const msg = error instanceof Error ? error.message : "Erro desconhecido";
+      res.status(500).json({
+        error: "Falha ao criar agendamentos",
+        message: msg,
+        hint: msg.includes("404") || msg.toLowerCase().includes("not found")
+          ? "Verifique se a coleção 'whatsapp_agendamentos' existe no Directus."
+          : undefined,
+      });
+    }
+  });
+
+  app.get("/api/whatsapp/agendamentos", async (req, res) => {
+    try {
+      const status = req.query.status as string | undefined;
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+      const validStatuses = ["pendente", "executando", "concluido", "erro", "cancelado"];
+      const result = await listAgendamentos({
+        status: status && validStatuses.includes(status) ? (status as any) : undefined,
+        limit,
+      });
+      res.json(result);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Erro desconhecido";
+      console.error("Error fetching agendamentos:", error);
+      res.status(500).json({
+        error: "Falha ao buscar agendamentos",
+        message: msg,
+        hint: msg.includes("404") || msg.toLowerCase().includes("not found")
+          ? "Verifique se a coleção 'whatsapp_agendamentos' existe no Directus."
+          : undefined,
+      });
+    }
+  });
+
+  app.delete("/api/whatsapp/agendamentos/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (!Number.isFinite(id)) {
+        return res.status(400).json({ error: "ID inválido" });
+      }
+      const updated = await cancelAgendamento(id);
+      res.json({ success: true, agendamento: updated });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Erro desconhecido";
+      console.error("Error cancelling agendamento:", error);
+      const isCollectionMissing = msg.includes("FORBIDDEN") || msg.includes("403") || msg.includes("404");
+      const status = msg.includes("não encontrado") ? 404 : 400;
+      res.status(status).json({
+        error: msg,
+        hint: isCollectionMissing
+          ? "Verifique se a coleção 'whatsapp_agendamentos' existe no Directus."
+          : undefined,
+      });
     }
   });
 

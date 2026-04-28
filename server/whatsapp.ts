@@ -8,7 +8,7 @@ import baileysMod, {
 import { Boom } from "@hapi/boom";
 import QRCodeMod from "qrcode";
 import pinoMod from "pino";
-import { WhatsAppGrupo, WhatsAppDisparo, Leilao } from "@shared/schema";
+import { WhatsAppGrupo, WhatsAppDisparo, WhatsAppAgendamento, WhatsAppAgendamentoStatus, Leilao } from "@shared/schema";
 
 const makeWASocket = (typeof baileysMod === "function" ? baileysMod : (baileysMod as any).default) as typeof baileysMod;
 const QRCode = (typeof QRCodeMod === "object" && QRCodeMod !== null && "toDataURL" in QRCodeMod ? QRCodeMod : (QRCodeMod as any).default || QRCodeMod) as typeof QRCodeMod;
@@ -424,6 +424,116 @@ export async function createDisparo(data: {
 export async function getDisparos(limit = 50): Promise<WhatsAppDisparo[]> {
   const result = await directusRequest("GET", `whatsapp_disparos?sort=-date_created&limit=${limit}`);
   return result?.data || [];
+}
+
+function normalizeAgendamento(raw: any): WhatsAppAgendamento {
+  let grupoIds: number[] = [];
+  if (Array.isArray(raw?.grupo_ids)) {
+    grupoIds = raw.grupo_ids.map((n: any) => Number(n)).filter((n: number) => Number.isFinite(n));
+  } else if (typeof raw?.grupo_ids === "string") {
+    try {
+      const parsed = JSON.parse(raw.grupo_ids);
+      if (Array.isArray(parsed)) {
+        grupoIds = parsed.map((n: any) => Number(n)).filter((n: number) => Number.isFinite(n));
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return {
+    id: raw.id,
+    leilao_id: raw.leilao_id,
+    leilao_nome: raw.leilao_nome ?? null,
+    grupo_ids: grupoIds,
+    mensagem: raw.mensagem ?? "",
+    scheduled_at: raw.scheduled_at,
+    status: (raw.status as WhatsAppAgendamentoStatus) || "pendente",
+    sent_count: raw.sent_count ?? null,
+    failed_count: raw.failed_count ?? null,
+    executed_at: raw.executed_at ?? null,
+    error_message: raw.error_message ?? null,
+    date_created: raw.date_created ?? null,
+    date_updated: raw.date_updated ?? null,
+  };
+}
+
+export async function createAgendamento(data: {
+  leilao_id: number;
+  leilao_nome: string | null;
+  grupo_ids: number[];
+  mensagem: string;
+  scheduled_at: string;
+}): Promise<WhatsAppAgendamento> {
+  const result = await directusRequest("POST", "whatsapp_agendamentos", {
+    leilao_id: data.leilao_id,
+    leilao_nome: data.leilao_nome,
+    grupo_ids: data.grupo_ids,
+    mensagem: data.mensagem,
+    scheduled_at: data.scheduled_at,
+    status: "pendente",
+  });
+  return normalizeAgendamento(result?.data);
+}
+
+export async function listAgendamentos(opts: { status?: WhatsAppAgendamentoStatus; limit?: number } = {}): Promise<WhatsAppAgendamento[]> {
+  const params = new URLSearchParams();
+  params.set("sort", "-scheduled_at");
+  params.set("limit", String(opts.limit ?? 100));
+  if (opts.status) {
+    params.set("filter[status][_eq]", opts.status);
+  }
+  const result = await directusRequest("GET", `whatsapp_agendamentos?${params.toString()}`);
+  return (result?.data || []).map(normalizeAgendamento);
+}
+
+export async function getAgendamentoById(id: number): Promise<WhatsAppAgendamento | null> {
+  try {
+    const result = await directusRequest("GET", `whatsapp_agendamentos/${id}`);
+    return result?.data ? normalizeAgendamento(result.data) : null;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    // Item específico não encontrado: retorna null. Erros de coleção/permissão são repropagados.
+    if (msg.includes("404") && msg.toLowerCase().includes("record")) {
+      return null;
+    }
+    if (msg.includes("FORBIDDEN") || msg.includes("403") || msg.includes("404")) {
+      throw e;
+    }
+    return null;
+  }
+}
+
+export async function updateAgendamento(id: number, patch: Partial<{
+  status: WhatsAppAgendamentoStatus;
+  sent_count: number;
+  failed_count: number;
+  executed_at: string;
+  error_message: string | null;
+}>): Promise<WhatsAppAgendamento> {
+  const result = await directusRequest("PATCH", `whatsapp_agendamentos/${id}`, patch);
+  return normalizeAgendamento(result?.data);
+}
+
+export async function cancelAgendamento(id: number): Promise<WhatsAppAgendamento> {
+  const current = await getAgendamentoById(id);
+  if (!current) {
+    throw new Error("Agendamento não encontrado");
+  }
+  if (current.status !== "pendente") {
+    throw new Error(`Só é possível cancelar agendamentos pendentes (status atual: ${current.status})`);
+  }
+  return updateAgendamento(id, { status: "cancelado" });
+}
+
+export async function getDueAgendamentos(): Promise<WhatsAppAgendamento[]> {
+  const nowIso = new Date().toISOString();
+  const params = new URLSearchParams();
+  params.set("sort", "scheduled_at");
+  params.set("limit", "20");
+  params.set("filter[status][_eq]", "pendente");
+  params.set("filter[scheduled_at][_lte]", nowIso);
+  const result = await directusRequest("GET", `whatsapp_agendamentos?${params.toString()}`);
+  return (result?.data || []).map(normalizeAgendamento);
 }
 
 export async function getWhatsAppGroups(): Promise<{

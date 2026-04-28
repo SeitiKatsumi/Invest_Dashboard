@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { WhatsAppGrupo, WhatsAppDisparo, Leilao } from "@shared/schema";
+import { WhatsAppGrupo, WhatsAppDisparo, WhatsAppAgendamento, Leilao } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +53,11 @@ import {
   LayoutList,
   Hash,
   ExternalLink,
+  Calendar,
+  CalendarClock,
+  X,
+  ListPlus,
+  AlertCircle,
 } from "lucide-react";
 
 function ConnectionPanel() {
@@ -873,19 +878,22 @@ function GruposPanel() {
   );
 }
 
+interface QueueItem {
+  leilao: Leilao;
+  mensagem: string;
+  scheduledAt: string;
+}
+
 function DisparoPanel() {
   const { toast } = useToast();
   const [leilaoId, setLeilaoId] = useState("");
-  const [leilao, setLeilao] = useState<Leilao | null>(null);
+  const [queue, setQueue] = useState<QueueItem[]>([]);
   const [selectedGrupos, setSelectedGrupos] = useState<number[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [mensagem, setMensagem] = useState("");
-  const [showMensagem, setShowMensagem] = useState(false);
   const [searchMode, setSearchMode] = useState<"listing" | "id">("listing");
   const [iframeHeight, setIframeHeight] = useState(800);
-  const [showWidget, setShowWidget] = useState(true);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const previewRef = useRef<HTMLDivElement>(null);
+  const queueRef = useRef<HTMLDivElement>(null);
 
   const { data: status } = useQuery<{ status: string }>({
     queryKey: ["/api/whatsapp/status"],
@@ -898,7 +906,27 @@ function DisparoPanel() {
   const activeGrupos = grupos?.filter((g) => g.ativo) || [];
   const isConnected = status?.status === "connected";
 
-  const searchLeilaoById = useCallback(async (id: number) => {
+  const fetchTemplate = useCallback(async (id: number): Promise<string> => {
+    try {
+      const resp = await fetch(`/api/whatsapp/preview/${id}`);
+      if (resp.ok) {
+        const data = await resp.json();
+        return data.mensagem || "";
+      }
+    } catch {
+      // ignore
+    }
+    return "";
+  }, []);
+
+  const addToQueue = useCallback(async (id: number) => {
+    if (queue.some((q) => q.leilao.id === id)) {
+      toast({
+        title: "Imóvel já está na fila",
+        description: `Leilão #${id} já foi adicionado`,
+      });
+      return;
+    }
     setIsSearching(true);
     try {
       const resp = await fetch(`/api/whatsapp/leilao/${id}`);
@@ -906,34 +934,27 @@ function DisparoPanel() {
         const err = await resp.json();
         throw new Error(err.error || "Leilão não encontrado");
       }
-      const data = await resp.json();
-      setLeilao(data);
-      setShowWidget(false);
-
-      const previewResp = await fetch(`/api/whatsapp/preview/${id}`);
-      if (previewResp.ok) {
-        const previewData = await previewResp.json();
-        setMensagem(previewData.mensagem);
-        setShowMensagem(true);
-      }
-
+      const leilao: Leilao = await resp.json();
+      const mensagem = await fetchTemplate(id);
+      setQueue((prev) => [...prev, { leilao, mensagem, scheduledAt: "" }]);
+      toast({
+        title: "Imóvel adicionado à fila",
+        description: leilao.nome_do_anuncio || `Leilão #${id}`,
+      });
+      setLeilaoId("");
       setTimeout(() => {
-        previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        queueRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 100);
     } catch (error) {
       toast({
-        title: "Leilão não encontrado",
+        title: "Falha ao adicionar imóvel",
         description: error instanceof Error ? error.message : "Verifique o ID",
         variant: "destructive",
       });
-      setLeilao(null);
-      setMensagem("");
-      setShowMensagem(false);
-      setShowWidget(true);
     } finally {
       setIsSearching(false);
     }
-  }, [toast]);
+  }, [queue, fetchTemplate, toast]);
 
   const searchLeilao = async () => {
     const id = parseInt(leilaoId);
@@ -941,7 +962,7 @@ function DisparoPanel() {
       toast({ title: "Digite um ID válido", variant: "destructive" });
       return;
     }
-    await searchLeilaoById(id);
+    await addToQueue(id);
   };
 
   useEffect(() => {
@@ -956,8 +977,7 @@ function DisparoPanel() {
       if (data.type === "LEILOES_PROPERTY_CLICK" && data.id) {
         const id = parseInt(data.id);
         if (!isNaN(id) && isFinite(id)) {
-          setLeilaoId(String(id));
-          searchLeilaoById(id);
+          addToQueue(id);
         }
       }
 
@@ -969,17 +989,18 @@ function DisparoPanel() {
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [searchLeilaoById]);
+  }, [addToQueue]);
 
-  const dispararMutation = useMutation({
-    mutationFn: (data: { leilaoId: number; grupoIds: number[]; mensagem: string }) =>
-      apiRequest("POST", "/api/whatsapp/disparar", data).then((r) => r.json()),
+  const dispararMultiMutation = useMutation({
+    mutationFn: (data: { items: { leilao_id: number; mensagem: string }[]; grupoIds: number[] }) =>
+      apiRequest("POST", "/api/whatsapp/disparar-multi", data).then((r) => r.json()),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/disparos"] });
       toast({
         title: "Disparo realizado!",
-        description: `${result.sent} enviados, ${result.failed} falharam`,
+        description: `${result.totalSent} enviados, ${result.totalFailed} falharam (${result.items?.length || 0} imóveis)`,
       });
+      setQueue([]);
       setSelectedGrupos([]);
     },
     onError: (error: Error) => {
@@ -991,32 +1012,118 @@ function DisparoPanel() {
     },
   });
 
-  const handleDisparar = () => {
-    if (!leilao) {
-      toast({ title: "Busque um leilão primeiro", variant: "destructive" });
+  const agendarMutation = useMutation({
+    mutationFn: (data: {
+      items: { leilao_id: number; mensagem: string; scheduled_at: string }[];
+      grupoIds: number[];
+    }) => apiRequest("POST", "/api/whatsapp/agendamentos", data).then((r) => r.json()),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/agendamentos"] });
+      const createdCount = result.created?.length || 0;
+      const errorCount = result.errors?.length || 0;
+      toast({
+        title: "Agendamentos criados!",
+        description: errorCount > 0
+          ? `${createdCount} agendados com sucesso, ${errorCount} falharam`
+          : `${createdCount} agendamento(s) criado(s)`,
+      });
+      setQueue([]);
+      setSelectedGrupos([]);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao agendar",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDispararAgora = () => {
+    if (queue.length === 0) {
+      toast({ title: "Adicione ao menos um imóvel à fila", variant: "destructive" });
       return;
     }
     if (selectedGrupos.length === 0) {
       toast({ title: "Selecione ao menos um grupo", variant: "destructive" });
       return;
     }
-    if (!mensagem.trim()) {
-      toast({ title: "A mensagem não pode estar vazia", variant: "destructive" });
+    const empty = queue.find((q) => !q.mensagem.trim());
+    if (empty) {
+      toast({
+        title: "Mensagem vazia",
+        description: `Leilão #${empty.leilao.id} está com mensagem vazia`,
+        variant: "destructive",
+      });
       return;
     }
-    dispararMutation.mutate({ leilaoId: leilao.id, grupoIds: selectedGrupos, mensagem });
+    dispararMultiMutation.mutate({
+      items: queue.map((q) => ({ leilao_id: q.leilao.id, mensagem: q.mensagem })),
+      grupoIds: selectedGrupos,
+    });
   };
 
-  const resetMensagem = async () => {
-    if (!leilao) return;
-    try {
-      const resp = await fetch(`/api/whatsapp/preview/${leilao.id}`);
-      if (resp.ok) {
-        const data = await resp.json();
-        setMensagem(data.mensagem);
-        toast({ title: "Template restaurado" });
+  const handleAgendar = () => {
+    if (queue.length === 0) {
+      toast({ title: "Adicione ao menos um imóvel à fila", variant: "destructive" });
+      return;
+    }
+    if (selectedGrupos.length === 0) {
+      toast({ title: "Selecione ao menos um grupo", variant: "destructive" });
+      return;
+    }
+    const now = Date.now();
+    for (const item of queue) {
+      if (!item.mensagem.trim()) {
+        toast({
+          title: "Mensagem vazia",
+          description: `Leilão #${item.leilao.id} está com mensagem vazia`,
+          variant: "destructive",
+        });
+        return;
       }
-    } catch {
+      if (!item.scheduledAt) {
+        toast({
+          title: "Data/hora obrigatória",
+          description: `Defina a data/hora do leilão #${item.leilao.id} para agendar`,
+          variant: "destructive",
+        });
+        return;
+      }
+      const dt = new Date(item.scheduledAt);
+      if (isNaN(dt.getTime()) || dt.getTime() <= now) {
+        toast({
+          title: "Data/hora inválida",
+          description: `O agendamento do leilão #${item.leilao.id} deve estar no futuro`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    agendarMutation.mutate({
+      items: queue.map((q) => ({
+        leilao_id: q.leilao.id,
+        mensagem: q.mensagem,
+        scheduled_at: new Date(q.scheduledAt).toISOString(),
+      })),
+      grupoIds: selectedGrupos,
+    });
+  };
+
+  const updateQueueItem = (id: number, patch: Partial<QueueItem>) => {
+    setQueue((prev) => prev.map((q) => (q.leilao.id === id ? { ...q, ...patch } : q)));
+  };
+
+  const removeFromQueue = (id: number) => {
+    setQueue((prev) => prev.filter((q) => q.leilao.id !== id));
+  };
+
+  const restoreTemplate = async (id: number) => {
+    const mensagem = await fetchTemplate(id);
+    if (mensagem) {
+      updateQueueItem(id, { mensagem });
+      toast({ title: "Template restaurado" });
+    } else {
       toast({ title: "Erro ao restaurar template", variant: "destructive" });
     }
   };
@@ -1035,23 +1142,27 @@ function DisparoPanel() {
     }
   };
 
-  const handleChangeProperty = () => {
-    setLeilao(null);
-    setMensagem("");
-    setShowMensagem(false);
+  const clearQueue = () => {
+    setQueue([]);
     setSelectedGrupos([]);
-    setShowWidget(true);
   };
+
+  const isPending = dispararMultiMutation.isPending || agendarMutation.isPending;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Send className="h-5 w-5" />
-          Disparo de Leilão
+          Disparo de Leilões
+          {queue.length > 0 && (
+            <Badge variant="secondary" className="ml-2" data-testid="badge-queue-count">
+              {queue.length} na fila
+            </Badge>
+          )}
         </CardTitle>
         <CardDescription>
-          Selecione um imóvel da listagem ou busque pelo ID para disparar
+          Selecione múltiplos imóveis para disparar agora ou agendar para horários diferentes
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -1115,10 +1226,10 @@ function DisparoPanel() {
           </div>
         )}
 
-        {searchMode === "listing" && showWidget && (
+        {searchMode === "listing" && (
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
-              Clique em um imóvel abaixo para selecioná-lo para o disparo
+              Clique em quantos imóveis quiser — cada clique adiciona à fila abaixo
             </p>
             <div className="border rounded-lg overflow-hidden bg-background">
               <iframe
@@ -1133,135 +1244,148 @@ function DisparoPanel() {
           </div>
         )}
 
-        {searchMode === "listing" && !showWidget && !leilao && (
-          <div className="flex items-center justify-center p-8 border rounded-lg border-dashed">
-            <div className="text-center space-y-2">
-              <LayoutList className="h-8 w-8 mx-auto text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Carregando imóvel...</p>
-            </div>
-          </div>
-        )}
-
         {isSearching && (
           <div className="flex items-center justify-center gap-2 p-4 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Buscando imóvel...
+            Adicionando imóvel à fila...
           </div>
         )}
 
-        {leilao && (
-          <div ref={previewRef} className="border rounded-lg p-4 space-y-3 bg-muted/30" data-testid="card-leilao-preview">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 space-y-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold text-lg" data-testid="text-leilao-nome">
-                    {leilao.nome_do_anuncio || `Leilão #${leilao.id}`}
-                  </h3>
-                  <Badge variant="outline" className="text-xs gap-1">
-                    <Hash className="h-3 w-3" />
-                    {leilao.id}
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap text-sm text-muted-foreground">
-                  {leilao.tipo_do_imovel && <Badge variant="outline">{leilao.tipo_do_imovel}</Badge>}
-                  {leilao.tipo_de_leilao && <Badge variant="outline">{leilao.tipo_de_leilao}</Badge>}
-                  {leilao.estado_uf && (
-                    <Badge variant="secondary" className="gap-1">
-                      <MapPin className="h-3 w-3" />{leilao.estado_uf}
-                    </Badge>
-                  )}
-                </div>
-              </div>
-              {(leilao as any).link_imagem && (
-                <img
-                  src={(leilao as any).link_imagem}
-                  alt="Imagem do leilão"
-                  className="w-24 h-24 rounded-lg object-cover"
-                  onError={(e) => (e.currentTarget.style.display = "none")}
-                />
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              {leilao.valor_avalaiacao_imovel && (
-                <div>
-                  <span className="text-muted-foreground">Avaliação:</span>{" "}
-                  <strong>R$ {leilao.valor_avalaiacao_imovel}</strong>
-                </div>
-              )}
-              {leilao.desconto && (
-                <div>
-                  <span className="text-muted-foreground">Desconto:</span>{" "}
-                  <strong className="text-green-600">{leilao.desconto}</strong>
-                </div>
-              )}
-              {leilao.cidade && (
-                <div>
-                  <span className="text-muted-foreground">Cidade:</span>{" "}
-                  <strong>{leilao.cidade}</strong>
-                </div>
-              )}
-              {leilao.praca_1 && (
-                <div>
-                  <span className="text-muted-foreground">1ª Praça:</span>{" "}
-                  <strong>{leilao.praca_1}</strong>
-                </div>
-              )}
-            </div>
-
-            {leilao.descricao && (
-              <p className="text-sm text-muted-foreground line-clamp-3">
-                {leilao.descricao}
-              </p>
-            )}
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleChangeProperty}
-              className="gap-2 text-xs"
-              data-testid="button-change-property"
-            >
-              <RefreshCw className="h-3 w-3" />
-              Trocar imóvel
-            </Button>
-          </div>
-        )}
-
-        {leilao && showMensagem && (
-          <div className="space-y-2">
+        {queue.length > 0 && (
+          <div ref={queueRef} className="space-y-3" data-testid="queue-section">
             <div className="flex items-center justify-between">
               <Label className="text-base font-semibold flex items-center gap-2">
-                <Edit className="h-4 w-4" />
-                Mensagem do Disparo
+                <ListPlus className="h-4 w-4" />
+                Fila de imóveis ({queue.length})
               </Label>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={resetMensagem}
-                className="gap-1 text-xs"
-                data-testid="button-reset-template"
+                onClick={clearQueue}
+                className="gap-1 text-xs text-destructive hover:text-destructive"
+                data-testid="button-clear-queue"
               >
-                <RefreshCw className="h-3 w-3" />
-                Restaurar original
+                <Trash2 className="h-3 w-3" />
+                Limpar fila
               </Button>
             </div>
-            <textarea
-              value={mensagem}
-              onChange={(e) => setMensagem(e.target.value)}
-              className="w-full min-h-[300px] p-4 rounded-lg border bg-background font-mono text-sm resize-y focus:outline-none focus:ring-2 focus:ring-ring"
-              data-testid="textarea-mensagem"
-            />
-            <p className="text-xs text-muted-foreground">
-              Edite o texto acima livremente. Use *texto* para negrito no WhatsApp. Clique em "Restaurar original" para voltar ao template padrão.
-            </p>
+
+            <div className="space-y-3">
+              {queue.map((item) => (
+                <div
+                  key={item.leilao.id}
+                  className="border rounded-lg p-4 space-y-3 bg-muted/30"
+                  data-testid={`card-queue-item-${item.leilao.id}`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3
+                          className="font-semibold text-base truncate"
+                          data-testid={`text-leilao-nome-${item.leilao.id}`}
+                        >
+                          {item.leilao.nome_do_anuncio || `Leilão #${item.leilao.id}`}
+                        </h3>
+                        <Badge variant="outline" className="text-xs gap-1">
+                          <Hash className="h-3 w-3" />
+                          {item.leilao.id}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
+                        {item.leilao.tipo_do_imovel && (
+                          <Badge variant="outline" className="text-xs">{item.leilao.tipo_do_imovel}</Badge>
+                        )}
+                        {item.leilao.cidade && (
+                          <Badge variant="secondary" className="gap-1 text-xs">
+                            <MapPin className="h-3 w-3" />
+                            {item.leilao.cidade}
+                            {item.leilao.estado_uf ? `/${item.leilao.estado_uf}` : ""}
+                          </Badge>
+                        )}
+                        {item.leilao.valor_avalaiacao_imovel && (
+                          <span className="text-xs">
+                            Avaliação: <strong>R$ {item.leilao.valor_avalaiacao_imovel}</strong>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 flex-shrink-0">
+                      {(item.leilao as any).link_imagem && (
+                        <img
+                          src={(item.leilao as any).link_imagem}
+                          alt="Imagem do leilão"
+                          className="w-16 h-16 rounded-lg object-cover"
+                          onError={(e) => (e.currentTarget.style.display = "none")}
+                        />
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeFromQueue(item.leilao.id)}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        data-testid={`button-remove-${item.leilao.id}`}
+                        title="Remover da fila"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-medium flex items-center gap-1">
+                        <Edit className="h-3 w-3" />
+                        Mensagem
+                      </Label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => restoreTemplate(item.leilao.id)}
+                        className="gap-1 text-xs h-7"
+                        data-testid={`button-reset-template-${item.leilao.id}`}
+                      >
+                        <RefreshCw className="h-3 w-3" />
+                        Restaurar template
+                      </Button>
+                    </div>
+                    <textarea
+                      value={item.mensagem}
+                      onChange={(e) => updateQueueItem(item.leilao.id, { mensagem: e.target.value })}
+                      className="w-full min-h-[180px] p-3 rounded-lg border bg-background font-mono text-xs resize-y focus:outline-none focus:ring-2 focus:ring-ring"
+                      data-testid={`textarea-mensagem-${item.leilao.id}`}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor={`scheduled-${item.leilao.id}`}
+                      className="text-xs font-medium flex items-center gap-1"
+                    >
+                      <CalendarClock className="h-3 w-3" />
+                      Data/hora do agendamento (opcional)
+                    </Label>
+                    <Input
+                      id={`scheduled-${item.leilao.id}`}
+                      type="datetime-local"
+                      value={item.scheduledAt}
+                      onChange={(e) => updateQueueItem(item.leilao.id, { scheduledAt: e.target.value })}
+                      className="text-sm"
+                      data-testid={`input-scheduled-${item.leilao.id}`}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Use só se for agendar. Para disparar agora, deixe em branco.
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
-        {leilao && (
+        {queue.length > 0 && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label className="text-base font-semibold">Selecione os grupos</Label>
+              <Label className="text-base font-semibold">Selecione os grupos (aplicado a todos os imóveis)</Label>
               <Button variant="ghost" size="sm" onClick={selectAll} data-testid="button-select-all-grupos">
                 {selectedGrupos.length === activeGrupos.length ? "Desmarcar todos" : "Selecionar todos"}
               </Button>
@@ -1269,7 +1393,7 @@ function DisparoPanel() {
 
             {activeGrupos.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Nenhum grupo ativo cadastrado. Adicione grupos na seção acima.
+                Nenhum grupo ativo cadastrado. Adicione grupos na seção abaixo.
               </p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -1299,24 +1423,225 @@ function DisparoPanel() {
               </div>
             )}
 
-            <Button
-              onClick={handleDisparar}
-              disabled={
-                !isConnected ||
-                selectedGrupos.length === 0 ||
-                dispararMutation.isPending
-              }
-              className="w-full gap-2"
-              size="lg"
-              data-testid="button-disparar"
-            >
-              {dispararMutation.isPending ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <Send className="h-5 w-5" />
-              )}
-              Disparar para {selectedGrupos.length} grupo{selectedGrupos.length !== 1 ? "s" : ""}
-            </Button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <Button
+                onClick={handleDispararAgora}
+                disabled={!isConnected || selectedGrupos.length === 0 || isPending}
+                className="w-full gap-2"
+                size="lg"
+                data-testid="button-disparar-agora"
+              >
+                {dispararMultiMutation.isPending ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <Send className="h-5 w-5" />
+                )}
+                Disparar todos agora
+              </Button>
+              <Button
+                onClick={handleAgendar}
+                disabled={selectedGrupos.length === 0 || isPending}
+                variant="secondary"
+                className="w-full gap-2"
+                size="lg"
+                data-testid="button-agendar"
+              >
+                {agendarMutation.isPending ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <CalendarClock className="h-5 w-5" />
+                )}
+                Agendar {queue.length} imóve{queue.length !== 1 ? "is" : "l"}
+              </Button>
+            </div>
+            {!isConnected && (
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" />
+                Conecte o WhatsApp para disparar agora. Agendamentos podem ser criados mesmo desconectado e serão executados quando reconectar.
+              </p>
+            )}
+          </div>
+        )}
+
+        {queue.length === 0 && (
+          <div className="flex items-center justify-center p-6 border rounded-lg border-dashed text-center">
+            <div className="space-y-2">
+              <ListPlus className="h-8 w-8 mx-auto text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                Nenhum imóvel na fila. Clique nos imóveis acima ou busque por ID para adicionar.
+              </p>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function AgendamentosPanel() {
+  const { toast } = useToast();
+  const { data: agendamentos, isLoading, error: queryError } = useQuery<WhatsAppAgendamento[]>({
+    queryKey: ["/api/whatsapp/agendamentos"],
+    refetchInterval: 30_000,
+    retry: false,
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/whatsapp/agendamentos/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/agendamentos"] });
+      toast({ title: "Agendamento cancelado" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao cancelar", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const renderStatus = (status: string) => {
+    switch (status) {
+      case "pendente":
+        return (
+          <Badge variant="secondary" className="gap-1">
+            <Clock className="h-3 w-3" />
+            Pendente
+          </Badge>
+        );
+      case "executando":
+        return (
+          <Badge className="gap-1 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Executando
+          </Badge>
+        );
+      case "concluido":
+        return (
+          <Badge className="gap-1 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+            <CheckCircle2 className="h-3 w-3" />
+            Concluído
+          </Badge>
+        );
+      case "erro":
+        return (
+          <Badge variant="destructive" className="gap-1">
+            <XCircle className="h-3 w-3" />
+            Erro
+          </Badge>
+        );
+      case "cancelado":
+        return (
+          <Badge variant="outline" className="gap-1">
+            <X className="h-3 w-3" />
+            Cancelado
+          </Badge>
+        );
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Calendar className="h-5 w-5" />
+          Agendamentos
+        </CardTitle>
+        <CardDescription>
+          Disparos agendados para execução automática (atualiza a cada 30s)
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        ) : queryError ? (
+          <div className="text-center py-6 px-4 border rounded-lg border-destructive/30 bg-destructive/5">
+            <AlertCircle className="h-10 w-10 mx-auto mb-2 text-destructive" />
+            <p className="text-sm font-medium text-destructive">Falha ao carregar agendamentos</p>
+            <p className="text-xs mt-2 text-muted-foreground" data-testid="text-agendamentos-error">
+              {queryError instanceof Error ? queryError.message : String(queryError)}
+            </p>
+            <p className="text-xs mt-2 text-muted-foreground">
+              Verifique se a coleção <code className="font-mono">whatsapp_agendamentos</code> existe no Directus.
+            </p>
+          </div>
+        ) : !agendamentos || agendamentos.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <Calendar className="h-12 w-12 mx-auto mb-2 opacity-50" />
+            <p>Nenhum agendamento criado</p>
+            <p className="text-xs mt-1">
+              Use a fila acima para agendar disparos para horários diferentes.
+            </p>
+          </div>
+        ) : (
+          <div className="max-h-[400px] overflow-y-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Quando</TableHead>
+                  <TableHead>Leilão</TableHead>
+                  <TableHead>Grupos</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {agendamentos.map((a) => {
+                  const dt = a.scheduled_at ? new Date(a.scheduled_at) : null;
+                  const dtLabel = dt && !isNaN(dt.getTime())
+                    ? dt.toLocaleString("pt-BR", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "-";
+                  return (
+                    <TableRow key={a.id} data-testid={`row-agendamento-${a.id}`}>
+                      <TableCell className="text-sm whitespace-nowrap">{dtLabel}</TableCell>
+                      <TableCell className="font-medium max-w-[220px] truncate">
+                        {a.leilao_nome || `#${a.leilao_id}`}
+                        <div className="text-xs text-muted-foreground">#{a.leilao_id}</div>
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {a.grupo_ids?.length || 0} grupo{(a.grupo_ids?.length || 0) !== 1 ? "s" : ""}
+                        {a.status === "concluido" && a.sent_count != null && (
+                          <div className="text-xs text-muted-foreground">
+                            {a.sent_count} enviados, {a.failed_count || 0} falhas
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {renderStatus(a.status)}
+                        {a.error_message && (
+                          <div className="text-xs text-destructive mt-1 max-w-[200px] truncate" title={a.error_message}>
+                            {a.error_message}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {a.status === "pendente" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => cancelMutation.mutate(a.id)}
+                            disabled={cancelMutation.isPending}
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            data-testid={`button-cancel-agendamento-${a.id}`}
+                          >
+                            <X className="h-3 w-3 mr-1" />
+                            Cancelar
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
           </div>
         )}
       </CardContent>
@@ -1430,6 +1755,8 @@ export default function WhatsAppPage() {
         </div>
 
         <DisparoPanel />
+
+        <AgendamentosPanel />
 
         <GruposPanel />
       </div>

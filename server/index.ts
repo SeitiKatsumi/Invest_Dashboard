@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { startWhatsAppScheduler } from "./whatsapp-scheduler";
 
 const app = express();
 const httpServer = createServer(app);
@@ -99,6 +100,11 @@ app.use((req, res, next) => {
     },
     () => {
       log(`serving on port ${port}`);
+      try {
+        startWhatsAppScheduler();
+      } catch (e) {
+        log(`Falha ao iniciar WhatsApp scheduler: ${e instanceof Error ? e.message : String(e)}`);
+      }
     },
   );
 })();
