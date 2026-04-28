@@ -555,7 +555,24 @@ export async function cancelAgendamento(id: number): Promise<WhatsAppAgendamento
   if (current.status !== "pendente") {
     throw new Error(`Só é possível cancelar agendamentos pendentes (status atual: ${current.status})`);
   }
-  return updateAgendamento(id, { status: "cancelado" });
+  // Atomic conditional patch: só altera se ainda estiver 'pendente' no Directus,
+  // evitando sobrescrever uma transição concorrente para 'executando'.
+  const params = new URLSearchParams();
+  params.set("filter[id][_eq]", String(id));
+  params.set("filter[status][_eq]", "pendente");
+  const result = await directusRequest(
+    "PATCH",
+    `whatsapp_agendamentos?${params.toString()}`,
+    { status: "cancelado" },
+  );
+  const items = Array.isArray(result?.data) ? result.data : [];
+  if (items.length === 0) {
+    const after = await getAgendamentoById(id);
+    throw new Error(
+      `Não foi possível cancelar: agendamento já está em '${after?.status ?? "desconhecido"}'`,
+    );
+  }
+  return normalizeAgendamento(items[0]);
 }
 
 export async function getDueAgendamentos(): Promise<WhatsAppAgendamento[]> {
