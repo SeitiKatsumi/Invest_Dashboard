@@ -1596,7 +1596,13 @@ export async function registerRoutes(
   app.get("/api/whatsapp/agendamentos", async (req, res) => {
     try {
       const statusParam = typeof req.query.status === "string" ? req.query.status : undefined;
-      const limit = typeof req.query.limit === "string" ? parseInt(req.query.limit) : undefined;
+      let limit: number | undefined;
+      if (typeof req.query.limit === "string") {
+        const parsed = parseInt(req.query.limit, 10);
+        if (Number.isFinite(parsed) && parsed > 0) {
+          limit = Math.min(parsed, 500);
+        }
+      }
       const validStatuses: WhatsAppAgendamentoStatus[] = [
         "pendente",
         "executando",
