@@ -1484,7 +1484,7 @@ export async function registerRoutes(
           });
         } catch (e) {
           const msg = e instanceof Error ? e.message : "Erro desconhecido";
-          perItem.push({ leilaoId, ok: false, sent: 0, failed: 0, error: msg });
+          perItem.push({ leilaoId, ok: false, sent: 0, failed: groupCount, error: msg });
           totalFailed += groupCount;
         }
       }
