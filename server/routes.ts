@@ -74,12 +74,14 @@ import {
 } from "./whatsapp";
 
 function isCollectionMissingError(msg: string): boolean {
-  return (
-    msg.includes("FORBIDDEN") ||
-    msg.includes("403") ||
-    msg.includes("404") ||
-    msg.toLowerCase().includes("not found")
-  );
+  const lower = msg.toLowerCase();
+  // Heurística mais estrita: só sugere "criar coleção" se o erro mencionar
+  // explicitamente whatsapp_agendamentos OU sinais típicos de coleção ausente
+  // (FORBIDDEN/403 vindo do Directus, ou "collection ... not found").
+  if (lower.includes("whatsapp_agendamentos")) return true;
+  if (msg.includes("FORBIDDEN") || msg.includes("403")) return true;
+  if (lower.includes("collection") && lower.includes("not found")) return true;
+  return false;
 }
 
 const COLLECTION_MISSING_HINT = "Verifique se a coleção 'whatsapp_agendamentos' existe no Directus.";
