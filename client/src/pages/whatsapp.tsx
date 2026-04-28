@@ -919,7 +919,11 @@ function DisparoPanel() {
     return "";
   }, []);
 
+  const inFlightIdsRef = useRef<Set<number>>(new Set());
   const addToQueue = useCallback(async (id: number) => {
+    if (inFlightIdsRef.current.has(id)) {
+      return;
+    }
     if (queue.some((q) => q.leilao.id === id)) {
       toast({
         title: "Imóvel já está na fila",
@@ -927,6 +931,7 @@ function DisparoPanel() {
       });
       return;
     }
+    inFlightIdsRef.current.add(id);
     setIsSearching(true);
     try {
       const resp = await fetch(`/api/whatsapp/leilao/${id}`);
@@ -936,15 +941,24 @@ function DisparoPanel() {
       }
       const leilao: Leilao = await resp.json();
       const mensagem = await fetchTemplate(id);
-      setQueue((prev) => [...prev, { leilao, mensagem, scheduledAt: "" }]);
-      toast({
-        title: "Imóvel adicionado à fila",
-        description: leilao.nome_do_anuncio || `Leilão #${id}`,
+      let added = false;
+      setQueue((prev) => {
+        if (prev.some((q) => q.leilao.id === leilao.id)) {
+          return prev;
+        }
+        added = true;
+        return [...prev, { leilao, mensagem, scheduledAt: "" }];
       });
-      setLeilaoId("");
-      setTimeout(() => {
-        queueRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 100);
+      if (added) {
+        toast({
+          title: "Imóvel adicionado à fila",
+          description: leilao.nome_do_anuncio || `Leilão #${id}`,
+        });
+        setLeilaoId("");
+        setTimeout(() => {
+          queueRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 100);
+      }
     } catch (error) {
       toast({
         title: "Falha ao adicionar imóvel",
@@ -952,6 +966,7 @@ function DisparoPanel() {
         variant: "destructive",
       });
     } finally {
+      inFlightIdsRef.current.delete(id);
       setIsSearching(false);
     }
   }, [queue, fetchTemplate, toast]);
@@ -1020,15 +1035,21 @@ function DisparoPanel() {
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/agendamentos"] });
       const createdCount = result.created?.length || 0;
-      const errorCount = result.errors?.length || 0;
+      const errors: Array<{ index: number; error: string }> = result.errors || [];
+      const errorCount = errors.length;
       toast({
         title: "Agendamentos criados!",
         description: errorCount > 0
-          ? `${createdCount} agendados com sucesso, ${errorCount} falharam`
+          ? `${createdCount} agendados com sucesso, ${errorCount} falharam (mantidos na fila)`
           : `${createdCount} agendamento(s) criado(s)`,
       });
-      setQueue([]);
-      setSelectedGrupos([]);
+      if (errorCount === 0) {
+        setQueue([]);
+        setSelectedGrupos([]);
+      } else {
+        const failedIdxSet = new Set(errors.map((e) => e.index));
+        setQueue((prev) => prev.filter((_, idx) => failedIdxSet.has(idx)));
+      }
     },
     onError: (error: Error) => {
       toast({
