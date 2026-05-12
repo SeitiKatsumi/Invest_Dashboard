@@ -1,5 +1,5 @@
 import * as cheerio from 'cheerio';
-import type { Browser, Page, BrowserContext } from 'playwright';
+import type { Browser, Page, BrowserContext, Response } from 'playwright';
 import type { CrawlResult, CrawlerOptions, ScrapingConfig } from './types.js';
 import {
   normalizeUrl, isSameDomain, getBuiltinBlocklist,
@@ -52,6 +52,7 @@ interface NormalizedConfig {
   allowlist_patterns: string[];
   blocklist_patterns: string[];
   pagination_pattern: string | null;
+  pagination_type: string | null;
   listing_page_indicators: string[];
   detail_page_indicators: string[];
   category_patterns: string[];
@@ -70,6 +71,7 @@ function normalizeConfig(config: ScrapingConfig | Record<string, unknown>): Norm
     allowlist_patterns: strArr(config.allowlist_patterns),
     blocklist_patterns: strArr(config.blocklist_patterns),
     pagination_pattern: typeof config.pagination_pattern === 'string' ? config.pagination_pattern : null,
+    pagination_type: typeof config.pagination_type === 'string' ? config.pagination_type : null,
     listing_page_indicators: strArr(config.listing_page_indicators),
     detail_page_indicators: strArr(config.detail_page_indicators),
     category_patterns: strArr(config.category_patterns),
@@ -255,6 +257,151 @@ export class DeterministicCrawler {
     return Array.from(new Set(links));
   }
 
+  private normalizeDiscoveredUrl(rawUrl: string, baseUrl: string): string | null {
+    const value = rawUrl.trim();
+    if (!value || value.length > 2000) return null;
+
+    try {
+      const origin = new URL(baseUrl).origin;
+      if (/^(lote|imovel|item|produto|property|listing|anuncio|venda|detalhe|detalhes)\//i.test(value)) {
+        return normalizeUrl(`/${value}`, origin);
+      }
+    } catch {}
+
+    return normalizeUrl(value, baseUrl);
+  }
+
+  private extractUrlsFromJsonValue(value: unknown, baseUrl: string, depth = 0): string[] {
+    if (depth > 8 || value == null) return [];
+
+    if (typeof value === 'string') {
+      const candidates = new Set<string>([value]);
+      const urlMatches = value.match(/(?:https?:\/\/[^\s"'<>]+|\/(?:lote|imovel|item|produto|property|listing|anuncio|venda|detalhe|detalhes)\/[^\s"'<>]+|(?:lote|imovel|item|produto|property|listing|anuncio|venda|detalhe|detalhes)\/[^\s"'<>]+)/gi) || [];
+      for (const match of urlMatches) candidates.add(match);
+
+      return Array.from(candidates)
+        .map(candidate => this.normalizeDiscoveredUrl(candidate, baseUrl))
+        .filter((url): url is string => Boolean(url));
+    }
+
+    if (Array.isArray(value)) {
+      return value.flatMap(item => this.extractUrlsFromJsonValue(item, baseUrl, depth + 1));
+    }
+
+    if (typeof value === 'object') {
+      return Object.values(value as Record<string, unknown>)
+        .flatMap(item => this.extractUrlsFromJsonValue(item, baseUrl, depth + 1));
+    }
+
+    return [];
+  }
+
+  private rememberDiscoveredLink(
+    url: string,
+    options: { useHeuristics?: boolean; allowGeneralVisit?: boolean } = {},
+  ): boolean {
+    if (!isSameDomain(url, this.domain) || this.matchesBlocklist(url)) return false;
+    this.allLinksSeen.add(url);
+
+    const collect = this.isDetailPage(url)
+      || this.matchesAllowlist(url)
+      || (options.useHeuristics !== false && this.useHeuristics && this.looksLikeDetailPage(url));
+
+    if (collect) this.collectedUrls.add(url);
+
+    if (options.allowGeneralVisit === false) {
+      return collect || this.isListingPage(url) || this.isCategoryPage(url) || this.isPaginationUrl(url);
+    }
+
+    return this.shouldVisit(url);
+  }
+
+  private buildHashUrl(baseUrl: string, params: Record<string, string | number>): string | null {
+    try {
+      const parsed = new URL(baseUrl);
+      const rawHash = parsed.hash.startsWith('#') ? parsed.hash.slice(1) : parsed.hash;
+      const search = new URLSearchParams(rawHash);
+      for (const [key, value] of Object.entries(params)) {
+        search.set(key, String(value));
+      }
+      parsed.hash = search.toString();
+      return parsed.toString();
+    } catch {
+      return null;
+    }
+  }
+
+  private isMglSearchContext(url: string): boolean {
+    return this.domain.replace(/^www\./, '') === 'mgl.com.br' && /\/busca\/?/i.test(url);
+  }
+
+  private buildMglPaginationUrls(baseUrl: string, total: number, perPage: number): string[] {
+    if (!this.isMglSearchContext(baseUrl) || total <= 0 || perPage <= 0) return [];
+
+    const pageCount = Math.ceil(total / perPage);
+    const urls: string[] = [];
+    for (let page = 2; page <= pageCount; page++) {
+      const url = this.buildHashUrl(baseUrl, {
+        Engine: 'StartMGL',
+        modelo: 'Imóveis',
+        Pagina: page,
+        PaginaIndex: 1,
+      });
+      if (url) urls.push(url);
+    }
+    return urls;
+  }
+
+  private async extractDynamicPaginationLinks(page: Page, currentUrl: string): Promise<string[]> {
+    if (!this.isMglSearchContext(currentUrl)) return [];
+
+    try {
+      const pageNumbers = await page.evaluate(() => {
+        const values = new Set<number>();
+        for (const element of Array.from(document.querySelectorAll('[onclick*="BuscaPaginacaoMGL"]'))) {
+          const onclick = element.getAttribute('onclick') || '';
+          const match = onclick.match(/BuscaPaginacaoMGL\((\d+)\)/i);
+          if (match) values.add(Number(match[1]));
+        }
+        return Array.from(values).filter(value => Number.isFinite(value) && value > 0);
+      });
+
+      return pageNumbers
+        .map(pageNumber => this.buildHashUrl(currentUrl, {
+          Engine: 'StartMGL',
+          modelo: 'Imóveis',
+          Pagina: pageNumber,
+          PaginaIndex: 1,
+        }))
+        .filter((url): url is string => Boolean(url));
+    } catch {
+      return [];
+    }
+  }
+
+  private shouldForceReloadForHashNavigation(page: Page, nextUrl: string): boolean {
+    try {
+      const current = new URL(page.url());
+      const next = new URL(nextUrl);
+      return current.origin === next.origin
+        && current.pathname === next.pathname
+        && current.search === next.search
+        && current.hash !== next.hash
+        && Boolean(next.hash);
+    } catch {
+      return false;
+    }
+  }
+
+  private async waitForJsonCollection(networkLinks: Set<string>, timeoutMs = 20000): Promise<void> {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+      if (networkLinks.size > 0) return;
+      if (this.abortSignal?.aborted) return;
+      await sleep(250);
+    }
+  }
+
   private prioritizeUrl(url: string): number {
     if (this.isPaginationUrl(url)) return 0;
     if (this.isCategoryPage(url)) { this.categoryUrls.add(url); return 1; }
@@ -423,6 +570,8 @@ export class DeterministicCrawler {
   async crawlWithPlaywright(startUrl: string, maxPages: number, externalPage?: Page): Promise<CrawlResult> {
     let page: Page;
     let poolHandle: { browser: Browser; context: BrowserContext; page: Page } | undefined;
+    const networkLinks = new Set<string>();
+    const paginationLinks = new Set<string>();
 
     if (externalPage) {
       page = externalPage;
@@ -433,8 +582,41 @@ export class DeterministicCrawler {
 
     const urlsToVisit: string[] = [startUrl];
     let spaDetectedOnce = false;
+    const responseHandler = async (response: Response) => {
+      try {
+        if (response.status() !== 200 || !isSameDomain(response.url(), this.domain)) return;
+
+        const contentType = response.headers()['content-type'] || '';
+        const isLikelyJson = contentType.includes('json') || /(?:\/api|api|json)/i.test(response.url());
+        if (!isLikelyJson) return;
+
+        const body = await response.text();
+        if (!body || body.length > 5_000_000) return;
+
+        const payload = JSON.parse(body) as unknown;
+        const discovered = this.extractUrlsFromJsonValue(payload, response.url());
+        for (const link of discovered) {
+          if (this.rememberDiscoveredLink(link, { useHeuristics: false, allowGeneralVisit: false })) {
+            networkLinks.add(link);
+          }
+        }
+
+        if (this.normalized.pagination_type === 'spa_json' && payload && typeof payload === 'object') {
+          const data = payload as Record<string, unknown>;
+          const total = typeof data.CountTotal === 'number' ? data.CountTotal : 0;
+          const lotes = Array.isArray(data.Lotes) ? data.Lotes.length : 0;
+          for (const link of this.buildMglPaginationUrls(startUrl, total, lotes)) {
+            if (!this.visitedUrls.has(link)) paginationLinks.add(link);
+          }
+        }
+      } catch {
+        // Response bodies are best-effort: some are streams, blocked, or not JSON.
+      }
+    };
 
     try {
+      page.on('response', responseHandler);
+
       while (urlsToVisit.length > 0 && this.visitedUrls.size < maxPages) {
         if (this.abortSignal?.aborted) break;
 
@@ -442,7 +624,16 @@ export class DeterministicCrawler {
         if (this.visitedUrls.has(currentUrl)) continue;
 
         try {
-          await page.goto(currentUrl, { waitUntil: 'networkidle', timeout: 45000 });
+          if (this.shouldForceReloadForHashNavigation(page, currentUrl)) {
+            await page.goto('about:blank', { waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => {});
+          }
+
+          const waitUntil = this.normalized.pagination_type === 'spa_json' ? 'domcontentloaded' : 'networkidle';
+          await page.goto(currentUrl, { waitUntil, timeout: 45000 });
+
+          if (this.normalized.pagination_type === 'spa_json') {
+            await this.waitForJsonCollection(networkLinks);
+          }
 
           const htmlCheck = await page.content();
           const cfIndicators = [
@@ -475,7 +666,16 @@ export class DeterministicCrawler {
           if (this.shouldCollect(currentUrl)) this.collectedUrls.add(currentUrl);
 
           const $ = cheerio.load(html);
-          const newLinks = this.extractLinks($, currentUrl);
+          for (const link of await this.extractDynamicPaginationLinks(page, currentUrl)) {
+            if (!this.visitedUrls.has(link)) paginationLinks.add(link);
+          }
+
+          const newLinks = Array.from(new Set([
+            ...Array.from(paginationLinks),
+            ...this.extractLinks($, currentUrl),
+            ...Array.from(networkLinks),
+          ]));
+          networkLinks.clear();
 
           for (const link of newLinks) {
             if (!this.visitedUrls.has(link) && !urlsToVisit.includes(link)) {
@@ -505,6 +705,7 @@ export class DeterministicCrawler {
         }
       }
     } finally {
+      page.off('response', responseHandler);
       if (poolHandle) {
         try { await poolHandle.context.close(); } catch {}
         await browserPool.release(poolHandle.browser);

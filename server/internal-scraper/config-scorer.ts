@@ -32,17 +32,18 @@ function patternSpecificity(pattern: string): number {
 }
 
 export function scoreConfig(config: ScrapingConfig | Record<string, unknown>): ConfigScore {
+  const cfg = config as Record<string, unknown>;
   const flags: string[] = [];
   let score = 0;
   const maxScore = 100;
 
-  const allowlist: string[] = Array.isArray(config.allowlist_patterns) ? config.allowlist_patterns as string[] : [];
-  const blocklist: string[] = Array.isArray(config.blocklist_patterns) ? config.blocklist_patterns as string[] : [];
-  const detailIndicators: string[] = Array.isArray(config.detail_page_indicators) ? config.detail_page_indicators as string[] : [];
-  const listingIndicators: string[] = Array.isArray(config.listing_page_indicators) ? config.listing_page_indicators as string[] : [];
-  const linkSelectors: string[] = Array.isArray(config.link_selectors) ? config.link_selectors as string[] : [];
-  const paginationPattern = typeof config.pagination_pattern === 'string' ? config.pagination_pattern : null;
-  const categoryPatterns: string[] = Array.isArray(config.category_patterns) ? config.category_patterns as string[] : [];
+  const allowlist: string[] = Array.isArray(cfg.allowlist_patterns) ? cfg.allowlist_patterns as string[] : [];
+  const blocklist: string[] = Array.isArray(cfg.blocklist_patterns) ? cfg.blocklist_patterns as string[] : [];
+  const detailIndicators: string[] = Array.isArray(cfg.detail_page_indicators) ? cfg.detail_page_indicators as string[] : [];
+  const listingIndicators: string[] = Array.isArray(cfg.listing_page_indicators) ? cfg.listing_page_indicators as string[] : [];
+  const linkSelectors: string[] = Array.isArray(cfg.link_selectors) ? cfg.link_selectors as string[] : [];
+  const paginationPattern = typeof cfg.pagination_pattern === 'string' ? cfg.pagination_pattern : null;
+  const categoryPatterns: string[] = Array.isArray(cfg.category_patterns) ? cfg.category_patterns as string[] : [];
 
   const hasAllowlist = allowlist.length > 0;
   if (hasAllowlist) {
@@ -106,7 +107,7 @@ export function scoreConfig(config: ScrapingConfig | Record<string, unknown>): C
     flags.push('Sem seletores de link definidos');
   }
 
-  const listingSelector = typeof config.listing_selector === 'string' ? config.listing_selector.trim() : '';
+  const listingSelector = typeof cfg.listing_selector === 'string' ? cfg.listing_selector.trim() : '';
   if (listingSelector) {
     if (GENERIC_LISTING_SELECTORS.includes(listingSelector.toLowerCase())) {
       flags.push(`listing_selector genérico demais ("${listingSelector}")`);
@@ -116,7 +117,7 @@ export function scoreConfig(config: ScrapingConfig | Record<string, unknown>): C
     }
   }
 
-  const linkSelector = typeof config.link_selector === 'string' ? config.link_selector.trim() : '';
+  const linkSelector = typeof cfg.link_selector === 'string' ? cfg.link_selector.trim() : '';
   if (linkSelector) {
     if (GENERIC_LISTING_SELECTORS.includes(linkSelector.toLowerCase()) || linkSelector === 'a[href]') {
       flags.push(`link_selector genérico demais ("${linkSelector}")`);
@@ -128,7 +129,7 @@ export function scoreConfig(config: ScrapingConfig | Record<string, unknown>): C
     score += 5;
   }
 
-  const configDomain = typeof config.domain === 'string' ? config.domain : '';
+  const configDomain = typeof cfg.domain === 'string' ? cfg.domain : '';
   if (configDomain && configDomain.length > 3) {
     score += 5;
   }

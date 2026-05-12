@@ -1,4 +1,5 @@
 import cron from 'node-cron';
+import type { ScheduledTask } from 'node-cron';
 
 const DIRECTUS_URL = process.env.DIRECTUS_URL?.trim();
 const DIRECTUS_TOKEN = process.env.DIRECTUS_TOKEN?.trim();
@@ -20,7 +21,7 @@ export interface ArchiverStatus {
   isRunning: boolean;
 }
 
-let cronTask: cron.ScheduledTask | null = null;
+let cronTask: ScheduledTask | null = null;
 let lastRunResult: ArchiverRunResult | null = null;
 let isRunning = false;
 

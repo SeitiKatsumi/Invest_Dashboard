@@ -28,6 +28,10 @@ export interface Site {
   last_scraping_at: string | null;
   last_scraping_urls_found: number | null;
   scraping_engine: "external" | "internal" | null;
+  scraping_config_locked?: boolean | number | string | null;
+  scraping_config_lock_reason?: string | null;
+  scraping_config_source?: string | null;
+  scraping_config_verified_at?: string | null;
   error_category?: ErrorCategory;
 }
 

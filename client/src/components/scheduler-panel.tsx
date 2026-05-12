@@ -69,11 +69,30 @@ interface RunResult {
   details: { siteId: number; siteName: string; action: string; success: boolean; urlsFound: number; error?: string }[];
 }
 
+interface SchedulerRunRecord {
+  id: string;
+  status: "running" | "completed" | "failed" | "cancelled" | "skipped";
+  trigger: "cron" | "manual";
+  started_at: string;
+  completed_at: string | null;
+  day_index: number;
+  day_name: string;
+  total_sites: number;
+  onboarded: number;
+  scraped: number;
+  errors: number;
+  total_urls_found: number;
+  error_message: string | null;
+}
+
 interface ScheduleStatus {
   config: ScheduleConfig;
   isRunning: boolean;
   lastRun: string | null;
   lastRunResult: RunResult | null;
+  latestPersistedRun: SchedulerRunRecord | null;
+  recentRuns: SchedulerRunRecord[];
+  missedRunWarning: boolean;
   nextRun: string | null;
   groups: ScheduleGroup[];
   cronActive: boolean;
@@ -86,6 +105,14 @@ function formatDateTime(iso: string | null) {
   if (!iso) return '—';
   const d = new Date(iso);
   return d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+function getRunStatusBadge(run: SchedulerRunRecord) {
+  if (run.status === "completed") return <Badge variant="outline" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">OK</Badge>;
+  if (run.status === "running") return <Badge variant="outline" className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">Rodando</Badge>;
+  if (run.status === "skipped") return <Badge variant="outline">Pulado</Badge>;
+  if (run.status === "cancelled") return <Badge variant="outline" className="bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-300">Cancelado</Badge>;
+  return <Badge variant="destructive">Falha</Badge>;
 }
 
 function cronToTime(expr: string): string {
@@ -192,7 +219,7 @@ export default function SchedulerPanel() {
     );
   }
 
-  const { config: cfg, isRunning, groups, lastRunResult, nextRun, cronActive } = status;
+  const { config: cfg, isRunning, groups, lastRunResult, latestPersistedRun, recentRuns, missedRunWarning, nextRun, cronActive } = status;
   const todayIdx = new Date().getDay();
   const todayGroup = groups.find(g => g.dayIndex === todayIdx);
   const totalSitesScheduled = groups.reduce((s, g) => s + g.sites.length, 0);
@@ -292,6 +319,18 @@ export default function SchedulerPanel() {
             </div>
           </div>
 
+          {missedRunWarning && (
+            <div className="flex items-start gap-2 p-3 rounded-lg border border-amber-300 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200 dark:border-amber-800">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <div className="text-sm">
+                <div className="font-medium">Agendamento sem execucao recente</div>
+                <div className="text-xs opacity-80">
+                  O scheduler esta ligado, mas o ultimo registro persistido e {latestPersistedRun ? formatDateTime(latestPersistedRun.started_at) : "inexistente"}. Com node-cron, isso geralmente indica processo parado ou dormindo no horario agendado.
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-wrap gap-2">
             {groups.map(group => {
               const isToday = group.dayIndex === todayIdx;
@@ -390,6 +429,27 @@ export default function SchedulerPanel() {
                 </div>
               </div>
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            </div>
+          )}
+
+          {recentRuns && recentRuns.length > 0 && (
+            <div className="space-y-2 pt-2 border-t">
+              <div className="text-sm font-medium text-muted-foreground">Historico persistente</div>
+              <div className="space-y-1">
+                {recentRuns.slice(0, expanded ? 8 : 3).map((run) => (
+                  <div key={run.id} className="flex items-center justify-between gap-3 rounded-md bg-muted/40 px-3 py-2 text-xs">
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">
+                        {formatDateTime(run.started_at)} - {run.day_name} - {run.trigger === "cron" ? "cron" : "manual"}
+                      </div>
+                      <div className="text-muted-foreground">
+                        {run.scraped} scrapes, {run.onboarded} onboardings, {run.total_urls_found} URLs, {run.errors} erros
+                      </div>
+                    </div>
+                    <div className="shrink-0">{getRunStatusBadge(run)}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

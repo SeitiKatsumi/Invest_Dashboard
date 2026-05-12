@@ -92,6 +92,11 @@ function getValidationStatus(site: Site): string | undefined {
   return cfg?.validation_status as string | undefined;
 }
 
+function isConfigLocked(site: Site | null | undefined): boolean {
+  const value = site?.scraping_config_locked;
+  return value === true || value === 1 || value === "1";
+}
+
 type ConfigVisualState = 'validated' | 'not_validated' | 'error' | 'none';
 
 function getConfigVisualState(site: Site): ConfigVisualState {
@@ -420,7 +425,7 @@ function SitesTable({
   onViewError: (site: Site) => void;
 }) {
   const [search, setSearch] = useState("");
-  const [filterConfig, setFilterConfig] = useState<"all" | "with" | "without" | "error">("all");
+  const [filterConfig, setFilterConfig] = useState<"all" | "with" | "without" | "error" | "zero" | "stale">("all");
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("active");
   const [filterErrorCategory, setFilterErrorCategory] = useState<ErrorCategory | "all">("all");
   const [page, setPage] = useState(1);
@@ -439,8 +444,14 @@ function SitesTable({
 
   const healthSummary = useMemo(() => {
     if (!sites) return null;
-    const counts: Record<string, number> = { ok: 0, cloudflare: 0, timeout: 0, access_denied: 0, config_invalid: 0, spa_dynamic_content: 0, empty_result: 0, unknown: 0, no_config: 0 };
+    const staleCutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const counts: Record<string, number> = { ok: 0, cloudflare: 0, timeout: 0, access_denied: 0, config_invalid: 0, spa_dynamic_content: 0, empty_result: 0, unknown: 0, no_config: 0, zero_urls: 0, stale: 0, active: 0 };
     for (const site of sites) {
+      const isActive = site.liga_desliga === "ligado";
+      if (isActive) counts.active++;
+      if (isActive && site.last_scraping_urls_found === 0) counts.zero_urls++;
+      const lastScrapeTime = site.last_scraping_at ? new Date(site.last_scraping_at).getTime() : 0;
+      if (isActive && (!lastScrapeTime || lastScrapeTime < staleCutoff)) counts.stale++;
       const cat = site.error_category || 'ok';
       if (!site.scraping_config && cat === 'ok') {
         counts.no_config++;
@@ -491,7 +502,9 @@ function SitesTable({
       filterConfig === "all" ||
       (filterConfig === "with" && site.scraping_config) ||
       (filterConfig === "without" && !site.scraping_config && !site.scraping_error) ||
-      (filterConfig === "error" && !!site.scraping_error);
+      (filterConfig === "error" && !!site.scraping_error) ||
+      (filterConfig === "zero" && site.last_scraping_urls_found === 0) ||
+      (filterConfig === "stale" && (!site.last_scraping_at || new Date(site.last_scraping_at).getTime() < Date.now() - 7 * 24 * 60 * 60 * 1000));
     const matchStatus =
       filterStatus === "all" ||
       (filterStatus === "active" && site.liga_desliga === "ligado") ||
@@ -619,6 +632,32 @@ function SitesTable({
                   </div>
                 </button>
               )}
+              {healthSummary.zero_urls > 0 && (
+                <button
+                  onClick={() => { setFilterErrorCategory("all"); setFilterConfig("zero"); setFilterStatus("active"); }}
+                  className={`flex items-center gap-2 p-2.5 rounded-lg border transition-colors cursor-pointer ${filterConfig === "zero" ? "bg-yellow-50 border-yellow-300 dark:bg-yellow-950 dark:border-yellow-700" : "hover:bg-muted"}`}
+                  data-testid="health-zero-urls"
+                >
+                  <FileWarning className="h-4 w-4 text-yellow-500 shrink-0" />
+                  <div className="text-left">
+                    <div className="text-lg font-bold leading-none text-yellow-600">{healthSummary.zero_urls}</div>
+                    <div className="text-[10px] text-muted-foreground">0 URLs</div>
+                  </div>
+                </button>
+              )}
+              {healthSummary.stale > 0 && (
+                <button
+                  onClick={() => { setFilterErrorCategory("all"); setFilterConfig("stale"); setFilterStatus("active"); }}
+                  className={`flex items-center gap-2 p-2.5 rounded-lg border transition-colors cursor-pointer ${filterConfig === "stale" ? "bg-amber-50 border-amber-300 dark:bg-amber-950 dark:border-amber-700" : "hover:bg-muted"}`}
+                  data-testid="health-stale"
+                >
+                  <Clock className="h-4 w-4 text-amber-500 shrink-0" />
+                  <div className="text-left">
+                    <div className="text-lg font-bold leading-none text-amber-600">{healthSummary.stale}</div>
+                    <div className="text-[10px] text-muted-foreground">7d+</div>
+                  </div>
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -692,6 +731,22 @@ function SitesTable({
             >
               <AlertTriangle className="h-3.5 w-3.5 mr-1" />
               Com Erro
+            </Button>
+            <Button
+              variant={filterConfig === "zero" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFilterConfig("zero")}
+              data-testid="button-filter-zero-urls"
+            >
+              0 URLs
+            </Button>
+            <Button
+              variant={filterConfig === "stale" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFilterConfig("stale")}
+              data-testid="button-filter-stale"
+            >
+              7d+
             </Button>
           </div>
         </div>
@@ -824,8 +879,12 @@ function SitesTable({
                           const configState = getConfigVisualState(site);
                           if (configState === 'validated') {
                             return (
-                              <Button variant="ghost" size="icon" onClick={() => onViewConfig(site)} data-testid={`button-view-config-${site.id}`} title="Config validada">
-                                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                              <Button variant="ghost" size="icon" onClick={() => onViewConfig(site)} data-testid={`button-view-config-${site.id}`} title={isConfigLocked(site) ? "Config validada e travada" : "Config validada"}>
+                                {isConfigLocked(site) ? (
+                                  <Lock className="h-4 w-4 text-amber-500" />
+                                ) : (
+                                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                )}
                               </Button>
                             );
                           }
@@ -1136,9 +1195,13 @@ function OnboardingDialog({
   ];
 
   const engine = site?.scraping_engine || "internal";
+  const configLocked = isConfigLocked(site);
 
   const mutation = useMutation({
     mutationFn: async () => {
+      if (configLocked) {
+        throw new Error("Config travada: onboarding bloqueado para preservar uma configuração validada manualmente.");
+      }
       const response = await apiRequest("POST", "/api/scraping/onboard", {
         siteId: site?.id,
         siteUrl: site?.url_listagem || site?.url_site,
@@ -1190,15 +1253,38 @@ function OnboardingDialog({
             <p className="text-sm font-semibold mt-1">{site?.nome_site || `Site #${site?.id}`}</p>
             <p className="text-xs text-muted-foreground break-all line-clamp-2">{site?.url_listagem || site?.url_site}</p>
             <div className="mt-1">
-              <Badge variant="outline" className={engine === "internal"
-                ? "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800"
-                : "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800"
-              }>
-                {engine === "internal" ? <Cpu className="h-3 w-3 mr-1" /> : <Cloud className="h-3 w-3 mr-1" />}
-                Motor {engine === "internal" ? "Interno" : "Externo"}
-              </Badge>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline" className={engine === "internal"
+                  ? "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800"
+                  : "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800"
+                }>
+                  {engine === "internal" ? <Cpu className="h-3 w-3 mr-1" /> : <Cloud className="h-3 w-3 mr-1" />}
+                  Motor {engine === "internal" ? "Interno" : "Externo"}
+                </Badge>
+                {configLocked && (
+                  <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800">
+                    <Lock className="h-3 w-3 mr-1" />
+                    Config travada
+                  </Badge>
+                )}
+              </div>
             </div>
           </div>
+
+          {configLocked && (
+            <div className="p-4 bg-amber-500/10 border border-amber-300 dark:border-amber-700 rounded-md space-y-1">
+              <div className="flex items-center gap-2">
+                <Lock className="h-5 w-5 text-amber-500" />
+                <p className="text-sm font-medium text-amber-700 dark:text-amber-300">Onboarding bloqueado</p>
+              </div>
+              <p className="text-xs text-amber-700 dark:text-amber-300">
+                Esta config foi validada manualmente e não será sobrescrita pela IA.
+              </p>
+              {site?.scraping_config_lock_reason && (
+                <p className="text-xs text-muted-foreground">{site.scraping_config_lock_reason}</p>
+              )}
+            </div>
+          )}
 
           <div>
             <Label className="text-sm font-medium">Modelo de IA</Label>
@@ -1243,7 +1329,7 @@ function OnboardingDialog({
 
           {result && (
             <div className="space-y-2">
-              {result.spa_warning && (
+              {Boolean(result.spa_warning) && (
                 <div className="p-4 bg-purple-500/10 border border-purple-300 dark:border-purple-700 rounded-md space-y-1" data-testid="alert-spa-warning">
                   <div className="flex items-center gap-2">
                     <Globe className="h-5 w-5 text-purple-500" />
@@ -1253,7 +1339,7 @@ function OnboardingDialog({
                   <p className="text-xs text-muted-foreground mt-1">A config foi salva como não validada. O conteúdo deste site é carregado via JavaScript e pode necessitar ajustes manuais.</p>
                 </div>
               )}
-              {result.config_validation === 'not_validated_spa_dynamic_content' && !result.spa_warning && (
+              {result.config_validation === 'not_validated_spa_dynamic_content' && !Boolean(result.spa_warning) && (
                 <div className="p-4 bg-purple-500/10 border border-purple-300 dark:border-purple-700 rounded-md" data-testid="alert-spa-validation">
                   <div className="flex items-center gap-2">
                     <Globe className="h-5 w-5 text-purple-500" />
@@ -1296,7 +1382,7 @@ function OnboardingDialog({
           {!result && (
             <Button
               onClick={() => mutation.mutate()}
-              disabled={mutation.isPending}
+              disabled={mutation.isPending || configLocked}
               data-testid="button-start-onboard"
             >
               {mutation.isPending ? (
@@ -2439,9 +2525,9 @@ function ApiStatusBadge() {
     refetchInterval: 30000,
   });
 
-  if (isLoading) return <Badge variant="secondary"><Loader2 className="h-3 w-3 animate-spin mr-1" />API</Badge>;
-  if (isError) return <Badge variant="destructive">API Offline</Badge>;
-  return <Badge variant="default">API Online</Badge>;
+  if (isLoading) return <Badge variant="secondary"><Loader2 className="h-3 w-3 animate-spin mr-1" />API externa</Badge>;
+  if (isError) return <Badge variant="destructive">API externa offline</Badge>;
+  return <Badge variant="default">API externa online</Badge>;
 }
 
 export default function ScrapingPage() {

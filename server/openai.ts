@@ -113,14 +113,14 @@ export async function extractAuctionDataFromImage(base64Image: string): Promise<
     
     if (!validationResult.success) {
       console.error("Validation errors:", validationResult.error.flatten());
-      const partialData: ExtractedAuctionData = {};
+      const partialData: Partial<ExtractedAuctionData> = {};
       for (const key of Object.keys(extractedAuctionDataSchema.shape)) {
         const value = parsedJson[key];
         if (typeof value === "string") {
           (partialData as Record<string, string>)[key] = value;
         }
       }
-      return partialData;
+      return extractedAuctionDataSchema.parse(partialData);
     }
     
     return validationResult.data;

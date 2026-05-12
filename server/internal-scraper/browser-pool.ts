@@ -1,4 +1,5 @@
 import type { Browser, BrowserContext, Page } from 'playwright';
+import { existsSync } from 'node:fs';
 import { STEALTH_BROWSER_ARGS, STEALTH_INIT_SCRIPT, randomUserAgent } from './utils.js';
 
 interface PooledBrowser {
@@ -12,6 +13,22 @@ const MAX_BROWSERS = 3;
 const MAX_USES_PER_BROWSER = 20;
 const BROWSER_MAX_AGE_MS = 30 * 60 * 1000;
 const ACQUIRE_TIMEOUT_MS = 30_000;
+
+const CHROME_EXECUTABLE_CANDIDATES = [
+  process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+  process.env.CHROME_PATH,
+  process.env.GOOGLE_CHROME_BIN,
+  'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+  'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+  '/usr/bin/google-chrome',
+  '/usr/bin/google-chrome-stable',
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser',
+].filter((path): path is string => Boolean(path));
+
+function findSystemChromeExecutable(): string | undefined {
+  return CHROME_EXECUTABLE_CANDIDATES.find(path => existsSync(path));
+}
 
 class BrowserPool {
   private pool: PooledBrowser[] = [];
@@ -172,9 +189,15 @@ class BrowserPool {
   private async createBrowser(): Promise<PooledBrowser | null> {
     try {
       const { chromium } = await import('playwright');
+      const executablePath = findSystemChromeExecutable();
+      if (executablePath) {
+        console.log(`[BrowserPool] Usando Chrome do sistema: ${executablePath}`);
+      }
+
       const browser = await chromium.launch({
         headless: true,
         args: STEALTH_BROWSER_ARGS,
+        executablePath,
       });
 
       const entry: PooledBrowser = {

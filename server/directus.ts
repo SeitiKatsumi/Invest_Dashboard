@@ -20,6 +20,26 @@ interface DirectusResponse<T> {
   };
 }
 
+async function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchWithRetry(url: string, init: RequestInit, attempts = 3): Promise<Response> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await fetch(url, init);
+    } catch (error) {
+      lastError = error;
+      if (attempt === attempts) break;
+      await sleep(500 * attempt);
+    }
+  }
+
+  throw lastError;
+}
+
 async function directusFetch<T>(
   endpoint: string,
   params?: Record<string, string | number>
@@ -43,7 +63,7 @@ async function directusFetch<T>(
     });
   }
 
-  const response = await fetch(url.toString(), {
+  const response = await fetchWithRetry(url.toString(), {
     headers: {
       Authorization: `Bearer ${DIRECTUS_TOKEN}`,
       "Content-Type": "application/json",

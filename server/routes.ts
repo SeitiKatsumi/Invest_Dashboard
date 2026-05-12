@@ -16,6 +16,10 @@ import {
   getDayNames,
 } from "./scraper-scheduler";
 import {
+  getSchedulerRunItems,
+  getSchedulerRuns,
+} from "./scheduler-persistence";
+import {
   initArchiver,
   getArchiverStatus,
   runArchiver,
@@ -50,6 +54,8 @@ import {
   scoreConfig,
   persistBatchReportToDirectus,
   classifyScrapingError,
+  ConfigLockedError,
+  getSiteConfigLock,
 } from "./scraping";
 import {
   connectWhatsApp,
@@ -442,13 +448,25 @@ export async function registerRoutes(
 
   app.post("/api/scraping/onboard", async (req, res) => {
     try {
-      const { siteId, siteUrl, maxPages, model, engine: rawEngine } = req.body;
+      const { siteId, siteUrl, maxPages, model, engine: rawEngine, force } = req.body;
       const engine = rawEngine || "internal";
       if (!siteUrl) {
         return res.status(400).json({ error: "URL do site é obrigatória" });
       }
       if (!isOpenAIKeyConfigured()) {
         return res.status(500).json({ error: "OPENAI_API_KEY não configurada" });
+      }
+      if (siteId && !force) {
+        const lock = await getSiteConfigLock(siteId);
+        if (lock.locked) {
+          return res.status(409).json({
+            error: "Config de scraping travada",
+            message: lock.reason || "Esta config foi verificada manualmente e nao pode ser sobrescrita por onboarding sem confirmacao explicita.",
+            config_locked: true,
+            config_source: lock.source,
+            config_verified_at: lock.verifiedAt,
+          });
+        }
       }
 
       const useInternal = engine === "internal";
@@ -478,11 +496,11 @@ export async function registerRoutes(
         }
 
         if (result.config) {
-          configConfidence = scoreConfig(result.config as Record<string, unknown>);
+          configConfidence = scoreConfig(result.config as unknown as Record<string, unknown>);
 
           try {
             const { DeterministicCrawler } = await import('./internal-scraper/index.js');
-            const testCrawler = new DeterministicCrawler(result.config as Record<string, unknown>, { concurrentRequests: 3, useHeuristics: false });
+            const testCrawler = new DeterministicCrawler(result.config as unknown as Record<string, unknown>, { concurrentRequests: 3, useHeuristics: false });
             const testResult = await testCrawler.crawl(siteUrl, 5, true);
             miniScrapeResult = { urls_found: testResult.total_urls, valid: testResult.total_urls > 0 };
 
@@ -531,7 +549,7 @@ export async function registerRoutes(
         if (siteId && result.config && !isConfigInvalid) {
           try {
             const configObj = typeof result.config === "object" && result.config !== null
-              ? result.config as Record<string, unknown>
+              ? result.config as unknown as Record<string, unknown>
               : {};
 
             if (isNotValidatedDueToSpa) {
@@ -542,7 +560,7 @@ export async function registerRoutes(
               (configObj as Record<string, unknown>).validation_note = String(diagnostics.config_validation_message || 'Não validada por bloqueio de acesso');
             }
 
-            await saveSiteScrapingConfig(siteId, configObj);
+            await saveSiteScrapingConfig(siteId, configObj, { force: !!force, source: "ai_onboarding" });
 
             if (isNotValidatedDueToSpa) {
               await saveSiteScrapingError(
@@ -589,7 +607,7 @@ export async function registerRoutes(
 
         if (siteId && result.config) {
           try {
-            await saveSiteScrapingConfig(siteId, result.config);
+            await saveSiteScrapingConfig(siteId, result.config, { force: !!force, source: "ai_onboarding" });
             await clearSiteScrapingError(siteId);
             await updateSiteEngine(siteId, "external");
           } catch (saveError) {
@@ -613,7 +631,7 @@ export async function registerRoutes(
       console.error("Error during onboarding:", error);
       const errorMsg = error instanceof Error ? error.message : "Erro desconhecido";
 
-      if (req.body.siteId) {
+      if (req.body.siteId && !(error instanceof ConfigLockedError)) {
         try {
           await saveSiteScrapingError(req.body.siteId, errorMsg, null);
         } catch (saveError) {
@@ -621,9 +639,10 @@ export async function registerRoutes(
         }
       }
 
-      res.status(500).json({
+      res.status(error instanceof ConfigLockedError ? 409 : 500).json({
         error: "Falha no onboarding",
         message: errorMsg,
+        config_locked: error instanceof ConfigLockedError ? true : undefined,
       });
     }
   });
@@ -1021,7 +1040,7 @@ export async function registerRoutes(
 
   app.post("/api/scraping/save-config", async (req, res) => {
     try {
-      const { siteId, config } = req.body;
+      const { siteId, config, force, source, lock, lockReason } = req.body;
       if (!siteId || !config) {
         return res.status(400).json({ error: "siteId e config são obrigatórios" });
       }
@@ -1029,13 +1048,19 @@ export async function registerRoutes(
       if (typeof config === "string") {
         try { parsedConfig = JSON.parse(config); } catch { return res.status(400).json({ error: "Config JSON inválido" }); }
       }
-      await saveSiteScrapingConfig(siteId, parsedConfig);
+      await saveSiteScrapingConfig(siteId, parsedConfig, {
+        force: !!force,
+        source: typeof source === "string" ? source : "manual_verified",
+        lock: typeof lock === "boolean" ? lock : undefined,
+        lockReason: typeof lockReason === "string" ? lockReason : undefined,
+      });
       res.json({ success: true });
     } catch (error) {
       console.error("Error saving config:", error);
-      res.status(500).json({
+      res.status(error instanceof ConfigLockedError ? 409 : 500).json({
         error: "Failed to save config",
         message: error instanceof Error ? error.message : "Unknown error",
+        config_locked: error instanceof ConfigLockedError ? true : undefined,
       });
     }
   });
@@ -1663,6 +1688,26 @@ export async function registerRoutes(
       res.json(status);
     } catch (error) {
       res.status(500).json({ error: "Falha ao obter status do agendamento" });
+    }
+  });
+
+  app.get("/api/scheduler/runs", async (req, res) => {
+    try {
+      const limit = Math.min(parseInt(String(req.query.limit || "20"), 10) || 20, 100);
+      const runs = await getSchedulerRuns(limit);
+      res.json(runs);
+    } catch (error) {
+      res.status(500).json({ error: "Falha ao obter historico do agendamento" });
+    }
+  });
+
+  app.get("/api/scheduler/runs/:runId/items", async (req, res) => {
+    try {
+      const limit = Math.min(parseInt(String(req.query.limit || "500"), 10) || 500, 1000);
+      const items = await getSchedulerRunItems(req.params.runId, limit);
+      res.json(items);
+    } catch (error) {
+      res.status(500).json({ error: "Falha ao obter detalhes da execucao" });
     }
   });
 

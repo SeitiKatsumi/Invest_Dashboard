@@ -1,11 +1,26 @@
 import cron from 'node-cron';
+import type { ScheduledTask } from 'node-cron';
 import {
   getSitesWithConfig,
+  saveSiteScrapingConfig,
   startInternalOnboarding,
   startInternalScraping,
+  updateSiteEngine,
+  clearSiteScrapingError,
 } from './scraping.js';
 import { getOpenAIApiKey, isOpenAIKeyConfigured } from './openai-usage.js';
 import { scoreConfig } from './internal-scraper/config-scorer.js';
+import {
+  createSchedulerRun,
+  createSchedulerRunItem,
+  ensureSchedulerPersistenceSchema,
+  getLatestSchedulerRun,
+  getSchedulerRuns,
+  updateSchedulerRun,
+  updateSchedulerRunItem,
+  type SchedulerRunRecord,
+  type SchedulerRunTrigger,
+} from './scheduler-persistence.js';
 const DIRECTUS_URL = process.env.DIRECTUS_URL || '';
 const DIRECTUS_TOKEN = process.env.DIRECTUS_TOKEN || '';
 
@@ -34,6 +49,9 @@ export interface ScheduleStatus {
   isRunning: boolean;
   lastRun: string | null;
   lastRunResult: RunResult | null;
+  latestPersistedRun: SchedulerRunRecord | null;
+  recentRuns: SchedulerRunRecord[];
+  missedRunWarning: boolean;
   nextRun: string | null;
   groups: ScheduleGroup[];
   cronActive: boolean;
@@ -64,12 +82,17 @@ const DEFAULT_CONFIG: ScheduleConfig = {
 };
 
 let config: ScheduleConfig = { ...DEFAULT_CONFIG };
-let cronTask: cron.ScheduledTask | null = null;
+let cronTask: ScheduledTask | null = null;
 let isRunning = false;
 let lastRun: string | null = null;
 let lastRunResult: RunResult | null = null;
 let currentRunAbort: AbortController | null = null;
 let cachedGroups: ScheduleGroup[] = [];
+let watchdogInterval: NodeJS.Timeout | null = null;
+let lastCatchUpAttemptKey: string | null = null;
+
+const SCHEDULER_TIMEZONE = 'America/Sao_Paulo';
+const WATCHDOG_INTERVAL_MS = 15 * 60 * 1000;
 
 function assignSitesToGroups(sites: any[], daysPerWeek: number, activeDays: number[]): ScheduleGroup[] {
   const groups: ScheduleGroup[] = activeDays.map(dayIdx => ({
@@ -121,24 +144,143 @@ function getNextRunDate(): string | null {
   return null;
 }
 
+function getSaoPauloParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: SCHEDULER_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+
+  const get = (type: string) => parts.find(part => part.type === type)?.value || '';
+  const weekdayMap: Record<string, number> = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
+  };
+
+  return {
+    dateKey: `${get('year')}-${get('month')}-${get('day')}`,
+    dayIndex: weekdayMap[get('weekday')] ?? date.getDay(),
+    hour: Number(get('hour')),
+    minute: Number(get('minute')),
+  };
+}
+
+function getConfiguredScheduleTime() {
+  const parts = config.cronExpression.split(' ');
+  return {
+    minute: Number.parseInt(parts[0] || '0', 10) || 0,
+    hour: Number.parseInt(parts[1] || '3', 10) || 3,
+  };
+}
+
+function isAfterTodaySchedule() {
+  const now = getSaoPauloParts();
+  const scheduled = getConfiguredScheduleTime();
+  return now.hour > scheduled.hour || (now.hour === scheduled.hour && now.minute >= scheduled.minute);
+}
+
+function didRunToday(run: SchedulerRunRecord | null, todayKey: string, todayIndex: number) {
+  if (!run?.started_at) return false;
+  const runParts = getSaoPauloParts(new Date(run.started_at));
+  if (runParts.dateKey !== todayKey || Number(run.day_index) !== todayIndex) return false;
+
+  const ageMs = Date.now() - new Date(run.started_at).getTime();
+  const staleRunningRun = run.status === 'running' && ageMs > 30 * 60 * 1000;
+  return !staleRunningRun;
+}
+
 async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function processGroup(group: ScheduleGroup): Promise<RunResult> {
+function isStaleSchedulerRun(run: SchedulerRunRecord | null): boolean {
+  if (!run?.started_at) return true;
+  return Date.now() - new Date(run.started_at).getTime() > 36 * 60 * 60 * 1000;
+}
+
+async function runDueIfMissed(reason: 'startup' | 'watchdog') {
+  if (!config.enabled || isRunning) return;
+
+  const now = getSaoPauloParts();
+  if (!config.activeDays.includes(now.dayIndex)) return;
+  if (!isAfterTodaySchedule()) return;
+  if (lastCatchUpAttemptKey === now.dateKey) return;
+
+  const latestRun = await getLatestSchedulerRun();
+  if (didRunToday(latestRun, now.dateKey, now.dayIndex)) return;
+
+  lastCatchUpAttemptKey = now.dateKey;
+  console.warn(`[Scheduler] Watchdog detectou execucao perdida (${reason}) para ${DAY_NAMES[now.dayIndex]}; iniciando catch-up.`);
+
+  try {
+    await executeCronJob();
+  } catch (error) {
+    console.error('[Scheduler] Erro no catch-up do watchdog:', error);
+  }
+}
+
+function startWatchdog() {
+  if (watchdogInterval) return;
+  watchdogInterval = setInterval(() => {
+    runDueIfMissed('watchdog').catch(error => {
+      console.error('[Scheduler] Erro no watchdog:', error);
+    });
+  }, WATCHDOG_INTERVAL_MS);
+  watchdogInterval.unref?.();
+}
+
+function stopWatchdog() {
+  if (!watchdogInterval) return;
+  clearInterval(watchdogInterval);
+  watchdogInterval = null;
+}
+
+async function processGroup(group: ScheduleGroup, trigger: SchedulerRunTrigger): Promise<RunResult> {
   const startedAt = new Date().toISOString();
   const details: RunResult['details'] = [];
   let onboarded = 0;
   let scraped = 0;
   let errors = 0;
   let totalUrlsFound = 0;
+  const runRecord = await createSchedulerRun({
+    status: 'running',
+    trigger,
+    started_at: startedAt,
+    completed_at: null,
+    day_index: group.dayIndex,
+    day_name: group.dayName,
+    total_sites: group.sites.length,
+    onboarded: 0,
+    scraped: 0,
+    errors: 0,
+    total_urls_found: 0,
+    config_snapshot: { ...config },
+    error_message: null,
+  });
 
   console.log(`[Scheduler] Iniciando processamento do grupo ${group.dayName} (${group.sites.length} sites)`);
 
-  const sitesNeedOnboarding = config.includeOnboarding
+  const sitesNeedOnboarding = config.includeOnboarding && trigger === 'manual'
     ? group.sites.filter(s => !s.hasConfig)
     : [];
   const sitesWithConfig = group.sites.filter(s => s.hasConfig);
+
+  if (config.includeOnboarding && trigger === 'cron') {
+    const skippedOnboarding = group.sites.filter(s => !s.hasConfig).length;
+    if (skippedOnboarding > 0) {
+      console.log(`[Scheduler] Cron pulou onboarding de ${skippedOnboarding} sites sem config; scraping dos sites configurados continua.`);
+    }
+  }
 
   if (config.runOnlyWithConfig) {
     sitesNeedOnboarding.length = 0;
@@ -155,6 +297,21 @@ async function processGroup(group: ScheduleGroup): Promise<RunResult> {
       if (currentRunAbort?.signal.aborted) return;
 
       semaphore.count++;
+      const item = await createSchedulerRunItem({
+        run: runRecord?.id || null,
+        site_id: site.id,
+        site_name: site.nome_site || null,
+        site_url: site.url || null,
+        action: 'onboarding',
+        status: 'running',
+        started_at: new Date().toISOString(),
+        completed_at: null,
+        urls_found: 0,
+        job_id: null,
+        result_classification: null,
+        confidence_score: null,
+        error_message: null,
+      });
       try {
         const result = await startInternalOnboarding(
           site.url,
@@ -163,20 +320,40 @@ async function processGroup(group: ScheduleGroup): Promise<RunResult> {
         );
 
         if (result.config) {
+          const configObj = result.config as unknown as Record<string, unknown>;
+          const confidence = scoreConfig(configObj);
+          await saveSiteScrapingConfig(site.id, configObj);
+          await updateSiteEngine(site.id, 'internal');
+          await clearSiteScrapingError(site.id);
           onboarded++;
           site.hasConfig = true;
           sitesWithConfig.push(site);
           details.push({ siteId: site.id, siteName: site.nome_site || '', action: 'onboarding', success: true, urlsFound: 0 });
+          await updateSchedulerRunItem(item?.id || null, {
+            status: 'success',
+            completed_at: new Date().toISOString(),
+            confidence_score: confidence.confidence,
+          });
           console.log(`[Scheduler] Onboarding OK: ${site.nome_site}`);
         } else {
           errors++;
           details.push({ siteId: site.id, siteName: site.nome_site || '', action: 'onboarding', success: false, urlsFound: 0, error: result.error });
+          await updateSchedulerRunItem(item?.id || null, {
+            status: 'error',
+            completed_at: new Date().toISOString(),
+            error_message: result.error || 'Onboarding nao retornou config',
+          });
           console.log(`[Scheduler] Onboarding falhou: ${site.nome_site} - ${result.error}`);
         }
       } catch (e) {
         errors++;
         const msg = e instanceof Error ? e.message : String(e);
         details.push({ siteId: site.id, siteName: site.nome_site || '', action: 'onboarding', success: false, urlsFound: 0, error: msg });
+        await updateSchedulerRunItem(item?.id || null, {
+          status: 'error',
+          completed_at: new Date().toISOString(),
+          error_message: msg,
+        });
       } finally {
         semaphore.count--;
       }
@@ -203,12 +380,32 @@ async function processGroup(group: ScheduleGroup): Promise<RunResult> {
       if (currentRunAbort?.signal.aborted) return;
 
       semaphore.count++;
+      const item = await createSchedulerRunItem({
+        run: runRecord?.id || null,
+        site_id: site.id,
+        site_name: site.nome_site || null,
+        site_url: site.url || null,
+        action: 'scraping',
+        status: 'running',
+        started_at: new Date().toISOString(),
+        completed_at: null,
+        urls_found: 0,
+        job_id: null,
+        result_classification: null,
+        confidence_score: null,
+        error_message: null,
+      });
       try {
         const fullSite = allSites.find((s: any) => s.id === site.id);
         const siteConfig = fullSite?.scraping_config;
         if (!siteConfig) {
           details.push({ siteId: site.id, siteName: site.nome_site || '', action: 'scraping', success: false, urlsFound: 0, error: 'Config não encontrada' });
           errors++;
+          await updateSchedulerRunItem(item?.id || null, {
+            status: 'error',
+            completed_at: new Date().toISOString(),
+            error_message: 'Config nao encontrada',
+          });
           return;
         }
 
@@ -235,16 +432,35 @@ async function processGroup(group: ScheduleGroup): Promise<RunResult> {
           const urls = jobStatus.totalUrls || 0;
           totalUrlsFound += urls;
           details.push({ siteId: site.id, siteName: site.nome_site || '', action: 'scraping', success: true, urlsFound: urls });
+          await updateSchedulerRunItem(item?.id || null, {
+            status: 'success',
+            completed_at: new Date().toISOString(),
+            urls_found: urls,
+            job_id: jobResult.job_id,
+            result_classification: jobStatus.resultClassification || null,
+            confidence_score: jobStatus.confidenceScore || null,
+          });
           console.log(`[Scheduler] Scraping OK: ${site.nome_site} - ${urls} URLs`);
         } else {
           errors++;
           details.push({ siteId: site.id, siteName: site.nome_site || '', action: 'scraping', success: false, urlsFound: 0, error: jobStatus?.error || 'Timeout' });
+          await updateSchedulerRunItem(item?.id || null, {
+            status: 'error',
+            completed_at: new Date().toISOString(),
+            job_id: jobResult.job_id,
+            error_message: jobStatus?.error || 'Timeout',
+          });
           console.log(`[Scheduler] Scraping falhou: ${site.nome_site} - ${jobStatus?.error || 'Timeout'}`);
         }
       } catch (e) {
         errors++;
         const msg = e instanceof Error ? e.message : String(e);
         details.push({ siteId: site.id, siteName: site.nome_site || '', action: 'scraping', success: false, urlsFound: 0, error: msg });
+        await updateSchedulerRunItem(item?.id || null, {
+          status: 'error',
+          completed_at: new Date().toISOString(),
+          error_message: msg,
+        });
       } finally {
         semaphore.count--;
       }
@@ -254,9 +470,10 @@ async function processGroup(group: ScheduleGroup): Promise<RunResult> {
     await Promise.allSettled(scrapePromises);
   }
 
-  return {
+  const completedAt = new Date().toISOString();
+  const result = {
     startedAt,
-    completedAt: new Date().toISOString(),
+    completedAt,
     dayIndex: group.dayIndex,
     dayName: group.dayName,
     totalSites: group.sites.length,
@@ -266,6 +483,19 @@ async function processGroup(group: ScheduleGroup): Promise<RunResult> {
     totalUrlsFound,
     details,
   };
+
+  await updateSchedulerRun(runRecord?.id || null, {
+    status: currentRunAbort?.signal.aborted ? 'cancelled' : errors > 0 ? 'failed' : 'completed',
+    completed_at: completedAt,
+    total_sites: result.totalSites,
+    onboarded,
+    scraped,
+    errors,
+    total_urls_found: totalUrlsFound,
+    error_message: currentRunAbort?.signal.aborted ? 'Execucao cancelada pelo usuario' : null,
+  });
+
+  return result;
 }
 
 async function executeCronJob() {
@@ -290,6 +520,21 @@ async function executeCronJob() {
 
     if (!todayGroup || todayGroup.sites.length === 0) {
       console.log(`[Scheduler] Nenhum site para processar hoje (${DAY_NAMES[today]})`);
+      await createSchedulerRun({
+        status: 'skipped',
+        trigger: 'cron',
+        started_at: lastRun,
+        completed_at: new Date().toISOString(),
+        day_index: today,
+        day_name: DAY_NAMES[today],
+        total_sites: 0,
+        onboarded: 0,
+        scraped: 0,
+        errors: 0,
+        total_urls_found: 0,
+        config_snapshot: { ...config },
+        error_message: 'Nenhum site no grupo do dia',
+      });
       lastRunResult = {
         startedAt: lastRun,
         completedAt: new Date().toISOString(),
@@ -305,7 +550,7 @@ async function executeCronJob() {
       return;
     }
 
-    lastRunResult = await processGroup(todayGroup);
+    lastRunResult = await processGroup(todayGroup, 'cron');
     console.log(`[Scheduler] Concluído: ${lastRunResult.scraped} scrapes, ${lastRunResult.onboarded} onboardings, ${lastRunResult.errors} erros, ${lastRunResult.totalUrlsFound} URLs`);
   } catch (e) {
     console.error('[Scheduler] Erro no cron job:', e);
@@ -336,11 +581,17 @@ function startCron() {
   cronTask = cron.schedule(config.cronExpression, () => {
     executeCronJob().catch(e => console.error('[Scheduler] Erro:', e));
   }, {
-    timezone: 'America/Sao_Paulo',
+    timezone: SCHEDULER_TIMEZONE,
   });
 
-  console.log(`[Scheduler] Cron ativo: ${config.cronExpression} (timezone: America/Sao_Paulo)`);
+  console.log(`[Scheduler] Cron ativo: ${config.cronExpression} (timezone: ${SCHEDULER_TIMEZONE})`);
+  startWatchdog();
   refreshGroups().catch(() => {});
+  setTimeout(() => {
+    runDueIfMissed('startup').catch(error => {
+      console.error('[Scheduler] Erro no watchdog de inicializacao:', error);
+    });
+  }, 30_000).unref?.();
 }
 
 function stopCron() {
@@ -348,6 +599,7 @@ function stopCron() {
     cronTask.stop();
     cronTask = null;
   }
+  stopWatchdog();
 }
 
 export function getScheduleConfig(): ScheduleConfig {
@@ -444,12 +696,19 @@ export async function getScheduleStatus(): Promise<ScheduleStatus> {
   if (cachedGroups.length === 0) {
     await refreshGroups();
   }
+  const [latestPersistedRun, recentRuns] = await Promise.all([
+    getLatestSchedulerRun(),
+    getSchedulerRuns(8),
+  ]);
 
   return {
     config: { ...config },
     isRunning,
     lastRun,
     lastRunResult,
+    latestPersistedRun,
+    recentRuns,
+    missedRunWarning: config.enabled && !isRunning && isStaleSchedulerRun(latestPersistedRun),
     nextRun: getNextRunDate(),
     groups: cachedGroups,
     cronActive: !!cronTask,
@@ -489,7 +748,7 @@ export async function triggerManualRun(dayIndex?: number): Promise<{ message: st
   const group = groupToProcess;
   (async () => {
     try {
-      lastRunResult = await processGroup(group);
+      lastRunResult = await processGroup(group, 'manual');
       console.log(`[Scheduler] Manual run concluído: ${lastRunResult.scraped} scrapes, ${lastRunResult.totalUrlsFound} URLs`);
     } catch (e) {
       console.error('[Scheduler] Erro no manual run:', e);
@@ -519,6 +778,7 @@ export function getDayNames() {
 
 export async function initScheduler() {
   console.log('[Scheduler] Inicializando...');
+  await ensureSchedulerPersistenceSchema();
   await loadConfigFromDirectus();
   if (config.enabled) {
     startCron();

@@ -302,9 +302,9 @@ export function buildLeilaoMessage(leilao: Leilao): string {
     const avaliacao = parseNumericValue(String(leilao.valor_avalaiacao_imovel));
     const candidates = [
       leilao.valor_leilao,
-      (leilao as Record<string, unknown>).valor_praca1,
-      (leilao as Record<string, unknown>).valor_praca2,
-      (leilao as Record<string, unknown>).valor_praca3,
+      (leilao as unknown as Record<string, unknown>).valor_praca1,
+      (leilao as unknown as Record<string, unknown>).valor_praca2,
+      (leilao as unknown as Record<string, unknown>).valor_praca3,
     ]
       .filter((v): v is string | number => v != null && String(v).trim() !== "")
       .map((v) => parseNumericValue(String(v)))

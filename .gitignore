@@ -5,3 +5,8 @@ server/public
 vite.config.ts.*
 *.tar.gz
 whatsapp_auth/
+.env
+.env.*
+!.env.example
+.dev-server.pid
+*.log

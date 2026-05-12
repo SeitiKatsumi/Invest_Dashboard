@@ -96,6 +96,58 @@ export async function deleteConfig(configId: string) {
 
 export type ErrorCategory = 'cloudflare' | 'timeout' | 'access_denied' | 'config_invalid' | 'spa_dynamic_content' | 'empty_result' | 'ok' | 'unknown';
 
+export class ConfigLockedError extends Error {
+  readonly statusCode = 409;
+
+  constructor(
+    readonly siteId: number,
+    readonly reason: string | null,
+  ) {
+    super(`Config de scraping travada para o site ${siteId}${reason ? `: ${reason}` : ''}`);
+    this.name = 'ConfigLockedError';
+  }
+}
+
+export interface SiteConfigLock {
+  locked: boolean;
+  reason: string | null;
+  source: string | null;
+  verifiedAt: string | null;
+}
+
+function isTruthyDirectusBoolean(value: unknown): boolean {
+  return value === true || value === 1 || value === '1' || value === 'true';
+}
+
+export async function getSiteConfigLock(siteId: number): Promise<SiteConfigLock> {
+  if (!DIRECTUS_URL || !DIRECTUS_TOKEN) {
+    return { locked: false, reason: null, source: null, verifiedAt: null };
+  }
+
+  const url = new URL(`${DIRECTUS_URL}/items/input_library_url/${siteId}`);
+  url.searchParams.set('fields', 'scraping_config_locked,scraping_config_lock_reason,scraping_config_source,scraping_config_verified_at');
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    return { locked: false, reason: null, source: null, verifiedAt: null };
+  }
+
+  const result = await response.json();
+  const site = result.data || {};
+  return {
+    locked: isTruthyDirectusBoolean(site.scraping_config_locked),
+    reason: site.scraping_config_lock_reason || null,
+    source: site.scraping_config_source || null,
+    verifiedAt: site.scraping_config_verified_at || null,
+  };
+}
+
 export function classifyScrapingError(site: {
   scraping_config?: string | Record<string, unknown> | null;
   scraping_error?: string | null;
@@ -129,10 +181,28 @@ export function classifyScrapingError(site: {
   return 'unknown';
 }
 
-export async function saveSiteScrapingConfig(siteId: number, config: Record<string, unknown>) {
+export async function saveSiteScrapingConfig(
+  siteId: number,
+  config: Record<string, unknown>,
+  options: { force?: boolean; source?: string; lock?: boolean; lockReason?: string | null } = {},
+) {
   if (!DIRECTUS_URL || !DIRECTUS_TOKEN) {
     throw new Error("DIRECTUS_URL and DIRECTUS_TOKEN must be set");
   }
+
+  const lock = await getSiteConfigLock(siteId);
+  if (lock.locked && !options.force) {
+    throw new ConfigLockedError(siteId, lock.reason);
+  }
+
+  const payload: Record<string, unknown> = {
+    scraping_config: JSON.stringify(config),
+  };
+
+  if (options.source) payload.scraping_config_source = options.source;
+  if (options.lock !== undefined) payload.scraping_config_locked = options.lock;
+  if (options.lockReason !== undefined) payload.scraping_config_lock_reason = options.lockReason;
+  if (options.lock) payload.scraping_config_verified_at = new Date().toISOString();
 
   const response = await fetch(`${DIRECTUS_URL}/items/input_library_url/${siteId}`, {
     method: "PATCH",
@@ -140,9 +210,7 @@ export async function saveSiteScrapingConfig(siteId: number, config: Record<stri
       Authorization: `Bearer ${DIRECTUS_TOKEN}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      scraping_config: JSON.stringify(config),
-    }),
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {
@@ -400,11 +468,12 @@ export async function getSitesWithConfig() {
   }
 
   const baseFields = "id,nome_site,url_site,url_listagem,liga_desliga,status,scraping_config,last_scraping_at,last_scraping_urls_found";
-  const extendedFields = `${baseFields},scraping_error,scraping_error_analysis,scraping_engine`;
+  const extendedFields = `${baseFields},scraping_error,scraping_error_analysis`;
+  const lockFields = `${extendedFields},scraping_config_locked,scraping_config_lock_reason,scraping_config_source,scraping_config_verified_at`;
 
   const url = new URL(`${DIRECTUS_URL}/items/input_library_url`);
   url.searchParams.set("limit", "-1");
-  url.searchParams.set("fields", extendedFields);
+  url.searchParams.set("fields", lockFields);
   url.searchParams.set("sort", "nome_site");
 
   let response = await fetch(url.toString(), {
@@ -415,7 +484,7 @@ export async function getSitesWithConfig() {
   });
 
   if (!response.ok) {
-    url.searchParams.set("fields", baseFields);
+    url.searchParams.set("fields", extendedFields);
     response = await fetch(url.toString(), {
       headers: {
         Authorization: `Bearer ${DIRECTUS_TOKEN}`,
@@ -424,8 +493,18 @@ export async function getSitesWithConfig() {
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to fetch sites: ${response.status} - ${error}`);
+      url.searchParams.set("fields", baseFields);
+      response = await fetch(url.toString(), {
+        headers: {
+          Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Failed to fetch sites: ${response.status} - ${error}`);
+      }
     }
   }
 
@@ -689,7 +768,7 @@ export async function startInternalScraping(
         link_selector: "",
         pagination_type: "none",
         ...(config as Record<string, unknown>),
-      } as ScrapingConfig;
+      } as unknown as ScrapingConfig;
 
       const crawler = new DeterministicCrawler(crawlerConfig, {
         concurrentRequests: concurrentRequests || 5,
@@ -713,8 +792,10 @@ export async function startInternalScraping(
         console.log(`[InternalScraping] SPA detectado para site ${siteId}: ${spaErrorMsg}`);
       }
 
+      const configLock = siteId ? await getSiteConfigLock(siteId) : null;
       const shouldAutoRetry = !_autoRetried
         && siteId
+        && !configLock?.locked
         && (classification === 'empty' || classification === 'config_suspect')
         && isOpenAIKeyConfigured();
 
@@ -737,12 +818,12 @@ export async function startInternalScraping(
           );
 
           if (reOnboardResult.config) {
-            const newConfidence = scoreConfig(reOnboardResult.config as Record<string, unknown>);
+            const newConfidence = scoreConfig(reOnboardResult.config as unknown as Record<string, unknown>);
             console.log(`[InternalScraping] Re-onboarding gerou nova config (confiança: ${newConfidence.confidence}%). Re-executando crawl...`);
             jobManager.updateProgress(job.id, 70, `Nova config gerada (confiança: ${newConfidence.confidence}%). Re-executando crawl...`);
 
             try {
-              await saveSiteScrapingConfig(siteId!, reOnboardResult.config as Record<string, unknown>);
+              await saveSiteScrapingConfig(siteId!, reOnboardResult.config as unknown as Record<string, unknown>);
               await updateSiteEngine(siteId!, "internal");
               console.log(`[InternalScraping] Nova config persistida para site ${siteId}`);
             } catch (saveErr) {
@@ -755,8 +836,8 @@ export async function startInternalScraping(
               listing_selector: "",
               link_selector: "",
               pagination_type: "none",
-              ...(reOnboardResult.config as Record<string, unknown>),
-            } as ScrapingConfig;
+              ...(reOnboardResult.config as unknown as Record<string, unknown>),
+            } as unknown as ScrapingConfig;
 
             const retryCrawler = new DeterministicCrawler(newCrawlerConfig, {
               concurrentRequests: concurrentRequests || 5,
