@@ -485,7 +485,7 @@ async function processGroup(group: ScheduleGroup, trigger: SchedulerRunTrigger):
   };
 
   await updateSchedulerRun(runRecord?.id || null, {
-    status: currentRunAbort?.signal.aborted ? 'cancelled' : errors > 0 ? 'failed' : 'completed',
+    status: currentRunAbort?.signal.aborted ? 'cancelled' : scraped === 0 && errors > 0 ? 'failed' : 'completed',
     completed_at: completedAt,
     total_sites: result.totalSites,
     onboarded,
