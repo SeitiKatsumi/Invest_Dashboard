@@ -1,4 +1,4 @@
-import cron from "node-cron";
+﻿import cron from "node-cron";
 import type { ScheduledTask } from "node-cron";
 import OpenAI from "openai";
 import { z } from "zod";
@@ -227,9 +227,9 @@ async function countUrlConsulta(params: Record<string, string>): Promise<number>
 
 async function getQueueStats(): Promise<AuctionExtractorStatus["queue"]> {
   try {
-    const base = { "filter[classifica][_eq]": "imóvel individual" };
+    const base = { "filter[classifica][_eq]": "imÃ³vel individual" };
     const [pending, processed, errors, totalIndividual] = await Promise.all([
-      countUrlConsulta({ ...base, "filter[status_processamento][_eq]": "não processado" }),
+      countUrlConsulta({ ...base, "filter[status_processamento][_eq]": "nÃ£o processado" }),
       countUrlConsulta({ ...base, "filter[status_processamento][_eq]": "processado" }),
       countUrlConsulta({ ...base, "filter[status_processamento][_eq]": "erro" }),
       countUrlConsulta(base),
@@ -245,8 +245,8 @@ async function fetchPendingUrls(limit: number): Promise<UrlConsultaQueueItem[]> 
   query.set("limit", String(limit));
   query.set("sort", "date_created");
   query.set("fields", "id,url,site_origem,status_processamento,classifica,date_created");
-  query.set("filter[status_processamento][_eq]", "não processado");
-  query.set("filter[classifica][_eq]", "imóvel individual");
+  query.set("filter[status_processamento][_eq]", "nÃ£o processado");
+  query.set("filter[classifica][_eq]", "imÃ³vel individual");
 
   const result = await directusRequest<{ data?: UrlConsultaQueueItem[] }>(
     `/items/url_consulta?${query.toString()}`,
@@ -385,10 +385,16 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: s
   }
 }
 
-function isHtmlInsufficient(html: string): boolean {
+function isHtmlInsufficient(html: string, url = ""): boolean {
   const compact = html.replace(/\s+/g, " ").trim().toLowerCase();
   if (compact.length < 500) return true;
-  return /enable javascript|habilite o javascript|checking your browser|cf-browser-verification|access denied|403 forbidden|captcha|recaptcha|verifica[cç][aã]o de seguran[cç]a|nao sou um robo|não sou um robô/.test(compact);
+  if (/enable javascript|habilite o javascript|checking your browser|cf-browser-verification|access denied|403 forbidden|captcha|recaptcha|verifica[cÃ§][aÃ£]o de seguran[cÃ§]a|nao sou um robo|nÃ£o sou um robÃ´/.test(compact)) {
+    return true;
+  }
+  if (/\/leilao\/index\/leilao_id\/\d+\/lote\/\d+/i.test(url)) {
+    return !/(detalhes do lote|lance m[ií]nimo|avalia[cç][aã]o|descri[cç][aã]o)/i.test(compact);
+  }
+  return false;
 }
 
 async function fetchHtmlHttp(url: string, signal: AbortSignal): Promise<{ html: string; url: string }> {
@@ -458,7 +464,7 @@ async function fetchAuctionHtml(url: string, mode: FetchMode, signal: AbortSigna
     try {
       const result = await fetchHtmlHttpWithWwwFallback(url, signal);
       effectiveUrl = result.url || url;
-      if (mode === "http" || !isHtmlInsufficient(result.html)) {
+      if (mode === "http" || !isHtmlInsufficient(result.html, effectiveUrl)) {
         return { ...result, strategy: "http" };
       }
       httpError = new Error("HTTP content looked insufficient; trying Playwright");
@@ -666,7 +672,7 @@ export function dateForDirectus(value: unknown): string | null {
     return `${year}-${month}-${day} ${hour}:${minute}:${second}`.substring(0, 19);
   }
 
-  const brMatch = text.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s*(?:-|as|às)?\s*(\d{1,2})[:h](\d{2})(?::(\d{2}))?)?/i);
+  const brMatch = text.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s*(?:-|as|Ã s)?\s*(\d{1,2})[:h](\d{2})(?::(\d{2}))?)?/i);
   if (brMatch) {
     const [, rawDay, rawMonth, year, rawHour = "00", rawMinute = "00", rawSecond = "00"] = brMatch;
     const day = rawDay.padStart(2, "0");
@@ -746,7 +752,7 @@ function hasRealEstateExtractionSignal(output: ExtractedAuctionPage): boolean {
     return true;
   }
 
-  if (area && /(\bm2\b|m²|metro|hectare|ha\b|alqueire)/.test(area)) {
+  if (area && /(\bm2\b|mÂ²|metro|hectare|ha\b|alqueire)/.test(area)) {
     return true;
   }
 

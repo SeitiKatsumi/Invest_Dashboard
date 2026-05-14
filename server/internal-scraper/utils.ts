@@ -132,6 +132,7 @@ const BLOCKLIST_PATTERNS: RegExp[] = [
   /\.(jpg|jpeg|png|gif|svg|webp|ico|css|js|woff|woff2|ttf|eot|pdf|zip|rar|exe|mp3|mp4|avi|mov)(\?|$)/i,
   /(facebook|twitter|instagram|linkedin|youtube|whatsapp|tiktok|pinterest)\.com/i,
   /\/(login|logout|register|signup|signin|cart|checkout|share|print|download)(\/|$|\?)/i,
+  /\/core\/api\//i,
   /\/(online|planilha|auditorio|arrematante|redefinir-senha|minha-conta)(\/|$|\?)/i,
   /\/(veiculos?|carros?|motos?|caminh(?:oes|ões)|maquinas?|sucatas?|semoventes|eletros?|eletronicos|eletrônicos|diversos|agrupamento)(\/|$|\?)/i,
   /\?(utm_|ref=|share=|fbclid=|gclid=)/i,
@@ -146,6 +147,7 @@ const URL_BLOCKLIST_PATTERNS = [
   /(facebook|twitter|instagram|linkedin|youtube|whatsapp)\.com/i,
   /(mailto:|tel:|javascript:|#)/,
   /\/share\?|\/login|\/register|\/cart|\/checkout/i,
+  /\/core\/api\//i,
   /\/(online|planilha|auditorio|arrematante|redefinir-senha|minha-conta)(\/|$|\?)/i,
   /\/(veiculos?|carros?|motos?|caminh(?:oes|ões)|maquinas?|sucatas?|semoventes|eletros?|eletronicos|eletrônicos|diversos|agrupamento)(\/|$|\?)/i,
 ];
