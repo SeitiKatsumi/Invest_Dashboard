@@ -224,6 +224,19 @@ class BrowserPool {
     });
     await context.addInitScript(STEALTH_INIT_SCRIPT);
     const page = await context.newPage();
+    await page.route('**/*', async (route) => {
+      const request = route.request();
+      const resourceType = request.resourceType();
+      const url = request.url();
+      if (
+        ['image', 'font', 'media'].includes(resourceType) ||
+        /(google-analytics|googletagmanager|facebook|doubleclick|hotjar|clarity|maps\.googleapis|cdn\.wts\.chat|cdn\.flw\.chat)/i.test(url)
+      ) {
+        await route.abort().catch(() => {});
+        return;
+      }
+      await route.continue().catch(() => {});
+    });
     return { context, page };
   }
 

@@ -3,8 +3,10 @@ import assert from "node:assert/strict";
 import {
   buildLeilaoPayload,
   cleanAuctionHtmlForExtraction,
+  dateForDirectus,
   detectNonRealEstateExtraction,
   getAuctionExtractorConfig,
+  getWwwFallbackUrl,
   normalizeAuctionUrl,
   previewAuctionPageExtraction,
 } from "./auction-extractor";
@@ -16,6 +18,20 @@ test("normalizeAuctionUrl resolves relative URLs and removes tracking params", (
   );
 
   assert.equal(normalized, "https://www.exemplo.com.br/lote/123?ok=1");
+});
+
+test("getWwwFallbackUrl builds a www retry URL only for naked hosts", () => {
+  assert.equal(
+    getWwwFallbackUrl("https://hoppeleiloes.com.br/oferta/123?ok=1"),
+    "https://www.hoppeleiloes.com.br/oferta/123?ok=1",
+  );
+  assert.equal(getWwwFallbackUrl("https://www.hoppeleiloes.com.br/oferta/123"), null);
+});
+
+test("dateForDirectus normalizes Brazilian auction dates", () => {
+  assert.equal(dateForDirectus("20/03/2026 - 16:40"), "2026-03-20 16:40:00");
+  assert.equal(dateForDirectus("04/05/2026 11:00:30"), "2026-05-04 11:00:30");
+  assert.equal(dateForDirectus("2026-01-10T10:00:00"), "2026-01-10 10:00:00");
 });
 
 test("cleanAuctionHtmlForExtraction strips scripts and preserves PDFs and images", () => {

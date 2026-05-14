@@ -10,3 +10,4 @@ whatsapp_auth/
 !.env.example
 .dev-server.pid
 *.log
+scraping-diagnosis*.json

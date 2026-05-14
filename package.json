@@ -7,6 +7,7 @@
     "dev": "tsx --env-file=.env script/dev.ts",
     "build": "tsx script/build.ts",
     "diagnose:playwright": "node scripts/diagnose-playwright.mjs",
+    "diagnose:scraping": "tsx --env-file=.env scripts/diagnose-scraping.ts",
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
     "test:extractor": "node --import tsx --test server/auction-extractor.test.ts",

@@ -320,6 +320,17 @@ function getHostname(value: string): string {
   }
 }
 
+export function getWwwFallbackUrl(rawUrl: string): string | null {
+  try {
+    const parsed = new URL(ensureProtocol(rawUrl));
+    if (!parsed.hostname || parsed.hostname.toLowerCase().startsWith("www.")) return null;
+    parsed.hostname = `www.${parsed.hostname}`;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
 function isSkippedHost(url: string, config = getAuctionExtractorConfig()): boolean {
   const host = getHostname(url);
   return !!host && config.skipHosts.some((skipHost) => host === skipHost || host.endsWith(`.${skipHost}`));
@@ -380,15 +391,33 @@ function isHtmlInsufficient(html: string): boolean {
   return /enable javascript|habilite o javascript|checking your browser|cf-browser-verification|access denied|403 forbidden|captcha|recaptcha|verifica[cç][aã]o de seguran[cç]a|nao sou um robo|não sou um robô/.test(compact);
 }
 
-async function fetchHtmlHttp(url: string, signal: AbortSignal): Promise<string> {
+async function fetchHtmlHttp(url: string, signal: AbortSignal): Promise<{ html: string; url: string }> {
   const response = await fetchWithTimeout(url, HTTP_TIMEOUT_MS, signal);
   if (!response.ok) {
     throw new Error(`HTTP ${response.status} fetching auction page`);
   }
-  return response.text();
+  return {
+    html: await response.text(),
+    url: response.url || url,
+  };
 }
 
-async function fetchHtmlPlaywright(url: string, signal: AbortSignal): Promise<string> {
+async function fetchHtmlHttpWithWwwFallback(url: string, signal: AbortSignal): Promise<{ html: string; url: string }> {
+  try {
+    return await fetchHtmlHttp(url, signal);
+  } catch (error) {
+    const fallbackUrl = getWwwFallbackUrl(url);
+    if (!fallbackUrl) throw error;
+
+    try {
+      return await fetchHtmlHttp(fallbackUrl, signal);
+    } catch (fallbackError) {
+      throw new Error(`${truncate(error, 500)}; www fallback failed: ${truncate(fallbackError, 500)}`);
+    }
+  }
+}
+
+async function fetchHtmlPlaywright(url: string, signal: AbortSignal): Promise<{ html: string; url: string }> {
   const timer = setTimeout(() => {
     if (!signal.aborted) {
       console.warn(`[AuctionExtractor] Playwright still loading after ${PLAYWRIGHT_TIMEOUT_MS}ms: ${url}`);
@@ -404,7 +433,10 @@ async function fetchHtmlPlaywright(url: string, signal: AbortSignal): Promise<st
     if (signal.aborted) throw new Error("cancelled");
     await handle.page.goto(url, { waitUntil: "domcontentloaded", timeout: PLAYWRIGHT_TIMEOUT_MS });
     await handle.page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => {});
-    return await withTimeout(handle.page.content(), 5_000, "Playwright page content timeout");
+    return {
+      html: await withTimeout(handle.page.content(), 5_000, "Playwright page content timeout"),
+      url: handle.page.url(),
+    };
   } finally {
     clearTimeout(timer);
     try {
@@ -414,17 +446,20 @@ async function fetchHtmlPlaywright(url: string, signal: AbortSignal): Promise<st
   }
 }
 
-async function fetchAuctionHtml(url: string, mode: FetchMode, signal: AbortSignal): Promise<{ html: string; strategy: "http" | "playwright" }> {
+async function fetchAuctionHtml(url: string, mode: FetchMode, signal: AbortSignal): Promise<{ html: string; strategy: "http" | "playwright"; url: string }> {
   if (mode === "playwright") {
-    return { html: await fetchHtmlPlaywright(url, signal), strategy: "playwright" };
+    const result = await fetchHtmlPlaywright(url, signal);
+    return { ...result, strategy: "playwright" };
   }
 
   let httpError: unknown;
+  let effectiveUrl = url;
   if (mode === "http" || mode === "http_playwright") {
     try {
-      const html = await fetchHtmlHttp(url, signal);
-      if (mode === "http" || !isHtmlInsufficient(html)) {
-        return { html, strategy: "http" };
+      const result = await fetchHtmlHttpWithWwwFallback(url, signal);
+      effectiveUrl = result.url || url;
+      if (mode === "http" || !isHtmlInsufficient(result.html)) {
+        return { ...result, strategy: "http" };
       }
       httpError = new Error("HTTP content looked insufficient; trying Playwright");
     } catch (error) {
@@ -434,7 +469,8 @@ async function fetchAuctionHtml(url: string, mode: FetchMode, signal: AbortSigna
   }
 
   try {
-    return { html: await fetchHtmlPlaywright(url, signal), strategy: "playwright" };
+    const result = await fetchHtmlPlaywright(effectiveUrl, signal);
+    return { ...result, strategy: "playwright" };
   } catch (playwrightError) {
     if (httpError) {
       throw new Error(`${truncate(httpError, 500)}; Playwright fallback failed: ${truncate(playwrightError, 500)}`);
@@ -554,16 +590,18 @@ function getOpenAIClient(): OpenAI {
   return new OpenAI({ apiKey: getOpenAIApiKey() });
 }
 
-async function callOpenAIExtractor(text: string, pageUrl: string, model: string): Promise<ExtractedAuctionPage> {
+async function callOpenAIExtractor(text: string, pageUrl: string, model: string, signal?: AbortSignal): Promise<ExtractedAuctionPage> {
   if (!isOpenAIKeyConfigured()) {
     throw new Error("OPENAI_API_KEY nao configurada");
   }
 
   let lastError: unknown;
   for (let attempt = 1; attempt <= OPENAI_RETRIES + 1; attempt++) {
+    if (signal?.aborted) throw new Error("cancelled");
+    const linked = createLinkedAbortController(signal, OPENAI_TIMEOUT_MS);
     try {
-      const response = await withTimeout(
-        getOpenAIClient().chat.completions.create({
+      const response = await getOpenAIClient().chat.completions.create(
+        {
           model,
           messages: [
             { role: "system", content: EXTRACTION_SYSTEM_PROMPT },
@@ -572,9 +610,11 @@ async function callOpenAIExtractor(text: string, pageUrl: string, model: string)
           temperature: 0.1,
           max_tokens: 16_384,
           response_format: { type: "json_object" },
-        }),
-        OPENAI_TIMEOUT_MS,
-        "OpenAI extraction timeout",
+        },
+        {
+          timeout: OPENAI_TIMEOUT_MS,
+          signal: linked.controller.signal,
+        },
       );
 
       if (response.usage) {
@@ -599,9 +639,12 @@ async function callOpenAIExtractor(text: string, pageUrl: string, model: string)
       return validation.data;
     } catch (error) {
       lastError = error;
+      if (signal?.aborted) throw new Error("cancelled");
       if (attempt <= OPENAI_RETRIES) {
         await sleep(800 * attempt);
       }
+    } finally {
+      linked.cleanup();
     }
   }
 
@@ -613,9 +656,27 @@ function toText(value: unknown): string {
   return String(value).trim();
 }
 
-function dateForDirectus(value: unknown): string | null {
+export function dateForDirectus(value: unknown): string | null {
   const text = toText(value);
   if (!text) return null;
+
+  const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s]+(\d{2}):(\d{2})(?::(\d{2}))?)?/);
+  if (isoMatch) {
+    const [, year, month, day, hour = "00", minute = "00", second = "00"] = isoMatch;
+    return `${year}-${month}-${day} ${hour}:${minute}:${second}`.substring(0, 19);
+  }
+
+  const brMatch = text.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s*(?:-|as|às)?\s*(\d{1,2})[:h](\d{2})(?::(\d{2}))?)?/i);
+  if (brMatch) {
+    const [, rawDay, rawMonth, year, rawHour = "00", rawMinute = "00", rawSecond = "00"] = brMatch;
+    const day = rawDay.padStart(2, "0");
+    const month = rawMonth.padStart(2, "0");
+    const hour = rawHour.padStart(2, "0");
+    const minute = rawMinute.padStart(2, "0");
+    const second = rawSecond.padStart(2, "0");
+    return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+  }
+
   return text.replace("T", " ").substring(0, 19);
 }
 
@@ -819,23 +880,23 @@ export async function previewAuctionPageExtraction(
         message: "Dominio fora do escopo deste extrator",
       };
     }
-    const { html, strategy } = await fetchAuctionHtml(pageUrl, config.fetchMode, linked.controller.signal);
+    const { html, strategy, url: effectiveUrl } = await fetchAuctionHtml(pageUrl, config.fetchMode, linked.controller.signal);
     const cleaned = cleanAuctionHtmlForExtraction(html);
-    const output = await callOpenAIExtractor(cleaned.text, pageUrl, config.model);
-    const nonRealEstateReason = detectNonRealEstateExtraction(output, pageUrl, cleaned.text);
+    const output = await callOpenAIExtractor(cleaned.text, effectiveUrl, config.model, linked.controller.signal);
+    const nonRealEstateReason = detectNonRealEstateExtraction(output, effectiveUrl, cleaned.text);
 
     if (!output.is_individual_item || nonRealEstateReason) {
       return {
-        url: pageUrl,
+        url: effectiveUrl,
         outcome: "not_individual",
         strategy,
         message: nonRealEstateReason || output.reason || "Nao e imovel individual",
       };
     }
 
-    const payload = buildLeilaoPayload(output, pageUrl, siteId);
+    const payload = buildLeilaoPayload(output, effectiveUrl, siteId);
     return {
-      url: pageUrl,
+      url: effectiveUrl,
       outcome: "would_create",
       strategy,
       message: "Preview extraido com sucesso",
@@ -889,28 +950,28 @@ async function processQueueItem(
       };
     }
 
-    const { html, strategy } = await fetchAuctionHtml(pageUrl, config.fetchMode, linked.controller.signal);
+    const { html, strategy, url: effectiveUrl } = await fetchAuctionHtml(pageUrl, config.fetchMode, linked.controller.signal);
     const cleaned = cleanAuctionHtmlForExtraction(html);
-    const output = await callOpenAIExtractor(cleaned.text, pageUrl, config.model);
-    const nonRealEstateReason = detectNonRealEstateExtraction(output, pageUrl, cleaned.text);
+    const output = await callOpenAIExtractor(cleaned.text, effectiveUrl, config.model, linked.controller.signal);
+    const nonRealEstateReason = detectNonRealEstateExtraction(output, effectiveUrl, cleaned.text);
 
     if (!output.is_individual_item || nonRealEstateReason) {
       await updateUrlConsulta(item.id, { status_processamento: "processado", erro_output: null }, dryRun);
       return {
         id: item.id,
-        url: pageUrl,
+        url: effectiveUrl,
         outcome: dryRun ? "dry_run_not_individual" : "not_individual",
         message: nonRealEstateReason || output.reason || `Nao e imovel individual (${strategy})`,
       };
     }
 
-    const payload = buildLeilaoPayload(output, pageUrl, item.site_origem);
+    const payload = buildLeilaoPayload(output, effectiveUrl, item.site_origem);
     const created = await createLeilaoFromPayload(payload, dryRun);
     await updateUrlConsulta(item.id, { status_processamento: "processado", erro_output: null }, dryRun);
 
     return {
       id: item.id,
-      url: pageUrl,
+      url: effectiveUrl,
       outcome: dryRun ? "dry_run_created" : "created",
       leilaoId: created.id,
       message: `Extraido via ${strategy}`,

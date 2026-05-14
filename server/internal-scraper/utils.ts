@@ -20,9 +20,9 @@ export const STEALTH_BROWSER_ARGS = [
 
 export const USER_AGENTS = [
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
+  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
 ];
 
 export function randomUserAgent(): string {
@@ -87,8 +87,8 @@ export function isSameDomain(url: string, domain: string): boolean {
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
-    const host = parsed.hostname.toLowerCase();
-    const d = domain.toLowerCase();
+    const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+    const d = domain.toLowerCase().replace(/^www\./, '');
     return host === d || host.endsWith('.' + d);
   } catch { return false; }
 }
@@ -132,6 +132,8 @@ const BLOCKLIST_PATTERNS: RegExp[] = [
   /\.(jpg|jpeg|png|gif|svg|webp|ico|css|js|woff|woff2|ttf|eot|pdf|zip|rar|exe|mp3|mp4|avi|mov)(\?|$)/i,
   /(facebook|twitter|instagram|linkedin|youtube|whatsapp|tiktok|pinterest)\.com/i,
   /\/(login|logout|register|signup|signin|cart|checkout|share|print|download)(\/|$|\?)/i,
+  /\/(online|planilha|auditorio|arrematante|redefinir-senha|minha-conta)(\/|$|\?)/i,
+  /\/(veiculos?|carros?|motos?|caminh(?:oes|ões)|maquinas?|sucatas?|semoventes|eletros?|eletronicos|eletrônicos|diversos|agrupamento)(\/|$|\?)/i,
   /\?(utm_|ref=|share=|fbclid=|gclid=)/i,
 ];
 
@@ -144,6 +146,8 @@ const URL_BLOCKLIST_PATTERNS = [
   /(facebook|twitter|instagram|linkedin|youtube|whatsapp)\.com/i,
   /(mailto:|tel:|javascript:|#)/,
   /\/share\?|\/login|\/register|\/cart|\/checkout/i,
+  /\/(online|planilha|auditorio|arrematante|redefinir-senha|minha-conta)(\/|$|\?)/i,
+  /\/(veiculos?|carros?|motos?|caminh(?:oes|ões)|maquinas?|sucatas?|semoventes|eletros?|eletronicos|eletrônicos|diversos|agrupamento)(\/|$|\?)/i,
 ];
 
 export function isValidPageUrl(url: string): boolean {

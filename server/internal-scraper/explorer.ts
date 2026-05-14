@@ -509,9 +509,10 @@ async function exploreWithPlaywright(
       try {
         console.log(`[Explorer/Playwright] Navegando: ${currentUrl}`);
         const response = await page.goto(currentUrl, {
-          waitUntil: 'networkidle',
+          waitUntil: 'domcontentloaded',
           timeout: 45000,
         });
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         const responseStatus = response ? response.status() : 0;
         if (response) {
