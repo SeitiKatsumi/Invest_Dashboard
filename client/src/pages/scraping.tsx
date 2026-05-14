@@ -17,6 +17,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import SchedulerPanel from "@/components/scheduler-panel";
+import AuctionExtractorPanel from "@/components/auction-extractor-panel";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -1525,7 +1526,7 @@ function ScrapingDialog({
 
               <div className="p-3 bg-muted/50 rounded-md">
                 <p className="text-xs text-muted-foreground">
-                  Webhook de callback: <span className="font-mono">n8n-invest...webhook/retornascrapapi</span>
+                  Destino: <span className="font-mono">url_consulta</span>
                 </p>
               </div>
             </>
@@ -2556,6 +2557,8 @@ export default function ScrapingPage() {
         </header>
 
         <BatchProcessingPanel sites={allSites || []} />
+
+        <AuctionExtractorPanel />
 
         <SchedulerPanel />
 

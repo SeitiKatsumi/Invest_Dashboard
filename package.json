@@ -9,6 +9,7 @@
     "diagnose:playwright": "node scripts/diagnose-playwright.mjs",
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
+    "test:extractor": "node --import tsx --test server/auction-extractor.test.ts",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {

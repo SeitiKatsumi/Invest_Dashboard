@@ -8,11 +8,13 @@ import type { ScrapingConfig } from './internal-scraper/types.js';
 import { browserPool } from './internal-scraper/browser-pool.js';
 import { scoreConfig } from './internal-scraper/config-scorer.js';
 import { getOpenAIApiKey, isOpenAIKeyConfigured } from './openai-usage.js';
+import { normalizeUrl } from './directus.js';
 
 const SCRAPING_API_URL = process.env.SCRAPING_API_URL?.trim() || "https://api-scrap-invest.server04.11mind.com.br";
 const DIRECTUS_URL = process.env.DIRECTUS_URL?.trim();
 const DIRECTUS_TOKEN = process.env.DIRECTUS_TOKEN?.trim();
-const N8N_WEBHOOK_URL = "https://n8n-invest.server04.11mind.com.br/webhook/retornascrapapi";
+const externalJobContext = new Map<string, { siteId?: number; siteUrl: string }>();
+const persistedUrlJobIds = new Set<string>();
 
 async function scrapingApiFetch(endpoint: string, options?: RequestInit) {
   const url = `${SCRAPING_API_URL}${endpoint}`;
@@ -53,9 +55,10 @@ export async function startScraping(
   siteUrl: string,
   config: Record<string, unknown>,
   maxPages?: number,
-  concurrentRequests?: number
+  concurrentRequests?: number,
+  siteId?: number
 ) {
-  return scrapingApiFetch("/api/scrape", {
+  const result = await scrapingApiFetch("/api/scrape", {
     method: "POST",
     body: JSON.stringify({
       url: siteUrl,
@@ -64,18 +67,200 @@ export async function startScraping(
       output_format: "json",
       target_description: "links de imóveis ou propriedades",
       use_heuristics: true,
-      callback_url: N8N_WEBHOOK_URL,
       concurrent_requests: concurrentRequests || 10,
     }),
   });
+
+  const jobId = String(result?.job_id || result?.id || "");
+  if (jobId) {
+    externalJobContext.set(jobId, { siteId, siteUrl });
+  }
+
+  return result;
 }
 
 export async function getJobs(limit?: number) {
-  return scrapingApiFetch(`/api/jobs?limit=${limit || 50}`);
+  const result = await scrapingApiFetch(`/api/jobs?limit=${limit || 50}`);
+  const jobs = Array.isArray(result?.jobs) ? result.jobs : [];
+  await Promise.all(jobs.map((job: any) => {
+    const jobId = String(job?.job_id || job?.id || "");
+    if (!jobId) return Promise.resolve();
+    return persistExternalJobUrlsIfCompleted(jobId, job).catch((error) => {
+      console.error("[Scraping] Falha ao persistir URLs do job externo:", error instanceof Error ? error.message : error);
+    });
+  }));
+  return result;
 }
 
 export async function getJob(jobId: string) {
-  return scrapingApiFetch(`/api/jobs/${jobId}`);
+  const job = await scrapingApiFetch(`/api/jobs/${jobId}`);
+  await persistExternalJobUrlsIfCompleted(jobId, job).catch((error) => {
+    console.error("[Scraping] Falha ao persistir URLs do job externo:", error instanceof Error ? error.message : error);
+  });
+  return job;
+}
+
+function ensureProtocol(url: string): string {
+  return /^[a-z][a-z\d+\-.]*:\/\//i.test(url) ? url : `https://${url}`;
+}
+
+function normalizeDiscoveredUrl(rawUrl: string, siteUrl?: string): string {
+  const trimmed = rawUrl.trim().replace(/&amp;/g, "&");
+  if (!trimmed) return "";
+
+  try {
+    const parsed = siteUrl
+      ? new URL(trimmed, ensureProtocol(siteUrl))
+      : new URL(ensureProtocol(trimmed));
+    parsed.hash = "";
+    for (const key of Array.from(parsed.searchParams.keys())) {
+      if (/^utm_/i.test(key) || /^(fbclid|gclid|msclkid|ttclid|ref)$/i.test(key)) {
+        parsed.searchParams.delete(key);
+      }
+    }
+    return parsed.toString();
+  } catch {
+    return trimmed;
+  }
+}
+
+async function findExistingUrlConsulta(url: string): Promise<number | null> {
+  if (!DIRECTUS_URL || !DIRECTUS_TOKEN) return null;
+
+  const normalized = normalizeUrl(url);
+  if (!normalized) return null;
+
+  const domain = normalized.split("/")[0];
+  let page = 1;
+  const pageSize = 500;
+
+  while (true) {
+    const query = new URLSearchParams();
+    query.set("fields", "id,url");
+    query.set("filter[url][_contains]", domain);
+    query.set("limit", String(pageSize));
+    query.set("page", String(page));
+
+    const response = await fetch(`${DIRECTUS_URL}/items/url_consulta?${query.toString()}`, {
+      headers: {
+        Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Falha ao verificar duplicata em url_consulta (${response.status})`);
+    }
+
+    const result = await response.json();
+    const items: Array<{ id: number; url?: string | null }> = result.data || [];
+    for (const item of items) {
+      if (item.url && normalizeUrl(item.url) === normalized) {
+        return item.id;
+      }
+    }
+
+    if (items.length < pageSize) break;
+    page++;
+  }
+
+  return null;
+}
+
+export async function persistDiscoveredUrlsToDirectus(
+  urls: string[],
+  siteId?: number,
+  siteUrl?: string,
+): Promise<{ inserted: number; skipped: number; errors: number; total: number }> {
+  if (!DIRECTUS_URL || !DIRECTUS_TOKEN) {
+    throw new Error("DIRECTUS_URL and DIRECTUS_TOKEN must be set");
+  }
+
+  const seen = new Set<string>();
+  let inserted = 0;
+  let skipped = 0;
+  let errors = 0;
+
+  for (const rawUrl of urls) {
+    const normalizedUrl = normalizeDiscoveredUrl(String(rawUrl || ""), siteUrl);
+    const key = normalizeUrl(normalizedUrl);
+    if (!normalizedUrl || !key || seen.has(key)) {
+      skipped++;
+      continue;
+    }
+    seen.add(key);
+
+    try {
+      const existingId = await findExistingUrlConsulta(normalizedUrl);
+      if (existingId) {
+        skipped++;
+        continue;
+      }
+
+      const payload = {
+        status: "published",
+        url: normalizedUrl,
+        site_origem: siteId || null,
+        status_processamento: "não processado",
+        classifica: "imóvel individual",
+        status_classifica: "classificada",
+      };
+
+      const response = await fetch(`${DIRECTUS_URL}/items/url_consulta`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(`Directus ${response.status}: ${body.slice(0, 500)}`);
+      }
+
+      inserted++;
+    } catch (error) {
+      errors++;
+      console.error("[Scraping] Erro ao persistir URL descoberta:", error instanceof Error ? error.message : error);
+    }
+  }
+
+  return { inserted, skipped, errors, total: urls.length };
+}
+
+function extractUrlsFromJob(job: any): string[] {
+  const resultUrls = Array.isArray(job?.result?.urls_found) ? job.result.urls_found : [];
+  const topLevelUrls = Array.isArray(job?.urls_found) ? job.urls_found : [];
+  return resultUrls.length > 0 ? resultUrls : topLevelUrls;
+}
+
+async function persistExternalJobUrlsIfCompleted(jobId: string, job: any): Promise<void> {
+  const status = String(job?.status || "").toLowerCase();
+  if (!["completed", "complete", "success", "finished"].includes(status)) return;
+  if (persistedUrlJobIds.has(jobId)) return;
+
+  const urls = extractUrlsFromJob(job);
+  if (urls.length === 0) return;
+
+  const context = externalJobContext.get(jobId);
+  const siteUrl = context?.siteUrl || job?.site_url || job?.url || "";
+  const result = await persistDiscoveredUrlsToDirectus(urls, context?.siteId || job?.site_id, siteUrl);
+  persistedUrlJobIds.add(jobId);
+  console.log(`[Scraping] Job externo ${jobId}: ${result.inserted} URL(s) inseridas em url_consulta, ${result.skipped} ignoradas, ${result.errors} erro(s)`);
+}
+
+async function persistInternalJobUrls(
+  jobId: string,
+  urls: string[],
+  siteId: number | undefined,
+  siteUrl: string,
+): Promise<void> {
+  if (persistedUrlJobIds.has(jobId) || urls.length === 0) return;
+  const result = await persistDiscoveredUrlsToDirectus(urls, siteId, siteUrl);
+  persistedUrlJobIds.add(jobId);
+  console.log(`[Scraping] Job interno ${jobId}: ${result.inserted} URL(s) inseridas em url_consulta, ${result.skipped} ignoradas, ${result.errors} erro(s)`);
 }
 
 export async function deleteJob(jobId: string) {
@@ -753,7 +938,7 @@ export async function startInternalScraping(
   concurrentRequests?: number,
   _autoRetried?: boolean,
 ): Promise<{ job_id: string }> {
-  const job = jobManager.createJob('scrape', siteUrl, siteId, N8N_WEBHOOK_URL);
+  const job = jobManager.createJob('scrape', siteUrl, siteId);
 
   const configConfidence = scoreConfig(config);
 
@@ -886,6 +1071,8 @@ export async function startInternalScraping(
               });
             }
 
+            await persistInternalJobUrls(job.id, finalResult.urls_found || [], siteId, siteUrl);
+
             if (finalResult.total_urls > 0) {
               await clearSiteScrapingError(siteId!);
             }
@@ -928,6 +1115,8 @@ export async function startInternalScraping(
           engine: 'internal',
         });
       }
+
+      await persistInternalJobUrls(job.id, result.urls_found || [], siteId, siteUrl);
 
       if (siteId) {
         try {
