@@ -124,24 +124,30 @@ function getNextRunDate(): string | null {
   if (!config.enabled || !cronTask) return null;
 
   const now = new Date();
+  const saoPauloNow = getSaoPauloParts(now);
   const parts = config.cronExpression.split(' ');
   const hour = parseInt(parts[1]) || 3;
   const minute = parseInt(parts[0]) || 0;
 
   for (let i = 0; i < 8; i++) {
-    const candidate = new Date(now);
-    candidate.setDate(candidate.getDate() + i);
-    candidate.setHours(hour, minute, 0, 0);
+    const candidate = saoPauloWallTimeToDate(saoPauloNow.dateKey, hour, minute, i);
+    if (!candidate || candidate <= now) continue;
 
-    if (candidate <= now) continue;
-
-    const dayOfWeek = candidate.getDay();
+    const dayOfWeek = getSaoPauloParts(candidate).dayIndex;
     if (config.activeDays.includes(dayOfWeek)) {
       return candidate.toISOString();
     }
   }
 
   return null;
+}
+
+function saoPauloWallTimeToDate(dateKey: string, hour: number, minute: number, addDays: number): Date | null {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  if (!year || !month || !day) return null;
+
+  const utc = new Date(Date.UTC(year, month - 1, day + addDays, hour + 3, minute, 0, 0));
+  return Number.isNaN(utc.getTime()) ? null : utc;
 }
 
 function getSaoPauloParts(date = new Date()) {
@@ -196,7 +202,8 @@ function didRunToday(run: SchedulerRunRecord | null, todayKey: string, todayInde
 
   const ageMs = Date.now() - new Date(run.started_at).getTime();
   const staleRunningRun = run.status === 'running' && ageMs > 30 * 60 * 1000;
-  return !staleRunningRun;
+  if (staleRunningRun) return false;
+  return run.status === 'completed' || run.status === 'running';
 }
 
 async function sleep(ms: number) {
@@ -205,6 +212,7 @@ async function sleep(ms: number) {
 
 function isStaleSchedulerRun(run: SchedulerRunRecord | null): boolean {
   if (!run?.started_at) return true;
+  if (run.status === 'cancelled' || run.status === 'failed') return true;
   return Date.now() - new Date(run.started_at).getTime() > 36 * 60 * 60 * 1000;
 }
 
