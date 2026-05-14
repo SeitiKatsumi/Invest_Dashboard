@@ -227,9 +227,9 @@ async function countUrlConsulta(params: Record<string, string>): Promise<number>
 
 async function getQueueStats(): Promise<AuctionExtractorStatus["queue"]> {
   try {
-    const base = { "filter[classifica][_eq]": "imÃ³vel individual" };
+    const base = { "filter[classifica][_eq]": "im\u00f3vel individual" };
     const [pending, processed, errors, totalIndividual] = await Promise.all([
-      countUrlConsulta({ ...base, "filter[status_processamento][_eq]": "nÃ£o processado" }),
+      countUrlConsulta({ ...base, "filter[status_processamento][_eq]": "n\u00e3o processado" }),
       countUrlConsulta({ ...base, "filter[status_processamento][_eq]": "processado" }),
       countUrlConsulta({ ...base, "filter[status_processamento][_eq]": "erro" }),
       countUrlConsulta(base),
@@ -245,8 +245,8 @@ async function fetchPendingUrls(limit: number): Promise<UrlConsultaQueueItem[]> 
   query.set("limit", String(limit));
   query.set("sort", "date_created");
   query.set("fields", "id,url,site_origem,status_processamento,classifica,date_created");
-  query.set("filter[status_processamento][_eq]", "nÃ£o processado");
-  query.set("filter[classifica][_eq]", "imÃ³vel individual");
+  query.set("filter[status_processamento][_eq]", "n\u00e3o processado");
+  query.set("filter[classifica][_eq]", "im\u00f3vel individual");
 
   const result = await directusRequest<{ data?: UrlConsultaQueueItem[] }>(
     `/items/url_consulta?${query.toString()}`,
@@ -388,7 +388,7 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: s
 function isHtmlInsufficient(html: string, url = ""): boolean {
   const compact = html.replace(/\s+/g, " ").trim().toLowerCase();
   if (compact.length < 500) return true;
-  if (/enable javascript|habilite o javascript|checking your browser|cf-browser-verification|access denied|403 forbidden|captcha|recaptcha|verifica[cÃ§][aÃ£]o de seguran[cÃ§]a|nao sou um robo|nÃ£o sou um robÃ´/.test(compact)) {
+  if (/enable javascript|habilite o javascript|checking your browser|cf-browser-verification|access denied|403 forbidden|captcha|recaptcha|verifica[c\u00e7][a\u00e3]o de seguran[c\u00e7]a|nao sou um robo|n\u00e3o sou um rob\u00f4/.test(compact)) {
     return true;
   }
   if (/\/leilao\/index\/leilao_id\/\d+\/lote\/\d+/i.test(url)) {
@@ -672,7 +672,7 @@ export function dateForDirectus(value: unknown): string | null {
     return `${year}-${month}-${day} ${hour}:${minute}:${second}`.substring(0, 19);
   }
 
-  const brMatch = text.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s*(?:-|as|Ã s)?\s*(\d{1,2})[:h](\d{2})(?::(\d{2}))?)?/i);
+  const brMatch = text.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s*(?:-|as|\u00e0s)?\s*(\d{1,2})[:h](\d{2})(?::(\d{2}))?)?/i);
   if (brMatch) {
     const [, rawDay, rawMonth, year, rawHour = "00", rawMinute = "00", rawSecond = "00"] = brMatch;
     const day = rawDay.padStart(2, "0");
@@ -752,7 +752,7 @@ function hasRealEstateExtractionSignal(output: ExtractedAuctionPage): boolean {
     return true;
   }
 
-  if (area && /(\bm2\b|mÂ²|metro|hectare|ha\b|alqueire)/.test(area)) {
+  if (area && /(\bm2\b|m\u00b2|metro|hectare|ha\b|alqueire)/.test(area)) {
     return true;
   }
 
