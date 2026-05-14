@@ -27,6 +27,11 @@ import {
   previewEligible,
 } from "./auction-archiver";
 import {
+  getAuctionExtractorStatus,
+  startAuctionExtractorRun,
+  cancelAuctionExtractor,
+} from "./auction-extractor";
+import {
   getScrapingApiStatus,
   startOnboarding,
   startScraping,
@@ -205,6 +210,53 @@ export async function registerRoutes(
       console.error("Error extracting data from image:", error);
       res.status(500).json({
         error: "Falha ao extrair dados da imagem",
+        message: error instanceof Error ? error.message : "Erro desconhecido",
+      });
+    }
+  });
+
+  app.get("/api/extractor/status", async (_req, res) => {
+    try {
+      res.json(await getAuctionExtractorStatus());
+    } catch (error) {
+      console.error("Error fetching auction extractor status:", error);
+      res.status(500).json({
+        error: "Falha ao buscar status do extrator",
+        message: error instanceof Error ? error.message : "Erro desconhecido",
+      });
+    }
+  });
+
+  app.post("/api/extractor/run", async (req, res) => {
+    try {
+      const rawLimit = req.body?.limit;
+      const limit = rawLimit === undefined || rawLimit === null || rawLimit === ""
+        ? undefined
+        : Number(rawLimit);
+
+      if (limit !== undefined && (!Number.isFinite(limit) || limit < 1 || limit > 100)) {
+        return res.status(400).json({ error: "limit deve ser um número entre 1 e 100" });
+      }
+
+      const dryRun = req.body?.dryRun === true;
+      const started = startAuctionExtractorRun({ limit, dryRun, source: "manual" });
+      res.status(202).json({ ...started, dryRun });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erro desconhecido";
+      res.status(message.includes("execucao") || message.includes("execução") ? 409 : 500).json({
+        error: "Falha ao iniciar extrator",
+        message,
+      });
+    }
+  });
+
+  app.post("/api/extractor/cancel", async (_req, res) => {
+    try {
+      const cancelled = cancelAuctionExtractor();
+      res.json({ cancelled });
+    } catch (error) {
+      res.status(500).json({
+        error: "Falha ao cancelar extrator",
         message: error instanceof Error ? error.message : "Erro desconhecido",
       });
     }
@@ -678,7 +730,7 @@ export async function registerRoutes(
         );
         res.json(result);
       } else {
-        const result = await startScraping(siteUrl, parsedConfig, maxPages, concurrentRequests);
+        const result = await startScraping(siteUrl, parsedConfig, maxPages, concurrentRequests, siteId);
         res.json(result);
       }
     } catch (error) {

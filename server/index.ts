@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { startWhatsAppScheduler } from "./whatsapp-scheduler";
+import { initAuctionExtractor } from "./auction-extractor";
 
 const app = express();
 const httpServer = createServer(app);
@@ -111,6 +112,11 @@ app.use((req, res, next) => {
         startWhatsAppScheduler();
       } catch (e) {
         log(`Falha ao iniciar WhatsApp scheduler: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      try {
+        initAuctionExtractor();
+      } catch (e) {
+        log(`Falha ao iniciar extrator de leiloes: ${e instanceof Error ? e.message : String(e)}`);
       }
     },
   );
