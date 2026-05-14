@@ -775,10 +775,19 @@ export function detectNonRealEstateExtraction(
   const url = foldForSearch(pageUrl);
   const sample = foldForSearch(pageText).slice(0, 20_000);
   const focusedText = `${title} ${type} ${url}`;
+  const hasTitleRealEstate = hasExplicitRealEstateText(title);
   const hasExplicitRealEstate = hasExplicitRealEstateText(`${title} ${url}`);
 
   const strongNonRealEstate = /(sucata|veicul|carro|moto|motocicleta|caminhao|caminhonete|utilitario|onibus|renavam|chassi|placa|\bfiat\b|\bvw\b|volkswagen|chevrolet|\bgm\b|\bd40\b|\bpalio\b|\bford\b|\bhonda\b|\byamaha\b|\btoyota\b|\brenault\b|\bmercedes\b|ano[ -/]*mod)/;
-  const weakNonRealEstate = /(maquina|equipamento|expositor|refrigerad|freezer|geladeira|balcao|joia|informatica|notebook|celular|semovente|gado|embarcacao|bem movel|bens moveis)/;
+  const weakNonRealEstate = /(maquina|equipamento|expositor|refrigerad|freezer|geladeira|balcao|joia|informatica|notebook|celular|semovente|gado|embarcacao|bem movel|bens moveis|gerador|aparelho|autoclave|auto\s*clave|termodesinfector|ortosintese|furgao)/;
+
+  if (strongNonRealEstate.test(title) && !hasTitleRealEstate) {
+    return "Titulo do lote indica veiculo/sucata, sem sinais suficientes de imovel";
+  }
+
+  if (weakNonRealEstate.test(title) && !hasTitleRealEstate) {
+    return "Titulo do lote indica bem movel/equipamento, sem sinais suficientes de imovel";
+  }
 
   if (strongNonRealEstate.test(focusedText) && !hasExplicitRealEstate) {
     return "Pagina aparenta ser veiculo/sucata, sem sinais suficientes de imovel";

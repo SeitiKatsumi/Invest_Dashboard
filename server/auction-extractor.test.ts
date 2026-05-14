@@ -181,6 +181,26 @@ test("detectNonRealEstateExtraction allows mixed lots when the page is explicitl
   assert.equal(reason, null);
 });
 
+test("detectNonRealEstateExtraction blocks equipment lots inside mixed auction URLs", () => {
+  const output = {
+    is_individual_item: true,
+    nome_do_anuncio: "Gerador MS 260 KVA e aparelho de anestesia",
+    tipo_do_imovel: "",
+    area_imovel: "",
+    link_matricula: "",
+    cidade: "Belo Horizonte",
+    estado_uf: "MG",
+  } as Parameters<typeof detectNonRealEstateExtraction>[0];
+
+  const reason = detectNonRealEstateExtraction(
+    output,
+    "https://marcoantonioleiloeiro.com.br/eventos/leilao/imovel-veiculos-diversos/lote/10162/lote",
+    "",
+  );
+
+  assert.match(reason || "", /equipamento|bem movel|imovel/i);
+});
+
 test("previewAuctionPageExtraction skips configured out-of-scope hosts", async () => {
   const config = getAuctionExtractorConfig();
   assert.ok(config.skipHosts.includes("venda-imoveis.caixa.gov.br"));
