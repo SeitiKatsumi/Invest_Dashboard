@@ -141,6 +141,46 @@ test("detectNonRealEstateExtraction does not treat removal address as real estat
   assert.match(reason || "", /nao ser de imovel|imovel/i);
 });
 
+test("detectNonRealEstateExtraction blocks vehicle lots even when the model returns area fields", () => {
+  const output = {
+    is_individual_item: true,
+    nome_do_anuncio: "GM Chevrolet D40 Custom ano mod 1990/1990",
+    tipo_do_imovel: "bem em leilao",
+    area_imovel: "360 m2",
+    link_matricula: "",
+    cidade: "Lagoa da Prata",
+    estado_uf: "MG",
+  } as Parameters<typeof detectNonRealEstateExtraction>[0];
+
+  const reason = detectNonRealEstateExtraction(
+    output,
+    "https://marcoantonioleiloeiro.com.br/eventos/leilao/gm-chevrolet-d40-custom-ano-mod-1990-1990/lote/10197",
+    "",
+  );
+
+  assert.match(reason || "", /veiculo|sucata|imovel/i);
+});
+
+test("detectNonRealEstateExtraction allows mixed lots when the page is explicitly real estate", () => {
+  const output = {
+    is_individual_item: true,
+    nome_do_anuncio: "Galpao industrial com equipamentos em Sete Lagoas",
+    tipo_do_imovel: "galpao",
+    area_imovel: "1.200 m2",
+    link_matricula: "",
+    cidade: "Sete Lagoas",
+    estado_uf: "MG",
+  } as Parameters<typeof detectNonRealEstateExtraction>[0];
+
+  const reason = detectNonRealEstateExtraction(
+    output,
+    "https://marcoantonioleiloeiro.com.br/eventos/leilao/galpao-e-equipamentos-sete-lagoas-mg/lote/10172",
+    "",
+  );
+
+  assert.equal(reason, null);
+});
+
 test("previewAuctionPageExtraction skips configured out-of-scope hosts", async () => {
   const config = getAuctionExtractorConfig();
   assert.ok(config.skipHosts.includes("venda-imoveis.caixa.gov.br"));

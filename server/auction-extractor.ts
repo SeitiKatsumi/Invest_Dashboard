@@ -760,6 +760,10 @@ function hasRealEstateExtractionSignal(output: ExtractedAuctionPage): boolean {
   return false;
 }
 
+function hasExplicitRealEstateText(value: string): boolean {
+  return /(apartamento|casa|terreno|predio|edificio|galpao|sala comercial|loja comercial|imovel|fazenda|sitio|chacara|lote de terreno|area rural|area urbana|complexo industrial|unidade residencial|unidade comercial)/.test(value);
+}
+
 export function detectNonRealEstateExtraction(
   output: ExtractedAuctionPage,
   pageUrl: string,
@@ -770,19 +774,20 @@ export function detectNonRealEstateExtraction(
   const url = foldForSearch(pageUrl);
   const sample = foldForSearch(pageText).slice(0, 20_000);
   const focusedText = `${title} ${type} ${url}`;
+  const hasExplicitRealEstate = hasExplicitRealEstateText(`${title} ${url}`);
 
-  const strongNonRealEstate = /(sucata|veicul|carro|moto|motocicleta|caminhao|caminhonete|utilitario|onibus|renavam|chassi|placa|fiat\/|vw\/|volkswagen|chevrolet|ford\/|honda\/|yamaha)/;
+  const strongNonRealEstate = /(sucata|veicul|carro|moto|motocicleta|caminhao|caminhonete|utilitario|onibus|renavam|chassi|placa|\bfiat\b|\bvw\b|volkswagen|chevrolet|\bgm\b|\bd40\b|\bpalio\b|\bford\b|\bhonda\b|\byamaha\b|\btoyota\b|\brenault\b|\bmercedes\b|ano[ -/]*mod)/;
   const weakNonRealEstate = /(maquina|equipamento|expositor|refrigerad|freezer|geladeira|balcao|joia|informatica|notebook|celular|semovente|gado|embarcacao|bem movel|bens moveis)/;
 
-  if (strongNonRealEstate.test(focusedText) && !hasRealEstateExtractionSignal(output)) {
+  if (strongNonRealEstate.test(focusedText) && !hasExplicitRealEstate) {
     return "Pagina aparenta ser veiculo/sucata, sem sinais suficientes de imovel";
   }
 
-  if (weakNonRealEstate.test(focusedText) && !hasRealEstateExtractionSignal(output)) {
+  if (weakNonRealEstate.test(focusedText) && !hasExplicitRealEstate) {
     return "Pagina aparenta nao ser de imovel";
   }
 
-  if (strongNonRealEstate.test(sample) && !hasRealEstateExtractionSignal(output)) {
+  if (strongNonRealEstate.test(sample) && !hasExplicitRealEstate && !hasRealEstateExtractionSignal(output)) {
     return "Conteudo da pagina indica veiculo/sucata, sem sinais suficientes de imovel";
   }
 
