@@ -201,6 +201,26 @@ test("detectNonRealEstateExtraction blocks equipment lots inside mixed auction U
   assert.match(reason || "", /equipamento|bem movel|imovel/i);
 });
 
+test("detectNonRealEstateExtraction blocks generic movable lots without real estate terms", () => {
+  const output = {
+    is_individual_item: true,
+    nome_do_anuncio: "Prensa de vulcanizacao modelo 661 marca Hideal",
+    tipo_do_imovel: "",
+    area_imovel: "",
+    link_matricula: "",
+    cidade: "Campinas",
+    estado_uf: "SP",
+  } as Parameters<typeof detectNonRealEstateExtraction>[0];
+
+  const reason = detectNonRealEstateExtraction(
+    output,
+    "https://marcoantonioleiloeiro.com.br/eventos/leilao/prensa-de-vulcanizacao/lote/10150",
+    "",
+  );
+
+  assert.match(reason || "", /equipamento|imovel|sinais/i);
+});
+
 test("previewAuctionPageExtraction skips configured out-of-scope hosts", async () => {
   const config = getAuctionExtractorConfig();
   assert.ok(config.skipHosts.includes("venda-imoveis.caixa.gov.br"));
