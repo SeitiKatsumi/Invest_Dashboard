@@ -762,7 +762,7 @@ function hasRealEstateExtractionSignal(output: ExtractedAuctionPage): boolean {
 }
 
 function hasExplicitRealEstateText(value: string): boolean {
-  return /(apartamento|casa|terreno|predio|edificio|galpao|sala comercial|loja comercial|imovel|fazenda|sitio|chacara|lote de terreno|area rural|area urbana|complexo industrial|unidade residencial|unidade comercial)/.test(value);
+  return /(apartamento|\bapto\b|casa|terreno|predio|edificio|galpao|\bsala\b|loja comercial|imovel residencial|imovel comercial|imovel rural|imovel urbano|fazenda|sitio|chacara|gleba|area rural|area urbana|complexo industrial|unidade residencial|unidade comercial)/.test(value);
 }
 
 export function detectNonRealEstateExtraction(
@@ -779,7 +779,7 @@ export function detectNonRealEstateExtraction(
   const hasExplicitRealEstate = hasExplicitRealEstateText(`${title} ${type} ${url}`);
 
   const strongNonRealEstate = /(sucata|veicul|carro|moto|motocicleta|caminhao|caminhonete|utilitario|onibus|renavam|chassi|placa|\bfiat\b|\bvw\b|volkswagen|chevrolet|\bgm\b|\bd40\b|\bpalio\b|\bford\b|\bhonda\b|\byamaha\b|\btoyota\b|\brenault\b|\bmercedes\b|ano[ -/]*mod)/;
-  const weakNonRealEstate = /(maquina|equipamento|expositor|refrigerad|freezer|geladeira|balcao|joia|informatica|notebook|celular|semovente|gado|embarcacao|bem movel|bens moveis|gerador|aparelho|autoclave|auto\s*clave|termodesinfector|ortosintese|furgao|prensa|vulcanizacao|madrilhadora|brunidor)/;
+  const weakNonRealEstate = /(maquina|equipamento|expositor|refrigerad|freezer|geladeira|balcao|joia|informatica|notebook|celular|semovente|gado|embarcacao|bem movel|bens moveis|gerador|aparelho|autoclave|auto\s*clave|termodesinfector|ortosintese|furgao|prensa|vulcanizacao|madrilhadora|brunidor|cadeira|odontologic|universitari|eletrodo|analion|ph-metro)/;
 
   if (strongNonRealEstate.test(title) && !hasTitleRealEstate) {
     return "Titulo do lote indica veiculo/sucata, sem sinais suficientes de imovel";
@@ -797,7 +797,7 @@ export function detectNonRealEstateExtraction(
     return "Pagina aparenta nao ser de imovel";
   }
 
-  if (!hasExplicitRealEstate && !toText(output.link_matricula)) {
+  if (!hasExplicitRealEstate) {
     return "Titulo, tipo e URL sem sinais suficientes de imovel";
   }
 

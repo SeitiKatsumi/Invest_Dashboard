@@ -221,6 +221,26 @@ test("detectNonRealEstateExtraction blocks generic movable lots without real est
   assert.match(reason || "", /equipamento|imovel|sinais/i);
 });
 
+test("detectNonRealEstateExtraction does not accept generic mixed-event titles", () => {
+  const output = {
+    is_individual_item: true,
+    nome_do_anuncio: "Grande leilao vara de feitos tributarios - imovel, veiculos, motocicleta e gerador",
+    tipo_do_imovel: "",
+    area_imovel: "",
+    link_matricula: "https://example.com/matricula.pdf",
+    cidade: "Belo Horizonte",
+    estado_uf: "MG",
+  } as Parameters<typeof detectNonRealEstateExtraction>[0];
+
+  const reason = detectNonRealEstateExtraction(
+    output,
+    "https://marcoantonioleiloeiro.com.br/eventos/leilao/imovel-veiculos-diversos/lote/10160/lote",
+    "",
+  );
+
+  assert.match(reason || "", /sinais|imovel/i);
+});
+
 test("previewAuctionPageExtraction skips configured out-of-scope hosts", async () => {
   const config = getAuctionExtractorConfig();
   assert.ok(config.skipHosts.includes("venda-imoveis.caixa.gov.br"));
