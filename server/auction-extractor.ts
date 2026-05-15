@@ -578,6 +578,97 @@ export function cleanAuctionHtmlForExtraction(rawHtml: string): { text: string; 
   return { text: mainText + pdfBlock, pdfUrls };
 }
 
+function isMglLotUrl(url: string): boolean {
+  return /(^|\.)mgl\.com\.br\/lote\//i.test(url);
+}
+
+function hasMglDetailSignals(text: string): boolean {
+  return /(c[oó]d do leil[aã]o|lance inicial|matr[ií]cula|avalia[cç][aã]o|informa[cç][oõ]es)/i.test(text)
+    && /(lote com [aá]rea|bairro|im[oó]vel|terreno|apartamento|casa|fazenda|galp[aã]o)/i.test(text);
+}
+
+function firstMatch(text: string, pattern: RegExp): string {
+  return cleanText(text.match(pattern)?.[1] || "");
+}
+
+export function extractMglAuctionPage(text: string, pageUrl: string): ExtractedAuctionPage | null {
+  if (!isMglLotUrl(pageUrl)) return null;
+
+  const source = cleanText(text);
+  if (!hasMglDetailSignals(source)) return null;
+
+  const titleWithCode = firstMatch(
+    source,
+    /([^\n]{5,220}?\/[A-Z]{2}\s*[—-]\s*[^\n|]+?)\s*\|\s*C[oó]d do leil[aã]o:/i,
+  );
+  const titleFromPageTitle = firstMatch(
+    source,
+    /^([^\n]{5,220}?\/[A-Z]{2}\s*[—-]\s*[^\n|]+?)\s+Lote em leil[aã]o\s+\|\s+MGL Leil[oõ]es/i,
+  );
+  const nomeDoAnuncio = titleWithCode || titleFromPageTitle || firstMatch(source, /^([^\n]{5,180}?\/[A-Z]{2}[^\n]+)/i);
+  if (!nomeDoAnuncio) return null;
+
+  const cityState = nomeDoAnuncio.match(/^([^/]{2,80})\/([A-Z]{2})\s*[—-]/);
+  const codeLine = firstMatch(source, /C[oó]d do leil[aã]o:\s*([^\n]+)/i);
+  const numeroProcesso = firstMatch(codeLine, /-\s*([A-Z]{1,6}\d[\w.-]*)\s*$/i) || codeLine;
+  const infoBlock = firstMatch(source, /Informa[cç][oõ]es\s+([\s\S]*?)\s+Matr[ií]cula/i);
+  const matricula = firstMatch(source, /(Matr[ií]cula\s+n[ºo.]?\s*[^.\n]+(?:\.[^\n]*)?)/i);
+  const condicoes = firstMatch(source, /Condi[cç][oõ]es\s+([\s\S]*?)\s+Importante:/i);
+  const descricao = cleanText([infoBlock, matricula, condicoes].filter(Boolean).join("\n\n"));
+  const areaImovel = firstMatch(nomeDoAnuncio, /[aá]rea de\s*([0-9.,]+\s*m[²2])/i)
+    || firstMatch(source, /[aá]rea (?:de terreno urbano, com|total(?: de)?|de)\s*([0-9.,]+\s*m[²2])/i);
+  const bairro = firstMatch(nomeDoAnuncio, /bairro\s+([^|\n]+)/i)
+    || firstMatch(source, /bairro\s+([^,\n.]+)/i);
+  const logradouro = firstMatch(source, /situado na\s+([^,\n]+),\s*bairro/i)
+    || firstMatch(source, /frente[^,\n]*confrontando com\s+([^;\n]+)/i);
+  const avaliacao = firstMatch(source, /Avalia[cç][aã]o:\s*(R\$\s*[0-9.,]+)/i);
+  const lanceInicial = firstMatch(source, /Lance Inicial:\s*(R\$\s*[0-9.,]+)/i)
+    || firstMatch(source, /Leil[aã]o\s+Abertura:[\s\S]*?\n\s*(R\$\s*[0-9.,]+)/i);
+  const abertura = firstMatch(source, /Abertura:\s*([0-9]{2}\/[0-9]{2}\/[0-9]{4}\s*-\s*[0-9]{2}:[0-9]{2})/i);
+  const desconto = firstMatch(source, /\(\s*([0-9.,]+\s*%\s*de desconto)\s*\)/i);
+  const image = firstMatch(source, /\[IMG:[^\]]+\]\s*\((https?:\/\/[^)]+)\)/i);
+  const tipo = /apartamento/i.test(nomeDoAnuncio)
+    ? "Apartamento"
+    : /casa/i.test(nomeDoAnuncio)
+      ? "Casa"
+      : /fazenda|rural|s[ií]tio|ch[aá]cara/i.test(nomeDoAnuncio)
+        ? "Imovel rural"
+        : /galp[aã]o/i.test(nomeDoAnuncio)
+          ? "Galpao"
+          : "Lote";
+
+  return {
+    is_individual_item: true,
+    reason: "MGL deterministic extraction",
+    nome_do_anuncio: nomeDoAnuncio,
+    descricao,
+    area_imovel: areaImovel,
+    tipo_do_imovel: tipo,
+    tipo_de_leilao: /online/i.test(source) ? "Online" : "",
+    nome_leiloeiro: "MGL Leiloes",
+    numero_do_processo: numeroProcesso,
+    valor_avalaiacao_imovel: avaliacao,
+    valor_leilao: lanceInicial,
+    valor_do_leilao: lanceInicial,
+    valor_praca1: lanceInicial,
+    valor_praca2: "",
+    valor_praca3: "",
+    desconto,
+    praca_1: abertura,
+    praca_2: "",
+    praca_3: "",
+    link_edital: "",
+    link_matricula: "",
+    cep: "",
+    cidade: cityState ? cleanText(cityState[1]) : firstMatch(source, /cidade de\s+([^,/.\n]+)/i),
+    estado_uf: cityState ? cityState[2] : firstMatch(source, /\/([A-Z]{2})\b/i),
+    bairro,
+    logradouro,
+    numero: "",
+    link_imagem: image,
+  };
+}
+
 const EXTRACTION_SYSTEM_PROMPT = `You extract data from auction websites.
 
 Set only one flag first:
@@ -925,7 +1016,9 @@ export async function previewAuctionPageExtraction(
     }
     const { html, strategy, url: effectiveUrl } = await fetchAuctionHtml(pageUrl, config.fetchMode, linked.controller.signal);
     const cleaned = cleanAuctionHtmlForExtraction(html);
-    const output = await callOpenAIExtractor(cleaned.text, effectiveUrl, config.model, linked.controller.signal);
+    const deterministicOutput = extractMglAuctionPage(cleaned.text, effectiveUrl);
+    const output = deterministicOutput
+      || await callOpenAIExtractor(cleaned.text, effectiveUrl, config.model, linked.controller.signal);
     const nonRealEstateReason = detectNonRealEstateExtraction(output, effectiveUrl, cleaned.text);
 
     if (!output.is_individual_item || nonRealEstateReason) {
@@ -995,7 +1088,12 @@ async function processQueueItem(
 
     const { html, strategy, url: effectiveUrl } = await fetchAuctionHtml(pageUrl, config.fetchMode, linked.controller.signal);
     const cleaned = cleanAuctionHtmlForExtraction(html);
-    const output = await callOpenAIExtractor(cleaned.text, effectiveUrl, config.model, linked.controller.signal);
+    const deterministicOutput = extractMglAuctionPage(cleaned.text, effectiveUrl);
+    if (isMglLotUrl(effectiveUrl) && !deterministicOutput && isHtmlInsufficient(html, effectiveUrl)) {
+      throw new Error(`MGL content insufficient after ${strategy}; detail signals not found`);
+    }
+    const output = deterministicOutput
+      || await callOpenAIExtractor(cleaned.text, effectiveUrl, config.model, linked.controller.signal);
     const nonRealEstateReason = detectNonRealEstateExtraction(output, effectiveUrl, cleaned.text);
 
     if (!output.is_individual_item || nonRealEstateReason) {
@@ -1017,7 +1115,7 @@ async function processQueueItem(
       url: effectiveUrl,
       outcome: dryRun ? "dry_run_created" : "created",
       leilaoId: created.id,
-      message: `Extraido via ${strategy}`,
+      message: deterministicOutput ? `Extraido via ${strategy} + parser MGL` : `Extraido via ${strategy}`,
       preview: dryRun ? buildDryRunPreview(payload) : undefined,
     };
   } catch (error) {

@@ -5,6 +5,7 @@ import {
   cleanAuctionHtmlForExtraction,
   dateForDirectus,
   detectNonRealEstateExtraction,
+  extractMglAuctionPage,
   getAuctionExtractorConfig,
   getWwwFallbackUrl,
   normalizeAuctionUrl,
@@ -29,6 +30,39 @@ test("normalizeAuctionUrl canonicalizes MGL lot URLs to www host", () => {
     normalized,
     "https://www.mgl.com.br/lote/imoveis-residenciais-casas-lotes-e-apartamentos-mg/183057",
   );
+});
+
+test("extractMglAuctionPage parses MGL detail text without OpenAI", () => {
+  const output = extractMglAuctionPage(
+    `BURITIZEIRO/MG — Lote com área de 2013,15m² no bairro Quintas do Agreste Lote em leilão | MGL Leilões
+BURITIZEIRO/MG — Lote com área de 2013,15m² no bairro Quintas do Agreste | Cód do leilão: 06038/010 - PA7540
+IMÓVEIS
+Online
+Leilão
+Abertura: 05/05/2026 - 14:00
+R$ 120.004,00
+Avaliação:
+R$ 0,00
+Lance Inicial:
+R$ 120.004,00
+( 0 % de desconto)
+[IMG: Foto de BURITIZEIRO/MG] (https://www.mgl.com.br/imagens-complete/605x487/casa.jpg)
+Informações
+PA7540 - Lote situado na Avenida Central do Brasil, bairro Quintas do Agreste, Buritizeiro/MG, com área de terreno urbano, com 2.013,15m².
+Matrícula nº 28.978, Lv. 2, do Ofício do Registro Geral de Imóveis de Pirapora/MG.
+Condições
+Condições de Pagamento: À vista;
+Importante:`,
+    "https://www.mgl.com.br/lote/imoveis-residenciais-casas-lotes-e-apartamentos-mg/183055",
+  );
+
+  assert.equal(output?.is_individual_item, true);
+  assert.equal(output?.nome_do_anuncio, "BURITIZEIRO/MG — Lote com área de 2013,15m² no bairro Quintas do Agreste");
+  assert.equal(output?.cidade, "BURITIZEIRO");
+  assert.equal(output?.estado_uf, "MG");
+  assert.equal(output?.valor_leilao, "R$ 120.004,00");
+  assert.equal(output?.area_imovel, "2013,15m²");
+  assert.equal(output?.logradouro, "Avenida Central do Brasil");
 });
 
 test("getWwwFallbackUrl builds a www retry URL only for naked hosts", () => {
