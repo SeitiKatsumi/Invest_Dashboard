@@ -30,6 +30,25 @@ function findSystemChromeExecutable(): string | undefined {
   return CHROME_EXECUTABLE_CANDIDATES.find(path => existsSync(path));
 }
 
+function getPlaywrightProxy():
+  | { server: string; username?: string; password?: string }
+  | undefined {
+  const server = (process.env.PLAYWRIGHT_PROXY_SERVER || process.env.SCRAPING_PROXY_SERVER || '').trim();
+  if (!server) return undefined;
+
+  const username = (process.env.PLAYWRIGHT_PROXY_USERNAME || process.env.SCRAPING_PROXY_USERNAME || '').trim();
+  const password = (process.env.PLAYWRIGHT_PROXY_PASSWORD || process.env.SCRAPING_PROXY_PASSWORD || '').trim();
+  return {
+    server,
+    ...(username ? { username } : {}),
+    ...(password ? { password } : {}),
+  };
+}
+
+function maskProxyServer(server: string): string {
+  return server.replace(/\/\/[^/@]+@/, '//***@');
+}
+
 class BrowserPool {
   private pool: PooledBrowser[] = [];
   private waitQueue: Array<{ resolve: (browser: Browser) => void; reject: (err: Error) => void }> = [];
@@ -193,11 +212,16 @@ class BrowserPool {
       if (executablePath) {
         console.log(`[BrowserPool] Usando Chrome do sistema: ${executablePath}`);
       }
+      const proxy = getPlaywrightProxy();
+      if (proxy) {
+        console.log(`[BrowserPool] Usando proxy Playwright: ${maskProxyServer(proxy.server)}`);
+      }
 
       const browser = await chromium.launch({
         headless: true,
         args: STEALTH_BROWSER_ARGS,
         executablePath,
+        proxy,
       });
 
       const entry: PooledBrowser = {
