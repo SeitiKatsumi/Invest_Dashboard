@@ -23,6 +23,7 @@ COPY --from=builder /app/package*.json ./
 
 RUN npm ci --omit=dev \
   && npx playwright install --with-deps chromium \
+  && npx playwright install chrome \
   && npm cache clean --force
 
 EXPOSE 5000

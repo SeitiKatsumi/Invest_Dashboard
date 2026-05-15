@@ -20,6 +20,17 @@ test("normalizeAuctionUrl resolves relative URLs and removes tracking params", (
   assert.equal(normalized, "https://www.exemplo.com.br/lote/123?ok=1");
 });
 
+test("normalizeAuctionUrl canonicalizes MGL lot URLs to www host", () => {
+  const normalized = normalizeAuctionUrl(
+    "https://mgl.com.br/lote/imoveis-residenciais-casas-lotes-e-apartamentos-mg/183057?utm_source=x#detalhes",
+  );
+
+  assert.equal(
+    normalized,
+    "https://www.mgl.com.br/lote/imoveis-residenciais-casas-lotes-e-apartamentos-mg/183057",
+  );
+});
+
 test("getWwwFallbackUrl builds a www retry URL only for naked hosts", () => {
   assert.equal(
     getWwwFallbackUrl("https://hoppeleiloes.com.br/oferta/123?ok=1"),

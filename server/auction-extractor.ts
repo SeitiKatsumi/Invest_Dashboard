@@ -287,6 +287,9 @@ export function normalizeAuctionUrl(rawUrl: string, baseUrl?: string | null): st
   try {
     const base = baseUrl ? ensureProtocol(baseUrl) : undefined;
     const parsed = base ? new URL(cleaned, base) : new URL(ensureProtocol(cleaned));
+    if (parsed.hostname.replace(/^www\./, "") === "mgl.com.br") {
+      parsed.hostname = "www.mgl.com.br";
+    }
     parsed.hash = "";
     for (const key of Array.from(parsed.searchParams.keys())) {
       if (/^utm_/i.test(key) || /^(fbclid|gclid|msclkid|ttclid)$/i.test(key)) {
@@ -392,6 +395,9 @@ function isHtmlInsufficient(html: string, url = ""): boolean {
   if (/enable javascript|habilite o javascript|checking your browser|cf-browser-verification|access denied|403 forbidden|captcha|recaptcha|verifica[c\u00e7][a\u00e3]o de seguran[c\u00e7]a|nao sou um robo|n\u00e3o sou um rob\u00f4/.test(compact)) {
     return true;
   }
+  if (/mgl\.com\.br\/lote\//i.test(url)) {
+    return !/(lance inicial|valor de avalia[cç][aã]o|avalia[cç][aã]o|matr[ií]cula|descri[cç][aã]o|visitar im[oó]vel|visitar m[oó]vel|lote com [aá]rea|[aá]rea de \d|bairro|cidade|estado)/i.test(compact);
+  }
   if (/\/leilao\/index\/leilao_id\/\d+\/lote\/\d+/i.test(url)) {
     return !/(detalhes do lote|lance m[ií]nimo|avalia[cç][aã]o|descri[cç][aã]o)/i.test(compact);
   }
@@ -439,6 +445,18 @@ async function fetchHtmlPlaywright(url: string, signal: AbortSignal): Promise<{ 
   try {
     if (signal.aborted) throw new Error("cancelled");
     await handle.page.goto(url, { waitUntil: "domcontentloaded", timeout: PLAYWRIGHT_TIMEOUT_MS });
+    if (/mgl\.com\.br\/lote\//i.test(url)) {
+      await handle.page.waitForFunction(
+        () => {
+          const text = document.body?.innerText || "";
+          const title = document.title || "";
+          return !/just a moment|checking your browser/i.test(title + " " + text)
+            && /(lote com área|lote com area|visitar imóvel|visitar móvel|lance inicial|matrícula|matricula|avaliação|avaliacao)/i.test(title + " " + text);
+        },
+        undefined,
+        { timeout: 20_000 },
+      ).catch(() => {});
+    }
     await handle.page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => {});
     return {
       html: await withTimeout(handle.page.content(), 5_000, "Playwright page content timeout"),
